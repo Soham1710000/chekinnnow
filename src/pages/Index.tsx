@@ -1,27 +1,56 @@
+import { lazy, Suspense } from "react";
 import { HeroSection } from "@/components/landing/HeroSection";
-import { CardCarousel } from "@/components/landing/CardCarousel";
-import { WhyChekInn } from "@/components/landing/WhyChekInn";
-import { TrustSection } from "@/components/landing/TrustSection";
-import { HowItWorks } from "@/components/landing/HowItWorks";
-import { BetaCTA } from "@/components/landing/BetaCTA";
-import { Testimonials } from "@/components/landing/Testimonials";
-import { PrivacySection } from "@/components/landing/PrivacySection";
-import { FinalCTA } from "@/components/landing/FinalCTA";
-import { Footer } from "@/components/landing/Footer";
+
+// Lazy load sections below the fold for faster initial load
+const CardCarousel = lazy(() => import("@/components/landing/CardCarousel").then(m => ({ default: m.CardCarousel })));
+const WhyChekInn = lazy(() => import("@/components/landing/WhyChekInn").then(m => ({ default: m.WhyChekInn })));
+const TrustSection = lazy(() => import("@/components/landing/TrustSection").then(m => ({ default: m.TrustSection })));
+const HowItWorks = lazy(() => import("@/components/landing/HowItWorks").then(m => ({ default: m.HowItWorks })));
+const BetaCTA = lazy(() => import("@/components/landing/BetaCTA").then(m => ({ default: m.BetaCTA })));
+const Testimonials = lazy(() => import("@/components/landing/Testimonials").then(m => ({ default: m.Testimonials })));
+const PrivacySection = lazy(() => import("@/components/landing/PrivacySection").then(m => ({ default: m.PrivacySection })));
+const FinalCTA = lazy(() => import("@/components/landing/FinalCTA").then(m => ({ default: m.FinalCTA })));
+const Footer = lazy(() => import("@/components/landing/Footer").then(m => ({ default: m.Footer })));
+
+// Minimal loading placeholder
+const SectionLoader = () => (
+  <div className="min-h-[200px]" />
+);
 
 const Index = () => {
   return (
     <main className="min-h-screen">
+      {/* Hero loads immediately */}
       <HeroSection />
-      <CardCarousel />
-      <WhyChekInn />
-      <TrustSection />
-      <HowItWorks />
-      <BetaCTA />
-      <Testimonials />
-      <PrivacySection />
-      <FinalCTA />
-      <Footer />
+      
+      {/* Lazy load everything below the fold */}
+      <Suspense fallback={<SectionLoader />}>
+        <CardCarousel />
+      </Suspense>
+      <Suspense fallback={<SectionLoader />}>
+        <WhyChekInn />
+      </Suspense>
+      <Suspense fallback={<SectionLoader />}>
+        <TrustSection />
+      </Suspense>
+      <Suspense fallback={<SectionLoader />}>
+        <HowItWorks />
+      </Suspense>
+      <Suspense fallback={<SectionLoader />}>
+        <BetaCTA />
+      </Suspense>
+      <Suspense fallback={<SectionLoader />}>
+        <Testimonials />
+      </Suspense>
+      <Suspense fallback={<SectionLoader />}>
+        <PrivacySection />
+      </Suspense>
+      <Suspense fallback={<SectionLoader />}>
+        <FinalCTA />
+      </Suspense>
+      <Suspense fallback={<SectionLoader />}>
+        <Footer />
+      </Suspense>
     </main>
   );
 };

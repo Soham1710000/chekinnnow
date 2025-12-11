@@ -3,8 +3,7 @@
 @tailwind utilities;
 
 /* ChekInn Design System - Apple-inspired, ultra-minimal */
-/* Font loaded via preconnect in HTML for faster rendering */
-@import url('https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700&display=swap');
+/* Font loaded via HTML link for faster rendering */
 
 @layer base {
   :root {

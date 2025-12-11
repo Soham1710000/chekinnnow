@@ -66,8 +66,10 @@ export const BetaCTA = () => {
             animate={isInView ? { opacity: 1, y: 0 } : {}}
             transition={{ duration: 0.8, delay: 0.5 }}
           >
-            <Button variant="pill" size="pill">
-              Join Beta
+            <Button variant="pill" size="pill" asChild>
+              <a href="https://app.emergent.sh/share?app=voicechat-companion" target="_blank" rel="noopener noreferrer">
+                Join Beta
+              </a>
             </Button>
           </motion.div>
         </div>

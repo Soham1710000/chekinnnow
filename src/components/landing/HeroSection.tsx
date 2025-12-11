@@ -79,11 +79,15 @@ export const HeroSection = () => {
             transition={{ duration: 0.8, delay: 0.4, ease: [0.25, 0.46, 0.45, 0.94] }}
             className="flex flex-col sm:flex-row gap-4 justify-center"
           >
-            <Button variant="hero" size="hero">
-              Join the Beta
+            <Button variant="hero" size="hero" asChild>
+              <a href="https://app.emergent.sh/share?app=voicechat-companion" target="_blank" rel="noopener noreferrer">
+                Join the Beta
+              </a>
             </Button>
-            <Button variant="hero-secondary" size="hero">
-              Download the App
+            <Button variant="hero-secondary" size="hero" asChild>
+              <a href="https://app.emergent.sh/share?app=voicechat-companion" target="_blank" rel="noopener noreferrer">
+                Download the App
+              </a>
             </Button>
           </motion.div>
         </div>

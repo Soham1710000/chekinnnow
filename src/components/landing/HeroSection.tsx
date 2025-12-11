@@ -33,13 +33,13 @@ export const HeroSection = () => {
   };
 
   return (
-    <section className="relative min-h-[85vh] md:min-h-screen flex items-center justify-center overflow-hidden py-16 md:py-0">
+    <section className="relative min-h-screen flex items-center justify-center overflow-hidden">
       {/* Gradient glow background */}
       <div className="absolute inset-0 hero-glow" />
       
-      {/* Subtle animated gradient orb - smaller on mobile */}
+      {/* Subtle animated gradient orb */}
       <motion.div
-        className="absolute top-1/4 left-1/2 -translate-x-1/2 w-[300px] md:w-[600px] h-[300px] md:h-[600px] rounded-full opacity-30"
+        className="absolute top-1/4 left-1/2 -translate-x-1/2 w-[600px] h-[600px] rounded-full opacity-30"
         style={{
           background: "radial-gradient(circle, hsl(220 100% 70% / 0.2) 0%, transparent 70%)",
         }}
@@ -50,41 +50,41 @@ export const HeroSection = () => {
         transition={{ duration: 8, repeat: Infinity, ease: "easeInOut" }}
       />
 
-      <div className="container-apple relative z-10 px-5 md:px-8">
+      <div className="container-apple relative z-10">
         <div className="max-w-4xl mx-auto text-center">
           {/* Main headline */}
           <motion.h1
-            initial={{ opacity: 0, y: 20 }}
+            initial={{ opacity: 0, y: 30 }}
             animate={{ opacity: 1, y: 0 }}
             transition={{ duration: 0.8, ease: [0.25, 0.46, 0.45, 0.94] }}
-            className="text-3xl md:text-4xl lg:text-display-xl font-semibold tracking-tight mb-4 md:mb-8"
+            className="text-display-xl mb-8"
           >
             Your next opportunity starts with the right introduction.
           </motion.h1>
 
           {/* Subheadline */}
           <motion.p
-            initial={{ opacity: 0, y: 15 }}
+            initial={{ opacity: 0, y: 20 }}
             animate={{ opacity: 1, y: 0 }}
             transition={{ duration: 0.8, delay: 0.2, ease: [0.25, 0.46, 0.45, 0.94] }}
-            className="text-base md:text-lg text-muted-foreground max-w-xl md:max-w-2xl mx-auto mb-8 md:mb-12"
+            className="text-body-lg text-muted-foreground max-w-2xl mx-auto mb-12"
           >
             ChekInn uses AI to understand you deeply and introduce you to the right people — recruiters, mentors, founders and collaborators.
           </motion.p>
 
           {/* CTA Buttons */}
           <motion.div
-            initial={{ opacity: 0, y: 15 }}
+            initial={{ opacity: 0, y: 20 }}
             animate={{ opacity: 1, y: 0 }}
             transition={{ duration: 0.8, delay: 0.4, ease: [0.25, 0.46, 0.45, 0.94] }}
-            className="flex flex-col sm:flex-row gap-3 justify-center"
+            className="flex flex-col sm:flex-row gap-4 justify-center"
           >
-            <Button variant="hero" size="default" className="md:px-8 md:py-6 md:text-base" asChild>
+            <Button variant="hero" size="hero" asChild>
               <a href="https://app.emergent.sh/share?app=voicechat-companion" target="_blank" rel="noopener noreferrer">
                 Join the Beta
               </a>
             </Button>
-            <Button variant="hero-secondary" size="default" className="md:px-8 md:py-6 md:text-base" asChild>
+            <Button variant="hero-secondary" size="hero" asChild>
               <a href="https://app.emergent.sh/share?app=voicechat-companion" target="_blank" rel="noopener noreferrer">
                 Download the App
               </a>

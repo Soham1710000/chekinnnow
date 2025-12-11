@@ -94,7 +94,7 @@ export const HeroSection = () => {
 
         {/* Floating cards */}
         <FloatingCard 
-          className="absolute left-4 md:left-12 lg:left-20 top-1/3 hidden md:block"
+          className="absolute left-4 md:left-12 lg:left-20 bottom-32 md:bottom-40 hidden md:block"
           delay={0}
         >
           <div className="flex items-center gap-3">
@@ -109,7 +109,7 @@ export const HeroSection = () => {
         </FloatingCard>
 
         <FloatingCard 
-          className="absolute right-4 md:right-12 lg:right-20 top-1/2 hidden md:block"
+          className="absolute right-4 md:right-12 lg:right-20 bottom-48 md:bottom-56 hidden md:block"
           delay={1.5}
         >
           <div className="flex items-center gap-3">

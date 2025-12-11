@@ -109,7 +109,7 @@ export const HeroSection = () => {
         </FloatingCard>
 
         <FloatingCard 
-          className="absolute right-4 md:right-8 lg:right-16 top-16 md:top-24 lg:top-28 hidden md:block"
+          className="absolute right-4 md:right-8 lg:right-16 top-4 md:top-6 hidden md:block"
           delay={1.5}
         >
           <div className="flex items-center gap-3">

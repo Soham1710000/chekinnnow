@@ -210,7 +210,7 @@
 
   /* Typography classes */
   .text-display-xl {
-    @apply text-5xl md:text-6xl lg:text-7xl font-semibold leading-tight tracking-tight;
+    @apply text-4xl md:text-5xl lg:text-6xl font-semibold leading-tight tracking-tight;
   }
 
   .text-display-lg {

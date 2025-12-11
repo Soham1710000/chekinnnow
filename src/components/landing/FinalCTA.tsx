@@ -25,11 +25,15 @@ export const FinalCTA = () => {
             transition={{ duration: 0.8, delay: 0.3 }}
             className="flex flex-col sm:flex-row gap-4 justify-center"
           >
-            <Button variant="hero" size="hero">
-              Join Beta
+            <Button variant="hero" size="hero" asChild>
+              <a href="https://app.emergent.sh/share?app=voicechat-companion" target="_blank" rel="noopener noreferrer">
+                Join Beta
+              </a>
             </Button>
-            <Button variant="hero-secondary" size="hero">
-              Download the App
+            <Button variant="hero-secondary" size="hero" asChild>
+              <a href="https://app.emergent.sh/share?app=voicechat-companion" target="_blank" rel="noopener noreferrer">
+                Download the App
+              </a>
             </Button>
           </motion.div>
         </div>

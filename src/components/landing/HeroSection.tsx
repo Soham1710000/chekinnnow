@@ -59,7 +59,7 @@ export const HeroSection = () => {
             transition={{ duration: 0.8, ease: [0.25, 0.46, 0.45, 0.94] }}
             className="text-display-xl mb-8"
           >
-            Better intros. Better opportunities.
+            The right introduction can change everything.
           </motion.h1>
 
           {/* Subheadline */}
@@ -69,7 +69,7 @@ export const HeroSection = () => {
             transition={{ duration: 0.8, delay: 0.2, ease: [0.25, 0.46, 0.45, 0.94] }}
             className="text-body-lg text-muted-foreground max-w-2xl mx-auto mb-12"
           >
-            ChekInn understands your goals and introduces you to people who can help you get there.
+            ChekInn learns your goals and connects you to people who help you grow.
           </motion.p>
 
           {/* CTA Buttons */}

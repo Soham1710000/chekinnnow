@@ -60,7 +60,7 @@ export const HeroSection = () => {
             className="mb-8"
           >
             <img 
-              src="/assets/handshake-illustration.jpeg" 
+              src="/assets/handshake-illustration.png" 
               alt="Handshake illustration representing connections" 
               className="w-32 h-32 md:w-40 md:h-40 mx-auto object-contain"
             />

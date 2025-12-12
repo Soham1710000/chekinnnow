@@ -52,11 +52,25 @@ export const HeroSection = () => {
 
       <div className="container-apple relative z-10">
         <div className="max-w-4xl mx-auto text-center">
+          {/* Illustration */}
+          <motion.div
+            initial={{ opacity: 0, scale: 0.9 }}
+            animate={{ opacity: 1, scale: 1 }}
+            transition={{ duration: 0.8, ease: [0.25, 0.46, 0.45, 0.94] }}
+            className="mb-8"
+          >
+            <img 
+              src="/assets/handshake-illustration.jpeg" 
+              alt="Handshake illustration representing connections" 
+              className="w-32 h-32 md:w-40 md:h-40 mx-auto object-contain"
+            />
+          </motion.div>
+
           {/* Main headline */}
           <motion.h1
             initial={{ opacity: 0, y: 30 }}
             animate={{ opacity: 1, y: 0 }}
-            transition={{ duration: 0.8, ease: [0.25, 0.46, 0.45, 0.94] }}
+            transition={{ duration: 0.8, delay: 0.1, ease: [0.25, 0.46, 0.45, 0.94] }}
             className="text-display-xl mb-8"
           >
             The right introduction can change everything.
@@ -82,11 +96,6 @@ export const HeroSection = () => {
             <Button variant="hero" size="hero" asChild>
               <a href="https://app.emergent.sh/share?app=voicechat-companion" target="_blank" rel="noopener noreferrer">
                 Join the Beta
-              </a>
-            </Button>
-            <Button variant="hero-secondary" size="hero" asChild>
-              <a href="https://app.emergent.sh/share?app=voicechat-companion" target="_blank" rel="noopener noreferrer">
-                Download the App
               </a>
             </Button>
           </motion.div>

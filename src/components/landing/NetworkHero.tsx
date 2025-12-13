@@ -1,9 +1,10 @@
 import { motion, AnimatePresence } from "framer-motion";
 import { useState, useEffect } from "react";
-import { useNavigate, useSearchParams } from "react-router-dom";
+import { useSearchParams } from "react-router-dom";
 import { Button } from "@/components/ui/button";
 import { ChevronDown } from "lucide-react";
 import { WaitlistModal } from "@/components/waitlist/WaitlistModal";
+
 // Sample profile data that cycles through
 const profiles = [
   {
@@ -39,7 +40,7 @@ const profiles = [
 // Floating Profile Card with attached message
 const FloatingProfileCard = ({ profile }: { profile: typeof profiles[0] }) => (
   <motion.div
-    className="absolute -left-20 top-16 z-30 w-[200px]"
+    className="absolute -left-4 md:-left-20 top-8 md:top-16 z-30 w-[140px] md:w-[200px]"
     animate={{ y: [0, -8, 0] }}
     transition={{ duration: 4, repeat: Infinity, ease: "easeInOut" }}
   >
@@ -59,13 +60,13 @@ const FloatingProfileCard = ({ profile }: { profile: typeof profiles[0] }) => (
             alt={profile.name}
             className="w-full h-full object-cover"
           />
-          <div className="absolute bottom-2 left-2 bg-black/70 backdrop-blur-sm text-white text-xs font-semibold px-2 py-1 rounded-lg">
+          <div className="absolute bottom-2 left-2 bg-black/70 backdrop-blur-sm text-white text-[10px] md:text-xs font-semibold px-2 py-1 rounded-lg">
             {profile.name.split(" ")[0]}
           </div>
         </div>
         {/* Attached text message */}
-        <div className="p-3 bg-[#E9E9EB]">
-          <p className="text-gray-900 text-xs font-medium leading-snug">
+        <div className="p-2 md:p-3 bg-[#E9E9EB]">
+          <p className="text-gray-900 text-[10px] md:text-xs font-medium leading-snug line-clamp-3">
             "{profile.bio}"
           </p>
         </div>
@@ -98,24 +99,24 @@ const IPhoneMockup = () => {
       <FloatingProfileCard profile={currentProfile} />
 
       {/* Half iPhone frame - cut off at bottom */}
-      <div className="relative w-[320px] h-[480px] overflow-hidden">
+      <div className="relative w-[220px] md:w-[320px] h-[320px] md:h-[480px] overflow-hidden">
         {/* Phone frame - extended beyond container so bottom is hidden */}
-        <div className="absolute inset-x-0 top-0 h-[600px] bg-white rounded-t-[45px] border-[8px] border-b-0 border-gray-900 shadow-2xl overflow-hidden">
+        <div className="absolute inset-x-0 top-0 h-[420px] md:h-[600px] bg-white rounded-t-[32px] md:rounded-t-[45px] border-[6px] md:border-[8px] border-b-0 border-gray-900 shadow-2xl overflow-hidden">
           {/* Dynamic Island */}
-          <div className="absolute top-2 left-1/2 -translate-x-1/2 w-24 h-6 bg-gray-900 rounded-full z-20" />
+          <div className="absolute top-1.5 md:top-2 left-1/2 -translate-x-1/2 w-16 md:w-24 h-4 md:h-6 bg-gray-900 rounded-full z-20" />
           
           {/* Screen content */}
-          <div className="absolute inset-0 pt-12 bg-gradient-to-b from-gray-50 to-white flex flex-col">
+          <div className="absolute inset-0 pt-8 md:pt-12 bg-gradient-to-b from-gray-50 to-white flex flex-col">
             {/* iMessage header */}
-            <div className="px-4 py-2 border-b border-gray-100">
-              <p className="text-xs text-gray-500 text-center">iMessage</p>
+            <div className="px-4 py-1.5 md:py-2 border-b border-gray-100">
+              <p className="text-[10px] md:text-xs text-gray-500 text-center">iMessage</p>
             </div>
 
             {/* Spacer to push reply to bottom */}
             <div className="flex-1" />
 
             {/* Reply message */}
-            <div className="px-4 mt-auto mb-32">
+            <div className="px-3 md:px-4 mt-auto mb-20 md:mb-32">
               <AnimatePresence mode="wait">
                 <motion.div
                   key={`reply-${currentProfile.id}`}
@@ -125,8 +126,8 @@ const IPhoneMockup = () => {
                   exit={{ opacity: 0, x: -20 }}
                   transition={{ duration: 0.4, delay: 0.4 }}
                 >
-                  <div className="bg-[#007AFF] text-white rounded-2xl rounded-br-md px-4 py-2.5">
-                    <p className="text-sm font-medium">{currentProfile.reply}</p>
+                  <div className="bg-[#007AFF] text-white rounded-2xl rounded-br-md px-3 md:px-4 py-2">
+                    <p className="text-xs md:text-sm font-medium">{currentProfile.reply}</p>
                   </div>
                 </motion.div>
               </AnimatePresence>
@@ -136,12 +137,12 @@ const IPhoneMockup = () => {
       </div>
 
       {/* Progress indicators */}
-      <div className="flex justify-center gap-2 mt-4">
+      <div className="flex justify-center gap-1.5 md:gap-2 mt-3 md:mt-4">
         {profiles.map((_, index) => (
           <motion.div
             key={index}
-            className={`h-1.5 rounded-full transition-all duration-300 ${
-              index === currentIndex ? "w-6 bg-gray-900" : "w-1.5 bg-gray-300"
+            className={`h-1 md:h-1.5 rounded-full transition-all duration-300 ${
+              index === currentIndex ? "w-4 md:w-6 bg-gray-900" : "w-1 md:w-1.5 bg-gray-300"
             }`}
           />
         ))}
@@ -152,7 +153,7 @@ const IPhoneMockup = () => {
 
 const NetworkVisualization = () => {
   return (
-    <div className="relative w-full flex justify-center pl-16">
+    <div className="relative w-full flex justify-center pl-8 md:pl-16">
       <IPhoneMockup />
     </div>
   );
@@ -172,20 +173,20 @@ export const NetworkHero = () => {
 
   return (
     <section className="relative min-h-screen bg-white overflow-hidden flex items-center">
-      <div className="container-apple relative z-10 py-20 pb-32">
-        <div className="grid lg:grid-cols-2 gap-12 lg:gap-8 items-center">
+      <div className="container-apple relative z-10 py-12 md:py-20 pb-24 md:pb-32 px-4 md:px-6">
+        <div className="grid lg:grid-cols-2 gap-8 md:gap-12 lg:gap-8 items-center">
           {/* Left column - Header with CTA */}
           <motion.div
             initial={{ opacity: 0, x: -30 }}
             animate={{ opacity: 1, x: 0 }}
             transition={{ duration: 0.8, ease: [0.25, 0.46, 0.45, 0.94] }}
-            className="text-center lg:text-left"
+            className="text-center lg:text-left order-2 lg:order-1"
           >
             <motion.h1
               initial={{ opacity: 0, y: 20 }}
               animate={{ opacity: 1, y: 0 }}
               transition={{ duration: 0.8, delay: 0.1 }}
-              className="text-4xl md:text-5xl lg:text-6xl font-bold text-gray-900 leading-tight mb-8"
+              className="text-3xl md:text-4xl lg:text-5xl xl:text-6xl font-bold text-gray-900 leading-tight mb-6 md:mb-8"
             >
               The right introduction can change everything.
             </motion.h1>
@@ -197,7 +198,7 @@ export const NetworkHero = () => {
               transition={{ duration: 0.8, delay: 0.3 }}
             >
               <Button 
-                className="bg-gray-900 text-white border-0 px-8 py-6 text-lg font-medium rounded-full hover:bg-gray-800 transition-colors"
+                className="bg-gray-900 text-white border-0 px-6 md:px-8 py-5 md:py-6 text-base md:text-lg font-medium rounded-full hover:bg-gray-800 transition-colors w-full sm:w-auto"
                 onClick={() => setIsModalOpen(true)}
               >
                 Join the Waitlist
@@ -210,20 +211,20 @@ export const NetworkHero = () => {
             initial={{ opacity: 0, x: 30 }}
             animate={{ opacity: 1, x: 0 }}
             transition={{ duration: 0.8, delay: 0.2, ease: [0.25, 0.46, 0.45, 0.94] }}
-            className="order-first lg:order-last"
+            className="order-1 lg:order-2"
           >
             <NetworkVisualization />
           </motion.div>
         </div>
       </div>
 
-      {/* Scroll indicator */}
+      {/* Scroll indicator - hidden on mobile */}
       <motion.button
         onClick={() => window.scrollTo({ top: window.innerHeight, behavior: "smooth" })}
         initial={{ opacity: 0 }}
         animate={{ opacity: 1 }}
         transition={{ delay: 1.5 }}
-        className="absolute bottom-8 left-1/2 -translate-x-1/2 flex flex-col items-center gap-2 text-gray-400 hover:text-gray-900 transition-colors cursor-pointer"
+        className="absolute bottom-6 md:bottom-8 left-1/2 -translate-x-1/2 flex-col items-center gap-2 text-gray-400 hover:text-gray-900 transition-colors cursor-pointer hidden md:flex"
       >
         <span className="text-xs font-medium tracking-wider uppercase">Scroll</span>
         <motion.div

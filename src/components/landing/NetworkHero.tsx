@@ -12,28 +12,32 @@ const profiles = [
     name: "Sarah Chen",
     bio: "Stanford CS '25 | Building AI tools for creators | Looking to connect with founders",
     image: "https://images.unsplash.com/photo-1494790108377-be9c29b29330?w=400&h=500&fit=crop&crop=face",
-    reply: "Would love to connect! ☕️"
+    reply: "Would love to connect! ☕️",
+    reason: "Both interested in AI tools for creators"
   },
   {
     id: 2,
     name: "Marcus Johnson",
     bio: "YC Founder | Previously @Stripe | Angel investing in health-tech",
     image: "https://images.unsplash.com/photo-1507003211169-0a1dd7228f2d?w=400&h=500&fit=crop&crop=face",
-    reply: "Let's grab coffee this week!"
+    reply: "Let's grab coffee this week!",
+    reason: "You're building in health-tech, he's investing"
   },
   {
     id: 3,
     name: "Emma Rodriguez",
     bio: "Product @Figma | Community builder | Always down to help early-stage startups",
     image: "https://images.unsplash.com/photo-1438761681033-6461ffad8d80?w=400&h=500&fit=crop&crop=face",
-    reply: "Intro'd you to my network 🙌"
+    reply: "Intro'd you to my network 🙌",
+    reason: "She mentors early-stage founders like you"
   },
   {
     id: 4,
     name: "Alex Kim",
     bio: "MIT '24 | ML researcher | Open to collabs on robotics projects",
     image: "https://images.unsplash.com/photo-1472099645785-5658abf4ff4e?w=400&h=500&fit=crop&crop=face",
-    reply: "This is exactly what I needed!"
+    reply: "This is exactly what I needed!",
+    reason: "Your robotics project matches his research"
   }
 ];
 
@@ -76,16 +80,7 @@ const FloatingProfileCard = ({ profile }: { profile: typeof profiles[0] }) => (
 );
 
 // Half iPhone Mockup with cycling content
-const IPhoneMockup = () => {
-  const [currentIndex, setCurrentIndex] = useState(0);
-
-  useEffect(() => {
-    const interval = setInterval(() => {
-      setCurrentIndex((prev) => (prev + 1) % profiles.length);
-    }, 3500);
-    return () => clearInterval(interval);
-  }, []);
-
+const IPhoneMockup = ({ currentIndex }: { currentIndex: number }) => {
   const currentProfile = profiles[currentIndex];
 
   return (
@@ -151,10 +146,37 @@ const IPhoneMockup = () => {
   );
 };
 
-const NetworkVisualization = () => {
+const NetworkVisualization = ({ currentIndex }: { currentIndex: number }) => {
   return (
     <div className="relative w-full flex justify-center pl-8 md:pl-16">
-      <IPhoneMockup />
+      <IPhoneMockup currentIndex={currentIndex} />
+    </div>
+  );
+};
+
+// Running reason ticker synced with profiles
+const ReasonTicker = ({ currentIndex }: { currentIndex: number }) => {
+  const currentProfile = profiles[currentIndex];
+  
+  return (
+    <div className="overflow-hidden mb-3 md:mb-4">
+      <AnimatePresence mode="wait">
+        <motion.div
+          key={`reason-${currentProfile.id}`}
+          initial={{ opacity: 0, x: 40 }}
+          animate={{ opacity: 1, x: 0 }}
+          exit={{ opacity: 0, x: -40 }}
+          transition={{ duration: 0.4 }}
+          className="flex items-center gap-2"
+        >
+          <span className="text-xs md:text-sm font-medium text-gray-500 uppercase tracking-wider">
+            Why ChekInn introduced them:
+          </span>
+          <span className="text-xs md:text-sm font-semibold text-gray-900">
+            {currentProfile.reason}
+          </span>
+        </motion.div>
+      </AnimatePresence>
     </div>
   );
 };
@@ -162,6 +184,7 @@ const NetworkVisualization = () => {
 export const NetworkHero = () => {
   const [searchParams] = useSearchParams();
   const [isModalOpen, setIsModalOpen] = useState(false);
+  const [currentIndex, setCurrentIndex] = useState(0);
   const referralCode = searchParams.get("ref");
 
   // Store referral code silently
@@ -170,6 +193,14 @@ export const NetworkHero = () => {
       sessionStorage.setItem("waitlist_ref", referralCode);
     }
   }, [referralCode]);
+
+  // Cycle through profiles
+  useEffect(() => {
+    const interval = setInterval(() => {
+      setCurrentIndex((prev) => (prev + 1) % profiles.length);
+    }, 3500);
+    return () => clearInterval(interval);
+  }, []);
 
   return (
     <section className="relative min-h-screen bg-white overflow-hidden flex items-center">
@@ -182,6 +213,9 @@ export const NetworkHero = () => {
             transition={{ duration: 0.8, ease: [0.25, 0.46, 0.45, 0.94] }}
             className="text-center lg:text-left order-2 lg:order-1"
           >
+            {/* Reason Ticker */}
+            <ReasonTicker currentIndex={currentIndex} />
+            
             <motion.h1
               initial={{ opacity: 0, y: 20 }}
               animate={{ opacity: 1, y: 0 }}
@@ -213,7 +247,7 @@ export const NetworkHero = () => {
             transition={{ duration: 0.8, delay: 0.2, ease: [0.25, 0.46, 0.45, 0.94] }}
             className="order-1 lg:order-2"
           >
-            <NetworkVisualization />
+            <NetworkVisualization currentIndex={currentIndex} />
           </motion.div>
         </div>
       </div>

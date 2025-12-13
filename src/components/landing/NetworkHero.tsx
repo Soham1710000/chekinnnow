@@ -9,39 +9,43 @@ import { WaitlistModal } from "@/components/waitlist/WaitlistModal";
 const profiles = [
   {
     id: 1,
-    name: "Aakash Singh",
-    bio: "Final Year Student | Looking for roles in growth or ops | Don't know how to reach recruiters",
+    name: "Rohan Verma",
+    title: "Engineer",
+    bio: "I'm moving from engineering into UI roles.\nI've built projects but don't know who to talk to without cold DMs.",
     image: "https://images.unsplash.com/photo-1506794778202-cad84cf45f1d?w=400&h=500&fit=crop&crop=face",
-    reply: "Happy to help. I usually talk to candidates who already have context.",
-    replyFrom: "Priya Nair",
-    reason: "One is hiring, one is exploring roles"
+    reply: "I made the same switch. Happy to help.",
+    replyFrom: "Riya Mehta — Product Designer",
+    reason: "Both are navigating a career transition"
   },
   {
     id: 2,
-    name: "Rohan Verma",
-    bio: "Software Engineer | Trying to move into UI roles | Built real projects, unsure who to talk to",
-    image: "https://images.unsplash.com/photo-1507003211169-0a1dd7228f2d?w=400&h=500&fit=crop&crop=face",
-    reply: "Made the same switch last year. Happy to share what worked!",
-    replyFrom: "Riya Mehta",
-    reason: "Both navigating a career transition"
+    name: "Amit Jain",
+    title: "Angel Investor",
+    bio: "I'm exploring AI concierge apps.\nI care more about real usage than pitch decks.",
+    image: "https://images.unsplash.com/photo-1472099645785-5658abf4ff4e?w=400&h=500&fit=crop&crop=face",
+    reply: "We see strong early usage.",
+    replyFrom: "Karan Malhotra — Founder",
+    reason: "One is investing and the other is building with real traction"
   },
   {
     id: 3,
-    name: "Amit Jain",
-    bio: "Angel Investor | Exploring AI concierge apps | Real usage matters more than pitch decks",
-    image: "https://images.unsplash.com/photo-1472099645785-5658abf4ff4e?w=400&h=500&fit=crop&crop=face",
-    reply: "We handle ~120 tasks/day with 2,400 daily visits. Still early!",
-    replyFrom: "Karan Malhotra",
-    reason: "One investing, one building with traction"
+    name: "Neha Kapoor",
+    title: "Consumer Ops",
+    bio: "I want to work on consumer AI,\nbut only with founders who ship fast.",
+    image: "https://images.unsplash.com/photo-1494790108377-be9c29b29330?w=400&h=500&fit=crop&crop=face",
+    reply: "That's exactly how we work.",
+    replyFrom: "Arjun Mehra — Founder",
+    reason: "Intent to collaborate"
   },
   {
     id: 4,
-    name: "Neha Kapoor",
-    bio: "Consumer Operations | Want to work on consumer AI with founders who ship fast",
-    image: "https://images.unsplash.com/photo-1494790108377-be9c29b29330?w=400&h=500&fit=crop&crop=face",
-    reply: "We shipped v1 in under two weeks. Looking for someone like you!",
-    replyFrom: "Arjun Mehra",
-    reason: "Matched on intent to collaborate"
+    name: "Aakash Singh",
+    title: "Final Year Student",
+    bio: "I'm graduating soon and exploring growth or ops roles.\nI don't want to spam recruiters on LinkedIn.",
+    image: "https://images.unsplash.com/photo-1507003211169-0a1dd7228f2d?w=400&h=500&fit=crop&crop=face",
+    reply: "Context helps. Let's talk.",
+    replyFrom: "Priya Nair — Talent Partner",
+    reason: "One is hiring and the other is actively exploring roles"
   }
 ];
 
@@ -72,9 +76,9 @@ const FloatingProfileCard = ({ profile }: { profile: typeof profiles[0] }) => (
             {profile.name.split(" ")[0]}
           </div>
         </div>
-        {/* Attached text message */}
-        <div className="p-2 md:p-3 bg-[#E9E9EB]">
-          <p className="text-gray-900 text-[10px] md:text-xs font-medium leading-snug line-clamp-3">
+        {/* Attached text message - bigger to fit multi-line bios */}
+        <div className="p-2.5 md:p-4 bg-[#E9E9EB]">
+          <p className="text-gray-900 text-[11px] md:text-sm font-medium leading-relaxed whitespace-pre-line">
             "{profile.bio}"
           </p>
         </div>

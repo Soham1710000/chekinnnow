@@ -58,8 +58,8 @@ const FloatingProfileCard = ({ profile }: { profile: typeof profiles[0] }) => (
         exit={{ opacity: 0, x: 20, scale: 0.95 }}
         transition={{ duration: 0.5 }}
       >
-        {/* Photo */}
-        <div className="aspect-[4/5] relative overflow-hidden">
+        {/* Photo - smaller */}
+        <div className="aspect-[4/3] relative overflow-hidden">
           <img 
             src={profile.image} 
             alt={profile.name}
@@ -69,9 +69,9 @@ const FloatingProfileCard = ({ profile }: { profile: typeof profiles[0] }) => (
             {profile.name.split(" ")[0]}
           </div>
         </div>
-        {/* Attached text message */}
-        <div className="p-2 md:p-3 bg-[#E9E9EB]">
-          <p className="text-gray-900 text-[10px] md:text-xs font-medium leading-snug line-clamp-3">
+        {/* Attached text message - more space */}
+        <div className="p-3 md:p-4 bg-[#E9E9EB]">
+          <p className="text-gray-900 text-[11px] md:text-sm font-medium leading-relaxed">
             "{profile.bio}"
           </p>
         </div>

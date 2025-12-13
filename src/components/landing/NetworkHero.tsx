@@ -1,5 +1,4 @@
 import { motion, AnimatePresence } from "framer-motion";
-import { Button } from "@/components/ui/button";
 import { useState, useEffect } from "react";
 
 // Sample profile data that cycles through
@@ -161,7 +160,7 @@ export const NetworkHero = () => {
     <section className="relative min-h-screen bg-white overflow-hidden flex items-center">
       <div className="container-apple relative z-10 py-20">
         <div className="grid lg:grid-cols-2 gap-12 lg:gap-8 items-center">
-          {/* Left column - Content */}
+          {/* Left column - Header only */}
           <motion.div
             initial={{ opacity: 0, x: -30 }}
             animate={{ opacity: 1, x: 0 }}
@@ -172,48 +171,10 @@ export const NetworkHero = () => {
               initial={{ opacity: 0, y: 20 }}
               animate={{ opacity: 1, y: 0 }}
               transition={{ duration: 0.8, delay: 0.1 }}
-              className="text-4xl md:text-5xl lg:text-6xl font-bold text-gray-900 leading-tight mb-6"
+              className="text-4xl md:text-5xl lg:text-6xl font-bold text-gray-900 leading-tight"
             >
-              Social Network on{" "}
-              <span className="bg-gradient-to-r from-[#007AFF] to-[#5856D6] bg-clip-text text-transparent">
-                iMessage
-              </span>
+              The right introduction can change everything.
             </motion.h1>
-
-            <motion.p
-              initial={{ opacity: 0, y: 20 }}
-              animate={{ opacity: 1, y: 0 }}
-              transition={{ duration: 0.8, delay: 0.2 }}
-              className="text-lg md:text-xl text-gray-600 max-w-lg mx-auto lg:mx-0 mb-8"
-            >
-              Connect with your network through the messaging app you already use. 
-              AI-powered introductions, seamless conversations, real relationships.
-            </motion.p>
-
-            <motion.div
-              initial={{ opacity: 0, y: 20 }}
-              animate={{ opacity: 1, y: 0 }}
-              transition={{ duration: 0.8, delay: 0.3 }}
-              className="flex flex-col sm:flex-row gap-4 justify-center lg:justify-start"
-            >
-              <Button
-                className="bg-gray-900 text-white border-0 px-8 py-6 text-lg font-medium rounded-full hover:bg-gray-800 transition-colors"
-                asChild
-              >
-                <a href="https://app.emergent.sh/share?app=voicechat-companion" target="_blank" rel="noopener noreferrer">
-                  Try it out
-                </a>
-              </Button>
-              <Button
-                variant="outline"
-                className="border-gray-300 text-gray-900 bg-transparent hover:bg-gray-100 px-8 py-6 text-lg font-medium rounded-full"
-                asChild
-              >
-                <a href="https://app.emergent.sh/share?app=voicechat-companion" target="_blank" rel="noopener noreferrer">
-                  Sign in
-                </a>
-              </Button>
-            </motion.div>
           </motion.div>
 
           {/* Right column - Visualization */}

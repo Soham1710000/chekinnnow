@@ -1,5 +1,5 @@
 import { motion, AnimatePresence } from "framer-motion";
-import { useState, useEffect } from "react";
+import { useState, useEffect, useLayoutEffect } from "react";
 import { useSearchParams } from "react-router-dom";
 import { Button } from "@/components/ui/button";
 import { ChevronDown, Users } from "lucide-react";
@@ -17,6 +17,18 @@ import rheaImg from "@/assets/profiles/rhea.jpg";
 import devImg from "@/assets/profiles/dev.jpg";
 import ishaanImg from "@/assets/profiles/ishaan.jpg";
 import pallaviImg from "@/assets/profiles/pallavi.jpg";
+
+// Preload all profile images for instant switching
+const allImages = [arnavImg, meeraImg, kushalImg, rajatImg, siddharthImg, ananyaImg, rheaImg, devImg, ishaanImg, pallaviImg];
+
+const usePreloadImages = (images: string[]) => {
+  useLayoutEffect(() => {
+    images.forEach((src) => {
+      const img = new Image();
+      img.src = src;
+    });
+  }, []);
+};
 
 // Sample profile data that cycles through
 const profiles = [
@@ -108,6 +120,7 @@ const FloatingProfileCard = ({ profile }: { profile: typeof profiles[0] }) => (
             alt={profile.name}
             loading="eager"
             decoding="async"
+            fetchPriority="high"
             className="w-full h-full object-cover object-top"
           />
         </div>
@@ -181,6 +194,7 @@ const IPhoneMockup = ({ currentIndex }: { currentIndex: number }) => {
                       alt={currentProfile.replyName}
                       loading="eager"
                       decoding="async"
+                      fetchPriority="high"
                       className="w-6 h-6 sm:w-7 sm:h-7 md:w-9 md:h-9 rounded-full object-cover object-top border-2 border-gray-200 shadow-sm"
                     />
                   </div>
@@ -221,6 +235,9 @@ const NetworkVisualization = ({ currentIndex }: { currentIndex: number }) => {
 const BASE_WAITLIST_COUNT = 7912; // Base offset for display
 
 export const NetworkHero = () => {
+  // Preload all images on mount for instant switching
+  usePreloadImages(allImages);
+  
   const [searchParams] = useSearchParams();
   const [isModalOpen, setIsModalOpen] = useState(false);
   const [currentIndex, setCurrentIndex] = useState(0);

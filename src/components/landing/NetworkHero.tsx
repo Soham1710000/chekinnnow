@@ -160,7 +160,7 @@ const NetworkVisualization = () => {
 export const NetworkHero = () => {
   return (
     <section className="relative min-h-screen bg-white overflow-hidden flex items-center">
-      <div className="container-apple relative z-10 py-20">
+      <div className="container-apple relative z-10 py-20 pb-32">
         <div className="grid lg:grid-cols-2 gap-12 lg:gap-8 items-center">
           {/* Left column - Header with CTA */}
           <motion.div

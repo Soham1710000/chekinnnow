@@ -34,10 +34,10 @@ const profiles = [
   }
 ];
 
-// Floating Profile Card
+// Floating Profile Card with attached message
 const FloatingProfileCard = ({ profile }: { profile: typeof profiles[0] }) => (
   <motion.div
-    className="absolute -left-16 top-24 z-30 w-[180px]"
+    className="absolute -left-20 top-16 z-30 w-[200px]"
     animate={{ y: [0, -8, 0] }}
     transition={{ duration: 4, repeat: Infinity, ease: "easeInOut" }}
   >
@@ -50,6 +50,7 @@ const FloatingProfileCard = ({ profile }: { profile: typeof profiles[0] }) => (
         exit={{ opacity: 0, x: 20, scale: 0.95 }}
         transition={{ duration: 0.5 }}
       >
+        {/* Photo */}
         <div className="aspect-[4/5] relative overflow-hidden">
           <img 
             src={profile.image} 
@@ -57,8 +58,14 @@ const FloatingProfileCard = ({ profile }: { profile: typeof profiles[0] }) => (
             className="w-full h-full object-cover"
           />
           <div className="absolute bottom-2 left-2 bg-black/70 backdrop-blur-sm text-white text-xs font-semibold px-2 py-1 rounded-lg">
-            {profile.name.split(' ')[0]}
+            {profile.name.split(" ")[0]}
           </div>
+        </div>
+        {/* Attached text message */}
+        <div className="p-3 bg-[#E9E9EB]">
+          <p className="text-gray-900 text-xs font-medium leading-snug">
+            "{profile.bio}"
+          </p>
         </div>
       </motion.div>
     </AnimatePresence>
@@ -100,24 +107,6 @@ const IPhoneMockup = () => {
             {/* iMessage header */}
             <div className="px-4 py-2 border-b border-gray-100">
               <p className="text-xs text-gray-500 text-center">iMessage</p>
-            </div>
-
-            {/* Bio text bubble */}
-            <div className="px-4 py-4 mt-8">
-              <AnimatePresence mode="wait">
-                <motion.div
-                  key={`bio-${currentProfile.id}`}
-                  className="bg-[#E9E9EB] rounded-2xl rounded-bl-md p-3.5"
-                  initial={{ opacity: 0, x: -20 }}
-                  animate={{ opacity: 1, x: 0 }}
-                  exit={{ opacity: 0, x: 20 }}
-                  transition={{ duration: 0.4, delay: 0.2 }}
-                >
-                  <p className="text-gray-900 text-sm font-medium leading-snug">
-                    "{currentProfile.bio}"
-                  </p>
-                </motion.div>
-              </AnimatePresence>
             </div>
 
             {/* Reply message */}

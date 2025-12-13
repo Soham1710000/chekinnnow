@@ -13,10 +13,10 @@ const profiles = [
     name: "Arnav",
     title: "Robotics Student",
     bio: "I'm working on a **robotics project** and exploring **research opportunities** in the US. Not sure how to find professors aligned with this work.",
-    image: "https://images.unsplash.com/photo-1506794778202-cad84cf45f1d?w=400&h=500&fit=crop&crop=face",
+    image: "https://images.unsplash.com/photo-1618641986557-1ecd230959aa?w=400&h=500&fit=crop&crop=face",
     replyName: "Dr. Meera Iyer",
     replyTitle: "Research Faculty",
-    replyImage: "https://images.unsplash.com/photo-1573496359142-b8d87734a5a2?w=400&h=500&fit=crop&crop=face",
+    replyImage: "https://images.unsplash.com/photo-1594744803329-e58b31de8bf5?w=400&h=500&fit=crop&crop=face",
     reply: "Sounds interesting. Happy to talk.",
     reason: "Both work in robotics research"
   },
@@ -25,10 +25,10 @@ const profiles = [
     name: "Kushal",
     title: "Early-Stage Founder",
     bio: "I'm building in **quick commerce** and testing **unit economics** at a small scale. Trying to understand how this space is evolving.",
-    image: "https://images.unsplash.com/photo-1507003211169-0a1dd7228f2d?w=400&h=500&fit=crop&crop=face",
+    image: "https://images.unsplash.com/photo-1633332755192-727a05c4013d?w=400&h=500&fit=crop&crop=face",
     replyName: "Rajat",
     replyTitle: "Angel Investor",
-    replyImage: "https://images.unsplash.com/photo-1472099645785-5658abf4ff4e?w=400&h=500&fit=crop&crop=face",
+    replyImage: "https://images.unsplash.com/photo-1560250097-0b93528c311a?w=400&h=500&fit=crop&crop=face",
     reply: "I've spent time studying this sector.",
     reason: "Both are exploring quick commerce"
   },
@@ -37,10 +37,10 @@ const profiles = [
     name: "Siddharth",
     title: "Software Engineer",
     bio: "I'm trying to move into **gaming companies** as an SDE. Built **side projects**, unsure how to approach teams early.",
-    image: "https://images.unsplash.com/photo-1500648767791-00dcc994a43e?w=400&h=500&fit=crop&crop=face",
+    image: "https://images.unsplash.com/photo-1611432579699-484f7990b127?w=400&h=500&fit=crop&crop=face",
     replyName: "Ananya",
     replyTitle: "Talent Lead, Gaming Startup",
-    replyImage: "https://images.unsplash.com/photo-1494790108377-be9c29b29330?w=400&h=500&fit=crop&crop=face",
+    replyImage: "https://images.unsplash.com/photo-1573497019940-1c28c88b4f3e?w=400&h=500&fit=crop&crop=face",
     reply: "That's understandable. Happy to chat.",
     reason: "Both work in gaming"
   },
@@ -49,10 +49,10 @@ const profiles = [
     name: "Rhea",
     title: "College Student & Gamer",
     bio: "I spend a lot of time playing **indie games**. Trying to understand what **paths exist** after college.",
-    image: "https://images.unsplash.com/photo-1438761681033-6461ffad8d80?w=400&h=500&fit=crop&crop=face",
+    image: "https://images.unsplash.com/photo-1544005313-94ddf0286df2?w=400&h=500&fit=crop&crop=face",
     replyName: "Dev",
     replyTitle: "Game Studio Team",
-    replyImage: "https://images.unsplash.com/photo-1519085360753-af0119f7cbe7?w=400&h=500&fit=crop&crop=face",
+    replyImage: "https://images.unsplash.com/photo-1507003211169-0a1dd7228f2d?w=400&h=500&fit=crop&crop=face",
     reply: "That's a good question.",
     reason: "Both are involved in games"
   },
@@ -61,10 +61,10 @@ const profiles = [
     name: "Ishaan",
     title: "Growth Marketer",
     bio: "I've worked on **growth** across LinkedIn and paid channels. Curious how **brand marketing** works at different stages.",
-    image: "https://images.unsplash.com/photo-1463453091185-61582044d556?w=400&h=500&fit=crop&crop=face",
+    image: "https://images.unsplash.com/photo-1506794778202-cad84cf45f1d?w=400&h=500&fit=crop&crop=face",
     replyName: "Pallavi",
     replyTitle: "Brand Marketer",
-    replyImage: "https://images.unsplash.com/photo-1534528741775-53994a69daeb?w=400&h=500&fit=crop&crop=face",
+    replyImage: "https://images.unsplash.com/photo-1580489944761-15a19d654956?w=400&h=500&fit=crop&crop=face",
     reply: "Happy to share notes.",
     reason: "Both have experience in growth"
   }
@@ -102,10 +102,11 @@ const FloatingProfileCard = ({ profile }: { profile: typeof profiles[0] }) => (
             className="w-full h-full object-cover"
           />
         </div>
-        {/* Name and title */}
-        <div className="px-2 py-1.5 md:px-3 md:py-2 bg-white border-b border-gray-100">
+        {/* Name and title - compact inline */}
+        <div className="px-2 py-1 md:px-2.5 md:py-1.5 bg-white border-b border-gray-100 flex items-center gap-1">
           <p className="text-[10px] md:text-xs font-semibold text-gray-900">{profile.name}</p>
-          <p className="text-[8px] md:text-[10px] text-gray-500">{profile.title}</p>
+          <span className="text-[8px] md:text-[10px] text-gray-400">•</span>
+          <p className="text-[8px] md:text-[10px] text-gray-500 truncate">{profile.title}</p>
         </div>
         {/* Attached text message - more space */}
         <div className="p-2.5 md:p-3 bg-[#E9E9EB]">
@@ -161,15 +162,15 @@ const IPhoneMockup = ({ currentIndex }: { currentIndex: number }) => {
                   transition={{ duration: 0.4, delay: 0.4 }}
                 >
                   {/* Reply profile name, title and photo */}
-                  <div className="flex items-center gap-1.5 mr-1">
+                  <div className="flex items-center gap-2 mr-1">
                     <div className="text-right">
-                      <p className="text-[10px] md:text-xs text-gray-700 font-medium">{currentProfile.replyName}</p>
-                      <p className="text-[8px] md:text-[10px] text-gray-400">{currentProfile.replyTitle}</p>
+                      <p className="text-[11px] md:text-sm text-gray-900 font-semibold">{currentProfile.replyName}</p>
+                      <p className="text-[9px] md:text-xs text-gray-500 font-medium">{currentProfile.replyTitle}</p>
                     </div>
                     <img 
                       src={currentProfile.replyImage} 
                       alt={currentProfile.replyName}
-                      className="w-6 h-6 md:w-8 md:h-8 rounded-full object-cover border border-gray-200"
+                      className="w-7 h-7 md:w-9 md:h-9 rounded-full object-cover border-2 border-gray-200 shadow-sm"
                     />
                   </div>
                   {/* Message bubble */}

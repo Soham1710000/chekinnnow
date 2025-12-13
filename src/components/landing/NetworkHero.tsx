@@ -177,19 +177,41 @@ const ReasonTicker = ({ currentIndex }: { currentIndex: number }) => {
   );
 };
 
+const BASE_WAITLIST_COUNT = 7912; // Base offset for display
+
 export const NetworkHero = () => {
   const [searchParams] = useSearchParams();
   const [isModalOpen, setIsModalOpen] = useState(false);
   const [currentIndex, setCurrentIndex] = useState(0);
-  const [waitlistCount, setWaitlistCount] = useState<number>(7913);
+  const [waitlistCount, setWaitlistCount] = useState<number>(BASE_WAITLIST_COUNT);
   const referralCode = searchParams.get("ref");
 
-  // Increment counter every 30 seconds by 5 users
+  // Fetch waitlist count and subscribe to real-time updates
   useEffect(() => {
-    const interval = setInterval(() => {
-      setWaitlistCount((prev) => prev + 5);
-    }, 30000);
-    return () => clearInterval(interval);
+    const fetchCount = async () => {
+      const { count } = await supabase
+        .from('waitlist')
+        .select('*', { count: 'exact', head: true });
+      setWaitlistCount(BASE_WAITLIST_COUNT + (count ?? 0));
+    };
+    
+    fetchCount();
+
+    // Subscribe to real-time updates
+    const channel = supabase
+      .channel('waitlist-count')
+      .on(
+        'postgres_changes',
+        { event: 'INSERT', schema: 'public', table: 'waitlist' },
+        () => {
+          setWaitlistCount((prev) => prev + 1);
+        }
+      )
+      .subscribe();
+
+    return () => {
+      supabase.removeChannel(channel);
+    };
   }, []);
 
   // Store referral code silently

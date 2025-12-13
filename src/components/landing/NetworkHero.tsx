@@ -268,7 +268,7 @@ export const NetworkHero = () => {
 
   return (
     <section className="relative min-h-[100svh] bg-white overflow-hidden flex items-center">
-      <div className="container-apple relative z-10 py-8 sm:py-12 md:py-20 pb-32 sm:pb-24 md:pb-32 px-4 md:px-6">
+      <div className="container-apple relative z-10 py-8 sm:py-12 md:py-20 pb-24 sm:pb-20 md:pb-28 px-4 md:px-6">
         <div className="grid lg:grid-cols-2 gap-4 sm:gap-8 md:gap-12 lg:gap-8 items-center">
           {/* Left column - Header with CTA */}
           <motion.div
@@ -354,7 +354,7 @@ export const NetworkHero = () => {
         initial={{ opacity: 0 }}
         animate={{ opacity: 1 }}
         transition={{ delay: 1.5 }}
-        className="absolute bottom-2 sm:bottom-4 md:bottom-6 left-0 right-0 flex flex-col items-center gap-2 sm:gap-4 md:gap-6 px-3 sm:px-4"
+        className="absolute bottom-1 sm:bottom-2 md:bottom-4 left-0 right-0 flex flex-col items-center gap-1 sm:gap-2 md:gap-4 px-3 sm:px-4"
       >
         {/* Scroll indicator */}
         <motion.button

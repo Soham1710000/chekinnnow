@@ -24,7 +24,7 @@ const profiles = [
     id: 1,
     name: "Arnav",
     title: "Robotics Student",
-    bio: "I'm working on a **robotics project** and exploring **research opportunities** in the US.",
+    bio: "Working on a **robotics project** and exploring **US research paths**.",
     image: arnavImg,
     replyName: "Dr. Meera Iyer",
     replyTitle: "Research Faculty",
@@ -35,7 +35,7 @@ const profiles = [
     id: 2,
     name: "Kushal",
     title: "Early-Stage Founder",
-    bio: "I'm building in **quick commerce** and testing **unit economics** at a small scale.",
+    bio: "I'm building in **quick commerce** and testing **unit economics**.",
     image: kushalImg,
     replyName: "Rajat",
     replyTitle: "Angel Investor",
@@ -57,7 +57,7 @@ const profiles = [
     id: 4,
     name: "Rhea",
     title: "College Student & Gamer",
-    bio: "I spend a lot of time playing **indie games**. Trying to understand what **paths exist** after college.",
+    bio: "I play **indie games** a lot. Not sure what comes **after college**.",
     image: rheaImg,
     replyName: "Dev",
     replyTitle: "Game Studio Team",
@@ -371,11 +371,11 @@ export const NetworkHero = () => {
         </motion.button>
 
         {/* Waitlisted users logos - highlighted */}
-        <div className="flex flex-col items-center gap-2 sm:gap-3 bg-gray-50/80 backdrop-blur-sm px-3 sm:px-6 py-2.5 sm:py-4 rounded-xl sm:rounded-2xl border border-gray-100 w-full sm:w-auto">
+        <div className="flex flex-col items-center gap-1.5 sm:gap-2 bg-gray-50/80 backdrop-blur-sm px-3 sm:px-6 py-2 sm:py-3 rounded-xl sm:rounded-2xl border border-gray-100 w-full sm:w-auto">
           <p className="text-[9px] sm:text-[10px] md:text-xs text-gray-600 uppercase tracking-wider font-semibold">
             Waitlisted users are from
           </p>
-          <div className="flex items-center justify-center gap-2 sm:gap-3 md:gap-6 flex-wrap">
+          <div className="flex items-center justify-center gap-2 sm:gap-3 md:gap-5 flex-wrap">
             {/* Google */}
             <div className="flex items-center">
               <span className="text-xs sm:text-sm md:text-base font-medium" style={{ color: '#4285F4' }}>G</span>
@@ -390,15 +390,15 @@ export const NetworkHero = () => {
             {/* BCG */}
             <span className="text-xs sm:text-sm md:text-base font-bold text-gray-800 tracking-tight">BCG</span>
             {/* Stanford */}
-            <span className="text-xs sm:text-sm md:text-base font-bold text-[#8C1515] tracking-tight hidden xs:inline">Stanford</span>
+            <span className="text-xs sm:text-sm md:text-base font-bold text-[#8C1515] tracking-tight">Stanford</span>
             {/* Tier 1 VC */}
-            <span className="text-[10px] sm:text-xs md:text-sm font-semibold text-gray-700 tracking-tight hidden sm:inline">Tier 1 VCs</span>
+            <span className="text-[10px] sm:text-xs md:text-sm font-semibold text-gray-700 tracking-tight">Tier 1 VCs</span>
             {/* CRED */}
-            <span className="text-xs sm:text-sm md:text-base font-black text-gray-800 tracking-tight hidden sm:block">CRED</span>
+            <span className="text-xs sm:text-sm md:text-base font-black text-gray-800 tracking-tight hidden sm:inline">CRED</span>
             {/* Flipkart */}
-            <span className="text-xs sm:text-sm md:text-base font-bold text-gray-800 italic hidden md:block">flipkart</span>
+            <span className="text-xs sm:text-sm md:text-base font-bold text-gray-800 italic hidden sm:inline">flipkart</span>
             {/* IIT Delhi */}
-            <span className="text-[10px] sm:text-xs md:text-sm font-bold text-gray-800 tracking-tight hidden lg:block">IIT Delhi</span>
+            <span className="text-[10px] sm:text-xs md:text-sm font-bold text-gray-800 tracking-tight hidden md:inline">IIT Delhi</span>
           </div>
         </div>
       </motion.div>

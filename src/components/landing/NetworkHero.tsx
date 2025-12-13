@@ -230,7 +230,7 @@ export const NetworkHero = () => {
               transition={{ duration: 0.8, delay: 0.1 }}
               className="text-3xl md:text-4xl lg:text-5xl xl:text-6xl font-bold text-gray-900 leading-tight mb-6 md:mb-8"
             >
-              The right introduction can change everything.
+              The right introduction changes everything.
             </motion.h1>
 
             {/* CTA Button */}
@@ -248,20 +248,21 @@ export const NetworkHero = () => {
                   Join the Waitlist
                 </Button>
                 
-                {/* Waitlist counter */}
-                {waitlistCount !== null && waitlistCount > 0 && (
-                  <motion.div
-                    initial={{ opacity: 0 }}
-                    animate={{ opacity: 1 }}
-                    transition={{ delay: 0.5 }}
-                    className="flex items-center justify-center lg:justify-start gap-1.5 text-gray-500 w-full"
-                  >
-                    <Users className="w-3.5 h-3.5" />
-                    <span className="text-xs md:text-sm font-medium">
-                      {waitlistCount.toLocaleString()}+ people waiting
-                    </span>
-                  </motion.div>
-                )}
+                {/* Waitlist counter - always visible */}
+                <motion.div
+                  initial={{ opacity: 0 }}
+                  animate={{ opacity: 1 }}
+                  transition={{ delay: 0.5 }}
+                  className="flex items-center justify-center lg:justify-start gap-1.5 text-gray-500 w-full"
+                >
+                  <Users className="w-3.5 h-3.5" />
+                  <span className="text-xs md:text-sm font-medium">
+                    {waitlistCount !== null && waitlistCount > 0 
+                      ? `${waitlistCount.toLocaleString()}+ people waiting`
+                      : "Join the waitlist"
+                    }
+                  </span>
+                </motion.div>
               </div>
               
               {/* Mobile scroll nudge */}

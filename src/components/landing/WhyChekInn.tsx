@@ -12,7 +12,7 @@ export const WhyChekInn = () => {
   const isInView = useInView(ref, { once: true, margin: "-100px" });
 
   return (
-    <section ref={ref} className="section-padding bg-background">
+    <section ref={ref} className="py-16 md:py-20 lg:py-24 pb-8 md:pb-12 lg:pb-16 bg-background">
       <div className="container-apple">
         <div className="max-w-3xl mx-auto">
           {statements.map((statement, index) => (

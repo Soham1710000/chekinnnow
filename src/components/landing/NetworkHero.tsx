@@ -103,14 +103,17 @@ const IPhoneMockup = () => {
           <div className="absolute top-2 left-1/2 -translate-x-1/2 w-24 h-6 bg-gray-900 rounded-full z-20" />
           
           {/* Screen content */}
-          <div className="absolute inset-0 pt-12 bg-gradient-to-b from-gray-50 to-white overflow-hidden">
+          <div className="absolute inset-0 pt-12 pb-20 bg-gradient-to-b from-gray-50 to-white overflow-hidden flex flex-col">
             {/* iMessage header */}
             <div className="px-4 py-2 border-b border-gray-100">
               <p className="text-xs text-gray-500 text-center">iMessage</p>
             </div>
 
-            {/* Reply message */}
-            <div className="px-4 mt-2">
+            {/* Spacer to push reply to bottom */}
+            <div className="flex-1" />
+
+            {/* Reply message - positioned at bottom right */}
+            <div className="px-4 pb-4">
               <AnimatePresence mode="wait">
                 <motion.div
                   key={`reply-${currentProfile.id}`}

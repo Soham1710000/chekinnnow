@@ -262,22 +262,42 @@ export const NetworkHero = () => {
         </div>
       </div>
 
-      {/* Scroll indicator - hidden on mobile */}
-      <motion.button
-        onClick={() => window.scrollTo({ top: window.innerHeight, behavior: "smooth" })}
+      {/* Bottom section with scroll + logos */}
+      <motion.div
         initial={{ opacity: 0 }}
         animate={{ opacity: 1 }}
         transition={{ delay: 1.5 }}
-        className="absolute bottom-6 md:bottom-8 left-1/2 -translate-x-1/2 flex-col items-center gap-2 text-gray-400 hover:text-gray-900 transition-colors cursor-pointer hidden md:flex"
+        className="absolute bottom-4 md:bottom-6 left-0 right-0 flex flex-col items-center gap-4 md:gap-6"
       >
-        <span className="text-xs font-medium tracking-wider uppercase">Scroll</span>
-        <motion.div
-          animate={{ y: [0, 6, 0] }}
-          transition={{ duration: 1.5, repeat: Infinity, ease: "easeInOut" }}
+        {/* Scroll indicator */}
+        <motion.button
+          onClick={() => window.scrollTo({ top: window.innerHeight, behavior: "smooth" })}
+          className="flex-col items-center gap-1 text-gray-400 hover:text-gray-900 transition-colors cursor-pointer hidden md:flex"
         >
-          <ChevronDown className="w-5 h-5" />
-        </motion.div>
-      </motion.button>
+          <span className="text-xs font-medium tracking-wider uppercase">Scroll</span>
+          <motion.div
+            animate={{ y: [0, 6, 0] }}
+            transition={{ duration: 1.5, repeat: Infinity, ease: "easeInOut" }}
+          >
+            <ChevronDown className="w-5 h-5" />
+          </motion.div>
+        </motion.button>
+
+        {/* Waitlisted users logos */}
+        <div className="flex flex-col items-center gap-2">
+          <p className="text-[10px] md:text-xs text-gray-400 uppercase tracking-wider font-medium">
+            Waitlisted users are from
+          </p>
+          <div className="flex items-center gap-4 md:gap-6 opacity-60">
+            <span className="text-xs md:text-sm font-semibold text-gray-600">CRED</span>
+            <span className="text-xs md:text-sm font-semibold text-gray-600">Flipkart</span>
+            <span className="text-xs md:text-sm font-semibold text-gray-600">Google</span>
+            <span className="text-xs md:text-sm font-semibold text-gray-600 hidden sm:block">Amazon</span>
+            <span className="text-xs md:text-sm font-semibold text-gray-600">IIT Delhi</span>
+            <span className="text-xs md:text-sm font-semibold text-gray-600 hidden sm:block">IIT Bombay</span>
+          </div>
+        </div>
+      </motion.div>
 
       {/* Waitlist Modal */}
       <WaitlistModal 

@@ -1,5 +1,6 @@
 import { motion } from "framer-motion";
 import { Button } from "@/components/ui/button";
+import { useMemo } from "react";
 
 interface Node {
   id: number;
@@ -8,26 +9,45 @@ interface Node {
   size: number;
   delay: number;
   color: string;
-  isCard?: boolean;
+  type: "avatar" | "card";
+  floatDuration: number;
+  floatOffset: number;
 }
 
-const generateNodes = (): Node[] => {
-  const colors = [
-    "hsl(220, 100%, 60%)",
-    "hsl(280, 100%, 65%)",
-    "hsl(340, 100%, 65%)",
-    "hsl(160, 100%, 50%)",
-    "hsl(45, 100%, 60%)",
-  ];
+const COLORS = [
+  "hsl(220, 100%, 60%)",  // Blue
+  "hsl(280, 100%, 65%)",  // Purple
+  "hsl(340, 100%, 65%)",  // Pink
+  "hsl(160, 100%, 45%)",  // Teal
+  "hsl(45, 100%, 55%)",   // Yellow
+  "hsl(200, 100%, 55%)",  // Cyan
+  "hsl(320, 100%, 60%)",  // Magenta
+];
 
+const INITIALS = ["JD", "SK", "AM", "TW", "RB", "KC", "LM", "NP", "ES", "VR", "DH", "BG", "CT", "FW", "HZ"];
+
+const generateNodes = (): Node[] => {
   const nodes: Node[] = [];
   
-  // Generate 12 nodes distributed in 2D space
+  // Positions distributed across the container (percentage-based)
   const positions = [
-    { x: 15, y: 20 }, { x: 75, y: 15 }, { x: 45, y: 35 },
-    { x: 25, y: 55 }, { x: 70, y: 45 }, { x: 85, y: 70 },
-    { x: 35, y: 75 }, { x: 55, y: 60 }, { x: 10, y: 80 },
-    { x: 60, y: 85 }, { x: 90, y: 25 }, { x: 50, y: 10 },
+    // Circular avatars
+    { x: 12, y: 18, type: "avatar" as const },
+    { x: 78, y: 12, type: "avatar" as const },
+    { x: 45, y: 8, type: "avatar" as const },
+    { x: 88, y: 45, type: "avatar" as const },
+    { x: 22, y: 72, type: "avatar" as const },
+    { x: 65, y: 78, type: "avatar" as const },
+    { x: 8, y: 45, type: "avatar" as const },
+    { x: 55, y: 42, type: "avatar" as const },
+    { x: 32, y: 35, type: "avatar" as const },
+    { x: 75, y: 62, type: "avatar" as const },
+    { x: 42, y: 88, type: "avatar" as const },
+    { x: 92, y: 82, type: "avatar" as const },
+    // Rounded rectangle cards
+    { x: 25, y: 52, type: "card" as const },
+    { x: 68, y: 28, type: "card" as const },
+    { x: 48, y: 65, type: "card" as const },
   ];
 
   positions.forEach((pos, i) => {
@@ -35,31 +55,77 @@ const generateNodes = (): Node[] => {
       id: i,
       x: pos.x,
       y: pos.y,
-      size: 40 + Math.random() * 20,
-      delay: i * 0.15,
-      color: colors[i % colors.length],
-      isCard: i % 4 === 0,
+      size: pos.type === "avatar" ? 36 + Math.random() * 16 : 0,
+      delay: i * 0.08,
+      color: COLORS[i % COLORS.length],
+      type: pos.type,
+      floatDuration: 4 + Math.random() * 3,
+      floatOffset: Math.random() * 12 - 6,
     });
   });
 
   return nodes;
 };
 
-const connections = [
-  [0, 2], [2, 4], [1, 4], [3, 7], [5, 8], [6, 9],
-  [2, 7], [4, 5], [0, 3], [1, 11], [11, 4], [7, 9],
+// Pre-defined connections between nodes
+const CONNECTIONS: [number, number][] = [
+  [0, 8], [8, 12], [12, 6], [2, 13], [13, 7], [7, 14],
+  [1, 13], [3, 9], [9, 14], [4, 12], [5, 14], [10, 4],
+  [11, 9], [2, 1], [6, 4], [8, 7], [5, 11],
 ];
 
+const AvatarNode = ({ node, initial }: { node: Node; initial: string }) => (
+  <motion.div
+    className="rounded-full flex items-center justify-center text-white font-semibold text-xs shadow-lg"
+    style={{
+      width: node.size,
+      height: node.size,
+      background: `linear-gradient(145deg, ${node.color}, ${node.color}cc)`,
+      boxShadow: `0 8px 32px ${node.color}40, inset 0 1px 0 rgba(255,255,255,0.2)`,
+    }}
+  >
+    {initial}
+  </motion.div>
+);
+
+const CardNode = ({ node }: { node: Node }) => (
+  <div
+    className="rounded-2xl backdrop-blur-md border border-white/15 p-3 flex items-center gap-3 min-w-[120px]"
+    style={{
+      background: `linear-gradient(145deg, ${node.color}18, ${node.color}08)`,
+      boxShadow: `0 8px 32px ${node.color}25, inset 0 1px 0 rgba(255,255,255,0.1)`,
+    }}
+  >
+    <div
+      className="w-9 h-9 rounded-full flex items-center justify-center text-white text-xs font-semibold"
+      style={{ background: node.color }}
+    >
+      {INITIALS[node.id % INITIALS.length]}
+    </div>
+    <div className="space-y-1.5">
+      <div className="w-14 h-2 rounded-full bg-white/25" />
+      <div className="w-10 h-1.5 rounded-full bg-white/12" />
+    </div>
+  </div>
+);
+
 const NetworkVisualization = () => {
-  const nodes = generateNodes();
+  const nodes = useMemo(() => generateNodes(), []);
 
   return (
-    <div className="relative w-full h-[400px] md:h-[500px]">
+    <div className="relative w-full h-[420px] md:h-[520px]">
       {/* Connection lines */}
-      <svg className="absolute inset-0 w-full h-full">
-        {connections.map(([from, to], i) => {
+      <svg className="absolute inset-0 w-full h-full pointer-events-none">
+        <defs>
+          <linearGradient id="lineGradient" x1="0%" y1="0%" x2="100%" y2="100%">
+            <stop offset="0%" stopColor="hsl(220, 100%, 60%)" stopOpacity="0.4" />
+            <stop offset="100%" stopColor="hsl(280, 100%, 65%)" stopOpacity="0.2" />
+          </linearGradient>
+        </defs>
+        {CONNECTIONS.map(([from, to], i) => {
           const fromNode = nodes[from];
           const toNode = nodes[to];
+          if (!fromNode || !toNode) return null;
           return (
             <motion.line
               key={i}
@@ -67,12 +133,16 @@ const NetworkVisualization = () => {
               y1={`${fromNode.y}%`}
               x2={`${toNode.x}%`}
               y2={`${toNode.y}%`}
-              stroke="hsl(220, 60%, 40%)"
-              strokeWidth="1"
-              strokeOpacity="0.3"
-              initial={{ pathLength: 0, opacity: 0 }}
-              animate={{ pathLength: 1, opacity: 0.3 }}
-              transition={{ duration: 1.5, delay: i * 0.1 }}
+              stroke="url(#lineGradient)"
+              strokeWidth="1.5"
+              initial={{ opacity: 0 }}
+              animate={{ opacity: [0.15, 0.35, 0.15] }}
+              transition={{
+                duration: 3,
+                delay: i * 0.1,
+                repeat: Infinity,
+                ease: "easeInOut",
+              }}
             />
           );
         })}
@@ -82,7 +152,7 @@ const NetworkVisualization = () => {
       {nodes.map((node) => (
         <motion.div
           key={node.id}
-          className="absolute"
+          className="absolute z-10"
           style={{
             left: `${node.x}%`,
             top: `${node.y}%`,
@@ -90,50 +160,29 @@ const NetworkVisualization = () => {
           }}
           initial={{ opacity: 0, scale: 0 }}
           animate={{ opacity: 1, scale: 1 }}
-          transition={{ duration: 0.6, delay: node.delay }}
+          transition={{
+            duration: 0.5,
+            delay: node.delay,
+            ease: [0.34, 1.56, 0.64, 1],
+          }}
         >
           <motion.div
             animate={{
-              y: [0, -8, 0],
-              scale: [1, 1.05, 1],
-              opacity: [0.8, 1, 0.8],
+              y: [0, node.floatOffset, 0],
+              scale: [1, 1.04, 1],
+              opacity: [0.85, 1, 0.85],
             }}
             transition={{
-              duration: 3 + Math.random() * 2,
+              duration: node.floatDuration,
               repeat: Infinity,
               ease: "easeInOut",
-              delay: node.delay,
+              delay: node.delay * 0.5,
             }}
           >
-            {node.isCard ? (
-              <div
-                className="rounded-xl backdrop-blur-sm border border-white/10 p-3 flex items-center gap-2"
-                style={{
-                  background: `linear-gradient(135deg, ${node.color}20, ${node.color}10)`,
-                  boxShadow: `0 4px 20px ${node.color}30`,
-                }}
-              >
-                <div
-                  className="w-8 h-8 rounded-full"
-                  style={{ background: node.color }}
-                />
-                <div className="space-y-1">
-                  <div className="w-16 h-2 rounded bg-white/20" />
-                  <div className="w-12 h-1.5 rounded bg-white/10" />
-                </div>
-              </div>
+            {node.type === "card" ? (
+              <CardNode node={node} />
             ) : (
-              <div
-                className="rounded-full flex items-center justify-center text-white font-medium text-sm"
-                style={{
-                  width: node.size,
-                  height: node.size,
-                  background: `linear-gradient(135deg, ${node.color}, ${node.color}99)`,
-                  boxShadow: `0 4px 20px ${node.color}50`,
-                }}
-              >
-                {String.fromCharCode(65 + (node.id % 26))}
-              </div>
+              <AvatarNode node={node} initial={INITIALS[node.id % INITIALS.length]} />
             )}
           </motion.div>
         </motion.div>

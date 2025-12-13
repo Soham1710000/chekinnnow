@@ -1,11 +1,13 @@
 import { motion, AnimatePresence } from "framer-motion";
-import { useState, useEffect, useLayoutEffect } from "react";
+import { useState, useEffect, useLayoutEffect, lazy, Suspense } from "react";
 import { useSearchParams } from "react-router-dom";
 import { Button } from "@/components/ui/button";
 import { ChevronDown, Users } from "lucide-react";
-import { WaitlistModal } from "@/components/waitlist/WaitlistModal";
 import { supabase } from "@/integrations/supabase/client";
 import { useFunnelTracking } from "@/hooks/useFunnelTracking";
+
+// Lazy load the modal - only needed on click
+const WaitlistModal = lazy(() => import("@/components/waitlist/WaitlistModal").then(m => ({ default: m.WaitlistModal })));
 // Import profile images
 import arnavImg from "@/assets/profiles/arnav.jpg";
 import meeraImg from "@/assets/profiles/meera.jpg";
@@ -439,12 +441,16 @@ export const NetworkHero = () => {
         </div>
       </motion.div>
 
-      {/* Waitlist Modal */}
-      <WaitlistModal 
-        isOpen={isModalOpen} 
-        onClose={() => setIsModalOpen(false)}
-        referralCode={referralCode}
-      />
+      {/* Waitlist Modal - lazy loaded */}
+      {isModalOpen && (
+        <Suspense fallback={null}>
+          <WaitlistModal 
+            isOpen={isModalOpen} 
+            onClose={() => setIsModalOpen(false)}
+            referralCode={referralCode}
+          />
+        </Suspense>
+      )}
     </section>
   );
 };

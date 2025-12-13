@@ -13,60 +13,55 @@ const profiles = [
     name: "Arnav",
     title: "Robotics Student",
     bio: "I'm working on a **robotics project** and exploring **research opportunities** in the US.",
-    image: "https://images.unsplash.com/photo-1618641986557-1ecd230959aa?w=400&h=500&fit=crop&crop=face",
+    image: "https://images.unsplash.com/photo-1531891437562-4301cf35b7e4?w=400&h=500&fit=crop&crop=face",
     replyName: "Dr. Meera Iyer",
     replyTitle: "Research Faculty",
-    replyImage: "https://images.unsplash.com/photo-1594744803329-e58b31de8bf5?w=400&h=500&fit=crop&crop=face",
-    reply: "Sounds interesting. Happy to talk.",
-    reason: "Both work in robotics research"
+    replyImage: "https://images.unsplash.com/photo-1573496359142-b8d87734a5a2?w=400&h=500&fit=crop&crop=face",
+    reply: "Sounds interesting. Happy to talk."
   },
   {
     id: 2,
     name: "Kushal",
     title: "Early-Stage Founder",
     bio: "I'm building in **quick commerce** and testing **unit economics** at a small scale.",
-    image: "https://images.unsplash.com/photo-1633332755192-727a05c4013d?w=400&h=500&fit=crop&crop=face",
+    image: "https://images.unsplash.com/photo-1519085360753-af0119f7cbe7?w=400&h=500&fit=crop&crop=face",
     replyName: "Rajat",
     replyTitle: "Angel Investor",
-    replyImage: "https://images.unsplash.com/photo-1560250097-0b93528c311a?w=400&h=500&fit=crop&crop=face",
-    reply: "I've spent time studying this sector.",
-    reason: "Both are exploring quick commerce"
+    replyImage: "https://images.unsplash.com/photo-1472099645785-5658abf4ff4e?w=400&h=500&fit=crop&crop=face",
+    reply: "I've spent time studying this sector."
   },
   {
     id: 3,
     name: "Siddharth",
     title: "Software Engineer",
     bio: "Built **side projects**, trying to break into **gaming** as an SDE.",
-    image: "https://images.unsplash.com/photo-1611432579699-484f7990b127?w=400&h=500&fit=crop&crop=face",
+    image: "https://images.unsplash.com/photo-1500648767791-00dcc994a43e?w=400&h=500&fit=crop&crop=face",
     replyName: "Ananya",
     replyTitle: "Talent Lead, Gaming Startup",
-    replyImage: "https://images.unsplash.com/photo-1573497019940-1c28c88b4f3e?w=400&h=500&fit=crop&crop=face",
-    reply: "That's understandable. Happy to chat.",
-    reason: "Both work in gaming"
+    replyImage: "https://images.unsplash.com/photo-1487412720507-e7ab37603c6f?w=400&h=500&fit=crop&crop=face",
+    reply: "That's understandable. Happy to chat."
   },
   {
     id: 4,
     name: "Rhea",
     title: "College Student & Gamer",
     bio: "I spend a lot of time playing **indie games**. Trying to understand what **paths exist** after college.",
-    image: "https://images.unsplash.com/photo-1544005313-94ddf0286df2?w=400&h=500&fit=crop&crop=face",
+    image: "https://images.unsplash.com/photo-1534528741775-53994a69daeb?w=400&h=500&fit=crop&crop=face",
     replyName: "Dev",
     replyTitle: "Game Studio Team",
-    replyImage: "https://images.unsplash.com/photo-1507003211169-0a1dd7228f2d?w=400&h=500&fit=crop&crop=face",
-    reply: "We are looking for beta testers in the team.",
-    reason: "Both are involved in games"
+    replyImage: "https://images.unsplash.com/photo-1506794778202-cad84cf45f1d?w=400&h=500&fit=crop&crop=face",
+    reply: "We are looking for beta testers in the team."
   },
   {
     id: 5,
     name: "Ishaan",
     title: "Growth Marketer",
     bio: "Curious how **brand marketing** works at different stages.",
-    image: "https://images.unsplash.com/photo-1506794778202-cad84cf45f1d?w=400&h=500&fit=crop&crop=face",
+    image: "https://images.unsplash.com/photo-1507003211169-0a1dd7228f2d?w=400&h=500&fit=crop&crop=face",
     replyName: "Pallavi",
     replyTitle: "Brand Marketer",
-    replyImage: "https://images.unsplash.com/photo-1580489944761-15a19d654956?w=400&h=500&fit=crop&crop=face",
-    reply: "Happy to share notes.",
-    reason: "Both have experience in growth"
+    replyImage: "https://images.unsplash.com/photo-1438761681033-6461ffad8d80?w=400&h=500&fit=crop&crop=face",
+    reply: "Happy to share notes."
   }
 ];
 
@@ -207,28 +202,6 @@ const NetworkVisualization = ({ currentIndex }: { currentIndex: number }) => {
   );
 };
 
-// Running reason ticker synced with profiles
-const ReasonTicker = ({ currentIndex }: { currentIndex: number }) => {
-  const currentProfile = profiles[currentIndex];
-  
-  return (
-    <div className="overflow-hidden mb-4 md:mb-6">
-      <AnimatePresence mode="wait">
-        <motion.p
-          key={`reason-${currentProfile.id}`}
-          initial={{ opacity: 0, y: 10 }}
-          animate={{ opacity: 1, y: 0 }}
-          exit={{ opacity: 0, y: -10 }}
-          transition={{ duration: 0.3 }}
-          className="text-sm md:text-base text-gray-500 italic"
-        >
-          "{currentProfile.reason}"
-        </motion.p>
-      </AnimatePresence>
-    </div>
-  );
-};
-
 const BASE_WAITLIST_COUNT = 7912; // Base offset for display
 
 export const NetworkHero = () => {
@@ -292,8 +265,6 @@ export const NetworkHero = () => {
             transition={{ duration: 0.8, ease: [0.25, 0.46, 0.45, 0.94] }}
             className="text-center lg:text-left order-2 lg:order-1"
           >
-            {/* Reason Ticker */}
-            <ReasonTicker currentIndex={currentIndex} />
             
             <motion.h1
               initial={{ opacity: 0, y: 20 }}

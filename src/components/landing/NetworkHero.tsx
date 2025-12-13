@@ -103,7 +103,7 @@ const IPhoneMockup = () => {
           <div className="absolute top-2 left-1/2 -translate-x-1/2 w-24 h-6 bg-gray-900 rounded-full z-20" />
           
           {/* Screen content */}
-          <div className="absolute inset-0 pt-12 pb-20 bg-gradient-to-b from-gray-50 to-white overflow-hidden flex flex-col">
+          <div className="absolute inset-0 pt-12 pb-8 bg-gradient-to-b from-gray-50 to-white overflow-hidden flex flex-col">
             {/* iMessage header */}
             <div className="px-4 py-2 border-b border-gray-100">
               <p className="text-xs text-gray-500 text-center">iMessage</p>

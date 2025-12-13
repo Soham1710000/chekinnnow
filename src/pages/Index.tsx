@@ -1,6 +1,5 @@
 import { lazy, Suspense } from "react";
 import { NetworkHero } from "@/components/landing/NetworkHero";
-import { HeroSection } from "@/components/landing/HeroSection";
 
 // Lazy load sections below the fold for faster initial load
 const CardCarousel = lazy(() => import("@/components/landing/CardCarousel").then(m => ({ default: m.CardCarousel })));
@@ -21,11 +20,8 @@ const SectionLoader = () => (
 const Index = () => {
   return (
     <main className="min-h-screen">
-      {/* Network Hero loads immediately */}
+      {/* Network Hero with CTA and scroll nudge */}
       <NetworkHero />
-      
-      {/* Original Hero */}
-      <HeroSection />
       
       {/* Lazy load everything below the fold */}
       <Suspense fallback={<SectionLoader />}>

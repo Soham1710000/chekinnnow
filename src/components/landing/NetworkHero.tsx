@@ -1,5 +1,7 @@
 import { motion, AnimatePresence } from "framer-motion";
 import { useState, useEffect } from "react";
+import { Button } from "@/components/ui/button";
+import { ChevronDown } from "lucide-react";
 
 // Sample profile data that cycles through
 const profiles = [
@@ -160,7 +162,7 @@ export const NetworkHero = () => {
     <section className="relative min-h-screen bg-white overflow-hidden flex items-center">
       <div className="container-apple relative z-10 py-20">
         <div className="grid lg:grid-cols-2 gap-12 lg:gap-8 items-center">
-          {/* Left column - Header only */}
+          {/* Left column - Header with CTA */}
           <motion.div
             initial={{ opacity: 0, x: -30 }}
             animate={{ opacity: 1, x: 0 }}
@@ -171,10 +173,26 @@ export const NetworkHero = () => {
               initial={{ opacity: 0, y: 20 }}
               animate={{ opacity: 1, y: 0 }}
               transition={{ duration: 0.8, delay: 0.1 }}
-              className="text-4xl md:text-5xl lg:text-6xl font-bold text-gray-900 leading-tight"
+              className="text-4xl md:text-5xl lg:text-6xl font-bold text-gray-900 leading-tight mb-8"
             >
               The right introduction can change everything.
             </motion.h1>
+
+            {/* CTA Button */}
+            <motion.div
+              initial={{ opacity: 0, y: 20 }}
+              animate={{ opacity: 1, y: 0 }}
+              transition={{ duration: 0.8, delay: 0.3 }}
+            >
+              <Button 
+                className="bg-gray-900 text-white border-0 px-8 py-6 text-lg font-medium rounded-full hover:bg-gray-800 transition-colors"
+                asChild
+              >
+                <a href="https://app.emergent.sh/share?app=voicechat-companion" target="_blank" rel="noopener noreferrer">
+                  Join the Waitlist
+                </a>
+              </Button>
+            </motion.div>
           </motion.div>
 
           {/* Right column - Visualization */}
@@ -188,6 +206,23 @@ export const NetworkHero = () => {
           </motion.div>
         </div>
       </div>
+
+      {/* Scroll indicator */}
+      <motion.button
+        onClick={() => window.scrollTo({ top: window.innerHeight, behavior: "smooth" })}
+        initial={{ opacity: 0 }}
+        animate={{ opacity: 1 }}
+        transition={{ delay: 1.5 }}
+        className="absolute bottom-8 left-1/2 -translate-x-1/2 flex flex-col items-center gap-2 text-gray-400 hover:text-gray-900 transition-colors cursor-pointer"
+      >
+        <span className="text-xs font-medium tracking-wider uppercase">Scroll</span>
+        <motion.div
+          animate={{ y: [0, 6, 0] }}
+          transition={{ duration: 1.5, repeat: Infinity, ease: "easeInOut" }}
+        >
+          <ChevronDown className="w-5 h-5" />
+        </motion.div>
+      </motion.button>
     </section>
   );
 };

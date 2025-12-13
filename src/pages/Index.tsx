@@ -1,4 +1,5 @@
 import { lazy, Suspense } from "react";
+import { NetworkHero } from "@/components/landing/NetworkHero";
 import { HeroSection } from "@/components/landing/HeroSection";
 
 // Lazy load sections below the fold for faster initial load
@@ -20,7 +21,10 @@ const SectionLoader = () => (
 const Index = () => {
   return (
     <main className="min-h-screen">
-      {/* Hero loads immediately */}
+      {/* Network Hero loads immediately */}
+      <NetworkHero />
+      
+      {/* Original Hero */}
       <HeroSection />
       
       {/* Lazy load everything below the fold */}

@@ -1,11 +1,13 @@
 import { useEffect, useState } from "react";
 import { useNavigate } from "react-router-dom";
 import { useAuth } from "@/hooks/useAuth";
+import { useWaitlistAnalytics } from "@/hooks/useWaitlistAnalytics";
 import { supabase } from "@/integrations/supabase/client";
 import { Button } from "@/components/ui/button";
 import { toast } from "sonner";
 import { motion } from "framer-motion";
-import { Check, X, LogOut, ArrowLeft } from "lucide-react";
+import { Check, X, LogOut, ArrowLeft, TrendingUp, Users, UserCheck, Share2 } from "lucide-react";
+import { BarChart, Bar, XAxis, YAxis, Tooltip, ResponsiveContainer } from "recharts";
 
 interface WaitlistEntry {
   id: string;
@@ -25,6 +27,7 @@ const Admin = () => {
   const [checkingAdmin, setCheckingAdmin] = useState(true);
   const [entries, setEntries] = useState<WaitlistEntry[]>([]);
   const [loadingEntries, setLoadingEntries] = useState(true);
+  const { stats, loading: statsLoading } = useWaitlistAnalytics();
 
   useEffect(() => {
     const checkAdminStatus = async () => {
@@ -156,34 +159,108 @@ const Admin = () => {
           </Button>
         </div>
 
-        {/* Stats */}
+        {/* Stats Cards */}
         <div className="grid grid-cols-2 md:grid-cols-4 gap-4 mb-8">
-          <div className="bg-white rounded-xl p-4 border">
-            <p className="text-sm text-gray-500">Total Users</p>
-            <p className="text-2xl font-bold">{entries.length}</p>
+          <div className="bg-white rounded-xl p-4 border shadow-sm">
+            <div className="flex items-center gap-3 mb-2">
+              <div className="w-10 h-10 bg-blue-100 rounded-lg flex items-center justify-center">
+                <Users className="w-5 h-5 text-blue-600" />
+              </div>
+              <p className="text-sm text-gray-500">Total Users</p>
+            </div>
+            <p className="text-3xl font-bold">{stats?.totalUsers || 0}</p>
           </div>
-          <div className="bg-white rounded-xl p-4 border">
-            <p className="text-sm text-gray-500">Access Granted</p>
-            <p className="text-2xl font-bold text-green-600">
-              {entries.filter((e) => e.access_granted).length}
-            </p>
+          <div className="bg-white rounded-xl p-4 border shadow-sm">
+            <div className="flex items-center gap-3 mb-2">
+              <div className="w-10 h-10 bg-green-100 rounded-lg flex items-center justify-center">
+                <UserCheck className="w-5 h-5 text-green-600" />
+              </div>
+              <p className="text-sm text-gray-500">Access Granted</p>
+            </div>
+            <p className="text-3xl font-bold text-green-600">{stats?.accessGranted || 0}</p>
           </div>
-          <div className="bg-white rounded-xl p-4 border">
-            <p className="text-sm text-gray-500">Waiting</p>
-            <p className="text-2xl font-bold text-orange-600">
-              {entries.filter((e) => !e.access_granted).length}
-            </p>
+          <div className="bg-white rounded-xl p-4 border shadow-sm">
+            <div className="flex items-center gap-3 mb-2">
+              <div className="w-10 h-10 bg-orange-100 rounded-lg flex items-center justify-center">
+                <TrendingUp className="w-5 h-5 text-orange-600" />
+              </div>
+              <p className="text-sm text-gray-500">Waiting</p>
+            </div>
+            <p className="text-3xl font-bold text-orange-600">{stats?.waiting || 0}</p>
           </div>
-          <div className="bg-white rounded-xl p-4 border">
-            <p className="text-sm text-gray-500">Total Referrals</p>
-            <p className="text-2xl font-bold">
-              {entries.reduce((sum, e) => sum + e.referrals_count, 0)}
-            </p>
+          <div className="bg-white rounded-xl p-4 border shadow-sm">
+            <div className="flex items-center gap-3 mb-2">
+              <div className="w-10 h-10 bg-purple-100 rounded-lg flex items-center justify-center">
+                <Share2 className="w-5 h-5 text-purple-600" />
+              </div>
+              <p className="text-sm text-gray-500">Total Referrals</p>
+            </div>
+            <p className="text-3xl font-bold text-purple-600">{stats?.totalReferrals || 0}</p>
+          </div>
+        </div>
+
+        {/* Charts Row */}
+        <div className="grid md:grid-cols-2 gap-6 mb-8">
+          {/* Daily Signups Chart */}
+          <div className="bg-white rounded-xl border shadow-sm p-6">
+            <h3 className="font-semibold text-gray-900 mb-4">Daily Signups (Last 7 Days)</h3>
+            {stats?.dailySignups && stats.dailySignups.length > 0 ? (
+              <ResponsiveContainer width="100%" height={200}>
+                <BarChart data={stats.dailySignups}>
+                  <XAxis 
+                    dataKey="date" 
+                    tickFormatter={(value) => new Date(value).toLocaleDateString('en-US', { weekday: 'short' })}
+                    tick={{ fontSize: 12 }}
+                  />
+                  <YAxis tick={{ fontSize: 12 }} allowDecimals={false} />
+                  <Tooltip 
+                    labelFormatter={(value) => new Date(value).toLocaleDateString()}
+                    formatter={(value) => [value, 'Signups']}
+                  />
+                  <Bar dataKey="count" fill="#3b82f6" radius={[4, 4, 0, 0]} />
+                </BarChart>
+              </ResponsiveContainer>
+            ) : (
+              <div className="h-[200px] flex items-center justify-center text-gray-400">
+                No data yet
+              </div>
+            )}
+          </div>
+
+          {/* Top Referrers */}
+          <div className="bg-white rounded-xl border shadow-sm p-6">
+            <h3 className="font-semibold text-gray-900 mb-4">Top Referrers</h3>
+            {stats?.topReferrers && stats.topReferrers.length > 0 ? (
+              <div className="space-y-3">
+                {stats.topReferrers.map((referrer, index) => (
+                  <div key={index} className="flex items-center justify-between">
+                    <div className="flex items-center gap-3">
+                      <span className="w-6 h-6 bg-gray-100 rounded-full flex items-center justify-center text-sm font-medium text-gray-600">
+                        {index + 1}
+                      </span>
+                      <span className="text-sm text-gray-700 truncate max-w-[180px]">
+                        {referrer.email}
+                      </span>
+                    </div>
+                    <span className="text-sm font-semibold text-purple-600">
+                      {referrer.referrals} referrals
+                    </span>
+                  </div>
+                ))}
+              </div>
+            ) : (
+              <div className="h-[200px] flex items-center justify-center text-gray-400">
+                No referrals yet
+              </div>
+            )}
           </div>
         </div>
 
         {/* Table */}
-        <div className="bg-white rounded-xl border overflow-hidden">
+        <div className="bg-white rounded-xl border shadow-sm overflow-hidden">
+          <div className="px-6 py-4 border-b">
+            <h3 className="font-semibold text-gray-900">All Users</h3>
+          </div>
           {loadingEntries ? (
             <div className="flex items-center justify-center py-20">
               <div className="w-8 h-8 border-2 border-gray-900 border-t-transparent rounded-full animate-spin" />
@@ -194,7 +271,7 @@ const Admin = () => {
                 <thead className="bg-gray-50 border-b">
                   <tr>
                     <th className="text-left text-sm font-medium text-gray-500 px-4 py-3">Pos</th>
-                    <th className="text-left text-sm font-medium text-gray-500 px-4 py-3">Email/Phone</th>
+                    <th className="text-left text-sm font-medium text-gray-500 px-4 py-3">Email</th>
                     <th className="text-left text-sm font-medium text-gray-500 px-4 py-3">Referral Code</th>
                     <th className="text-left text-sm font-medium text-gray-500 px-4 py-3">Referrals</th>
                     <th className="text-left text-sm font-medium text-gray-500 px-4 py-3">Status</th>

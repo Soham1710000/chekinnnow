@@ -284,17 +284,36 @@ export const NetworkHero = () => {
         </motion.button>
 
         {/* Waitlisted users logos */}
-        <div className="flex flex-col items-center gap-2">
+        <div className="flex flex-col items-center gap-3">
           <p className="text-[10px] md:text-xs text-gray-400 uppercase tracking-wider font-medium">
             Waitlisted users are from
           </p>
-          <div className="flex items-center gap-4 md:gap-6 opacity-60">
-            <span className="text-xs md:text-sm font-semibold text-gray-600">CRED</span>
-            <span className="text-xs md:text-sm font-semibold text-gray-600">Flipkart</span>
-            <span className="text-xs md:text-sm font-semibold text-gray-600">Google</span>
-            <span className="text-xs md:text-sm font-semibold text-gray-600 hidden sm:block">Amazon</span>
-            <span className="text-xs md:text-sm font-semibold text-gray-600">IIT Delhi</span>
-            <span className="text-xs md:text-sm font-semibold text-gray-600 hidden sm:block">IIT Bombay</span>
+          <div className="flex items-center justify-center gap-6 md:gap-10 flex-wrap opacity-50 grayscale">
+            {/* CRED */}
+            <svg className="h-4 md:h-5" viewBox="0 0 80 24" fill="currentColor">
+              <text x="0" y="18" className="text-gray-700" style={{ fontSize: '18px', fontWeight: 900, letterSpacing: '-0.5px' }}>CRED</text>
+            </svg>
+            {/* Flipkart */}
+            <svg className="h-4 md:h-5" viewBox="0 0 80 24" fill="currentColor">
+              <text x="0" y="18" className="text-gray-700" style={{ fontSize: '16px', fontWeight: 700, fontStyle: 'italic' }}>flipkart</text>
+            </svg>
+            {/* Google */}
+            <div className="flex items-center">
+              <span className="text-sm md:text-base font-medium" style={{ color: '#4285F4' }}>G</span>
+              <span className="text-sm md:text-base font-medium" style={{ color: '#EA4335' }}>o</span>
+              <span className="text-sm md:text-base font-medium" style={{ color: '#FBBC05' }}>o</span>
+              <span className="text-sm md:text-base font-medium" style={{ color: '#4285F4' }}>g</span>
+              <span className="text-sm md:text-base font-medium" style={{ color: '#34A853' }}>l</span>
+              <span className="text-sm md:text-base font-medium" style={{ color: '#EA4335' }}>e</span>
+            </div>
+            {/* Amazon */}
+            <svg className="h-4 md:h-5 hidden sm:block" viewBox="0 0 90 24" fill="currentColor">
+              <text x="0" y="18" className="text-gray-700" style={{ fontSize: '16px', fontWeight: 700, letterSpacing: '-0.3px' }}>amazon</text>
+            </svg>
+            {/* IIT Delhi */}
+            <span className="text-xs md:text-sm font-bold text-gray-600 tracking-tight">IIT Delhi</span>
+            {/* IIT Bombay */}
+            <span className="text-xs md:text-sm font-bold text-gray-600 tracking-tight hidden sm:block">IIT Bombay</span>
           </div>
         </div>
       </motion.div>

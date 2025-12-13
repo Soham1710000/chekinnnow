@@ -111,17 +111,27 @@ const IPhoneMockup = ({ currentIndex }: { currentIndex: number }) => {
             {/* Spacer to push reply to bottom */}
             <div className="flex-1" />
 
-            {/* Reply message */}
+            {/* Reply message with profile */}
             <div className="px-3 md:px-4 mt-auto mb-28 md:mb-40">
               <AnimatePresence mode="wait">
                 <motion.div
                   key={`reply-${currentProfile.id}`}
-                  className="flex justify-end"
+                  className="flex flex-col items-end gap-1"
                   initial={{ opacity: 0, x: 20 }}
                   animate={{ opacity: 1, x: 0 }}
                   exit={{ opacity: 0, x: -20 }}
                   transition={{ duration: 0.4, delay: 0.4 }}
                 >
+                  {/* Profile name and photo */}
+                  <div className="flex items-center gap-1.5 mr-1">
+                    <span className="text-[10px] md:text-xs text-gray-500 font-medium">{currentProfile.name.split(" ")[0]}</span>
+                    <img 
+                      src={currentProfile.image} 
+                      alt={currentProfile.name}
+                      className="w-5 h-5 md:w-6 md:h-6 rounded-full object-cover border border-gray-200"
+                    />
+                  </div>
+                  {/* Message bubble */}
                   <div className="bg-[#007AFF] text-white rounded-2xl rounded-br-md px-3 md:px-4 py-2">
                     <p className="text-xs md:text-sm font-medium">{currentProfile.reply}</p>
                   </div>

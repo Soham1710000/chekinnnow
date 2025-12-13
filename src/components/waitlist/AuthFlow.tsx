@@ -1,4 +1,4 @@
-import { useState } from "react";
+import { useState, useEffect } from "react";
 import { motion } from "framer-motion";
 import { supabase } from "@/integrations/supabase/client";
 import { Button } from "@/components/ui/button";
@@ -6,6 +6,7 @@ import { Input } from "@/components/ui/input";
 import { toast } from "sonner";
 import { z } from "zod";
 import { Loader2 } from "lucide-react";
+import { useFunnelTracking } from "@/hooks/useFunnelTracking";
 
 const emailSchema = z.string().email("Please enter a valid email");
 
@@ -14,6 +15,16 @@ export const AuthFlow = () => {
   const [email, setEmail] = useState("");
   const [password, setPassword] = useState("");
   const [isSignUp, setIsSignUp] = useState(true);
+  const [hasStartedAuth, setHasStartedAuth] = useState(false);
+  const { trackEvent } = useFunnelTracking();
+
+  // Track when user starts typing (first interaction with auth form)
+  useEffect(() => {
+    if ((email || password) && !hasStartedAuth) {
+      setHasStartedAuth(true);
+      trackEvent("auth_start", { mode: isSignUp ? "signup" : "signin" });
+    }
+  }, [email, password, hasStartedAuth, isSignUp, trackEvent]);
 
   const handleEmailAuth = async () => {
     try {
@@ -46,6 +57,7 @@ export const AuthFlow = () => {
             throw error;
           }
         } else {
+          trackEvent("auth_complete", { mode: "signup" });
           toast.success("Account created successfully!");
         }
       } else {
@@ -54,6 +66,7 @@ export const AuthFlow = () => {
           password,
         });
         if (error) throw error;
+        trackEvent("auth_complete", { mode: "signin" });
         toast.success("Signed in successfully!");
       }
     } catch (error: any) {

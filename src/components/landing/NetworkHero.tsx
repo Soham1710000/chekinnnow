@@ -17,9 +17,11 @@ import rheaImg from "@/assets/profiles/rhea.jpg";
 import devImg from "@/assets/profiles/dev.jpg";
 import ishaanImg from "@/assets/profiles/ishaan.jpg";
 import pallaviImg from "@/assets/profiles/pallavi.jpg";
+import aaravImg from "@/assets/profiles/aarav.jpg";
+import nishaImg from "@/assets/profiles/nisha.jpg";
 
 // Preload all profile images for instant switching
-const allImages = [arnavImg, meeraImg, kushalImg, rajatImg, siddharthImg, ananyaImg, rheaImg, devImg, ishaanImg, pallaviImg];
+const allImages = [arnavImg, meeraImg, kushalImg, rajatImg, siddharthImg, ananyaImg, rheaImg, devImg, ishaanImg, pallaviImg, aaravImg, nishaImg];
 
 const usePreloadImages = (images: string[]) => {
   useLayoutEffect(() => {
@@ -86,6 +88,17 @@ const profiles = [
     replyTitle: "Brand Marketer",
     replyImage: pallaviImg,
     reply: "Happy to share notes."
+  },
+  {
+    id: 6,
+    name: "Aarav",
+    title: "Early Career",
+    bio: "I've been trying to meet people who enjoy **long walks** and **good coffee**. Feels nicer when there's something simple in common.",
+    image: aaravImg,
+    replyName: "Nisha",
+    replyTitle: "Working Professional",
+    replyImage: nishaImg,
+    reply: "That sounds like my kind of thing. Happy to catch up."
   }
 ];
 

@@ -12,7 +12,7 @@ const profiles = [
     name: "Aakash Singh",
     bio: "Final Year Student | Looking for roles in growth or ops | Don't know how to reach recruiters",
     image: "https://images.unsplash.com/photo-1506794778202-cad84cf45f1d?w=400&h=500&fit=crop&crop=face",
-    reply: "Happy to help. I usually talk to candidates who already have context.",
+    reply: "Happy to help!",
     replyFrom: "Priya Nair",
     reason: "One is hiring, one is exploring roles"
   },
@@ -21,7 +21,7 @@ const profiles = [
     name: "Rohan Verma",
     bio: "Software Engineer | Trying to move into UI roles | Built real projects, unsure who to talk to",
     image: "https://images.unsplash.com/photo-1507003211169-0a1dd7228f2d?w=400&h=500&fit=crop&crop=face",
-    reply: "Made the same switch last year. Happy to share what worked!",
+    reply: "Made the same switch!",
     replyFrom: "Riya Mehta",
     reason: "Both navigating a career transition"
   },
@@ -30,7 +30,7 @@ const profiles = [
     name: "Amit Jain",
     bio: "Angel Investor | Exploring AI concierge apps | Real usage matters more than pitch decks",
     image: "https://images.unsplash.com/photo-1472099645785-5658abf4ff4e?w=400&h=500&fit=crop&crop=face",
-    reply: "We handle ~120 tasks/day with 2,400 daily visits. Still early!",
+    reply: "2,400 daily users 🚀",
     replyFrom: "Karan Malhotra",
     reason: "One investing, one building with traction"
   },
@@ -39,7 +39,7 @@ const profiles = [
     name: "Neha Kapoor",
     bio: "Consumer Operations | Want to work on consumer AI with founders who ship fast",
     image: "https://images.unsplash.com/photo-1494790108377-be9c29b29330?w=400&h=500&fit=crop&crop=face",
-    reply: "We shipped v1 in under two weeks. Looking for someone like you!",
+    reply: "Let's talk!",
     replyFrom: "Arjun Mehra",
     reason: "Matched on intent to collaborate"
   }
@@ -125,8 +125,8 @@ const IPhoneMockup = ({ currentIndex }: { currentIndex: number }) => {
                   exit={{ opacity: 0, x: -20 }}
                   transition={{ duration: 0.4, delay: 0.4 }}
                 >
-                  <div className="bg-[#007AFF] text-white rounded-2xl rounded-br-md px-3 md:px-4 py-2">
-                    <p className="text-xs md:text-sm font-medium">{currentProfile.reply}</p>
+                  <div className="bg-[#007AFF] text-white rounded-2xl rounded-br-md px-2 md:px-3 py-1.5 md:py-2 max-w-[140px] md:max-w-none">
+                    <p className="text-[10px] md:text-sm font-medium">{currentProfile.reply}</p>
                   </div>
                 </motion.div>
               </AnimatePresence>

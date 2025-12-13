@@ -36,7 +36,7 @@ const profiles = [
     id: 3,
     name: "Siddharth",
     title: "Software Engineer",
-    bio: "I'm trying to move into **gaming companies** as an SDE. Built **side projects**, unsure how to approach teams early.",
+    bio: "Built **side projects**, trying to break into **gaming** as an SDE.",
     image: "https://images.unsplash.com/photo-1611432579699-484f7990b127?w=400&h=500&fit=crop&crop=face",
     replyName: "Ananya",
     replyTitle: "Talent Lead, Gaming Startup",

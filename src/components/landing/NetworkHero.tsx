@@ -98,7 +98,7 @@ const profiles = [
     replyName: "Nisha",
     replyTitle: "Working Professional",
     replyImage: nishaImg,
-    reply: "That sounds like my kind of thing. Happy to catch up."
+    reply: "That sounds like my kind of thing. When?"
   }
 ];
 

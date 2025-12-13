@@ -9,7 +9,7 @@ export const FinalCTA = () => {
   const [isModalOpen, setIsModalOpen] = useState(false);
 
   return (
-    <section ref={ref} className="section-padding bg-background">
+    <section ref={ref} className="py-12 md:py-16 lg:py-20 bg-background">
       <div className="container-apple">
         <div className="max-w-4xl mx-auto text-center">
           <motion.div

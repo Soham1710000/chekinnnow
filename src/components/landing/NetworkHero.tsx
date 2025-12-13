@@ -9,35 +9,39 @@ import { WaitlistModal } from "@/components/waitlist/WaitlistModal";
 const profiles = [
   {
     id: 1,
-    name: "Sarah Chen",
-    bio: "Stanford CS '25 | Building AI tools for creators | Looking to connect with founders",
-    image: "https://images.unsplash.com/photo-1494790108377-be9c29b29330?w=400&h=500&fit=crop&crop=face",
-    reply: "Would love to connect! ☕️",
-    reason: "Both interested in AI tools for creators"
+    name: "Aakash Singh",
+    bio: "Final Year Student | Looking for roles in growth or ops | Don't know how to reach recruiters",
+    image: "https://images.unsplash.com/photo-1506794778202-cad84cf45f1d?w=400&h=500&fit=crop&crop=face",
+    reply: "Happy to help. I usually talk to candidates who already have context.",
+    replyFrom: "Priya Nair",
+    reason: "One is hiring, one is exploring roles"
   },
   {
     id: 2,
-    name: "Marcus Johnson",
-    bio: "YC Founder | Previously @Stripe | Angel investing in health-tech",
+    name: "Rohan Verma",
+    bio: "Software Engineer | Trying to move into UI roles | Built real projects, unsure who to talk to",
     image: "https://images.unsplash.com/photo-1507003211169-0a1dd7228f2d?w=400&h=500&fit=crop&crop=face",
-    reply: "Let's grab coffee this week!",
-    reason: "You're building in health-tech, he's investing"
+    reply: "Made the same switch last year. Happy to share what worked!",
+    replyFrom: "Riya Mehta",
+    reason: "Both navigating a career transition"
   },
   {
     id: 3,
-    name: "Emma Rodriguez",
-    bio: "Product @Figma | Community builder | Always down to help early-stage startups",
-    image: "https://images.unsplash.com/photo-1438761681033-6461ffad8d80?w=400&h=500&fit=crop&crop=face",
-    reply: "Intro'd you to my network 🙌",
-    reason: "She mentors early-stage founders like you"
+    name: "Amit Jain",
+    bio: "Angel Investor | Exploring AI concierge apps | Real usage matters more than pitch decks",
+    image: "https://images.unsplash.com/photo-1472099645785-5658abf4ff4e?w=400&h=500&fit=crop&crop=face",
+    reply: "We handle ~120 tasks/day with 2,400 daily visits. Still early!",
+    replyFrom: "Karan Malhotra",
+    reason: "One investing, one building with traction"
   },
   {
     id: 4,
-    name: "Alex Kim",
-    bio: "MIT '24 | ML researcher | Open to collabs on robotics projects",
-    image: "https://images.unsplash.com/photo-1472099645785-5658abf4ff4e?w=400&h=500&fit=crop&crop=face",
-    reply: "This is exactly what I needed!",
-    reason: "Your robotics project matches his research"
+    name: "Neha Kapoor",
+    bio: "Consumer Operations | Want to work on consumer AI with founders who ship fast",
+    image: "https://images.unsplash.com/photo-1494790108377-be9c29b29330?w=400&h=500&fit=crop&crop=face",
+    reply: "We shipped v1 in under two weeks. Looking for someone like you!",
+    replyFrom: "Arjun Mehra",
+    reason: "Matched on intent to collaborate"
   }
 ];
 

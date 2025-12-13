@@ -318,11 +318,7 @@ export const NetworkHero = () => {
           <p className="text-[10px] md:text-xs text-gray-600 uppercase tracking-wider font-semibold">
             Waitlisted users are from
           </p>
-          <div className="flex items-center justify-center gap-4 md:gap-8 flex-wrap">
-            {/* CRED */}
-            <span className="text-sm md:text-base font-black text-gray-800 tracking-tight">CRED</span>
-            {/* Flipkart */}
-            <span className="text-sm md:text-base font-bold text-gray-800 italic">flipkart</span>
+          <div className="flex items-center justify-center gap-3 md:gap-6 flex-wrap">
             {/* Google */}
             <div className="flex items-center">
               <span className="text-sm md:text-base font-medium" style={{ color: '#4285F4' }}>G</span>
@@ -332,12 +328,20 @@ export const NetworkHero = () => {
               <span className="text-sm md:text-base font-medium" style={{ color: '#34A853' }}>l</span>
               <span className="text-sm md:text-base font-medium" style={{ color: '#EA4335' }}>e</span>
             </div>
-            {/* Amazon */}
-            <span className="text-sm md:text-base font-bold text-gray-800 tracking-tight hidden sm:block">amazon</span>
+            {/* Netflix */}
+            <span className="text-sm md:text-base font-bold text-[#E50914] tracking-tight">NETFLIX</span>
+            {/* BCG */}
+            <span className="text-sm md:text-base font-bold text-gray-800 tracking-tight">BCG</span>
+            {/* Stanford */}
+            <span className="text-sm md:text-base font-bold text-[#8C1515] tracking-tight">Stanford</span>
+            {/* Tier 1 VC */}
+            <span className="text-xs md:text-sm font-semibold text-gray-700 tracking-tight">Tier 1 VCs</span>
+            {/* CRED */}
+            <span className="text-sm md:text-base font-black text-gray-800 tracking-tight hidden sm:block">CRED</span>
+            {/* Flipkart */}
+            <span className="text-sm md:text-base font-bold text-gray-800 italic hidden sm:block">flipkart</span>
             {/* IIT Delhi */}
-            <span className="text-xs md:text-sm font-bold text-gray-800 tracking-tight">IIT Delhi</span>
-            {/* IIT Bombay */}
-            <span className="text-xs md:text-sm font-bold text-gray-800 tracking-tight hidden sm:block">IIT Bombay</span>
+            <span className="text-xs md:text-sm font-bold text-gray-800 tracking-tight hidden md:block">IIT Delhi</span>
           </div>
         </div>
       </motion.div>

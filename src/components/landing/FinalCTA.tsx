@@ -1,10 +1,12 @@
-import { useRef } from "react";
+import { useRef, useState } from "react";
 import { motion, useInView } from "framer-motion";
 import { Button } from "@/components/ui/button";
+import { WaitlistModal } from "@/components/waitlist/WaitlistModal";
 
 export const FinalCTA = () => {
   const ref = useRef(null);
   const isInView = useInView(ref, { once: true, margin: "-100px" });
+  const [isModalOpen, setIsModalOpen] = useState(false);
 
   return (
     <section ref={ref} className="section-padding bg-background">
@@ -16,14 +18,21 @@ export const FinalCTA = () => {
             transition={{ duration: 0.8 }}
             className="flex justify-center"
           >
-            <Button variant="hero" size="hero" asChild>
-              <a href="https://app.emergent.sh/share?app=voicechat-companion" target="_blank" rel="noopener noreferrer">
-                Join Waitlist
-              </a>
+            <Button 
+              variant="hero" 
+              size="hero"
+              onClick={() => setIsModalOpen(true)}
+            >
+              Join the Waitlist
             </Button>
           </motion.div>
         </div>
       </div>
+
+      <WaitlistModal 
+        isOpen={isModalOpen} 
+        onClose={() => setIsModalOpen(false)}
+      />
     </section>
   );
 };

@@ -2,8 +2,9 @@ import { motion, AnimatePresence } from "framer-motion";
 import { useState, useEffect } from "react";
 import { useSearchParams } from "react-router-dom";
 import { Button } from "@/components/ui/button";
-import { ChevronDown } from "lucide-react";
+import { ChevronDown, Users } from "lucide-react";
 import { WaitlistModal } from "@/components/waitlist/WaitlistModal";
+import { supabase } from "@/integrations/supabase/client";
 
 // Sample profile data that cycles through
 const profiles = [
@@ -180,7 +181,19 @@ export const NetworkHero = () => {
   const [searchParams] = useSearchParams();
   const [isModalOpen, setIsModalOpen] = useState(false);
   const [currentIndex, setCurrentIndex] = useState(0);
+  const [waitlistCount, setWaitlistCount] = useState<number | null>(null);
   const referralCode = searchParams.get("ref");
+
+  // Fetch waitlist count
+  useEffect(() => {
+    const fetchCount = async () => {
+      const { count } = await supabase
+        .from('waitlist')
+        .select('*', { count: 'exact', head: true });
+      setWaitlistCount(count ?? 0);
+    };
+    fetchCount();
+  }, []);
 
   // Store referral code silently
   useEffect(() => {
@@ -227,12 +240,29 @@ export const NetworkHero = () => {
               transition={{ duration: 0.8, delay: 0.3 }}
               className="flex flex-col items-center lg:items-start gap-6 md:gap-8"
             >
-              <Button 
-                className="bg-gray-900 text-white border-0 px-6 md:px-8 py-5 md:py-6 text-base md:text-lg font-medium rounded-full hover:bg-gray-800 transition-colors w-full sm:w-auto"
-                onClick={() => setIsModalOpen(true)}
-              >
-                Join the Waitlist
-              </Button>
+              <div className="flex flex-col items-center lg:items-start gap-3">
+                <Button 
+                  className="bg-gray-900 text-white border-0 px-6 md:px-8 py-5 md:py-6 text-base md:text-lg font-medium rounded-full hover:bg-gray-800 transition-colors w-full sm:w-auto"
+                  onClick={() => setIsModalOpen(true)}
+                >
+                  Join the Waitlist
+                </Button>
+                
+                {/* Waitlist counter */}
+                {waitlistCount !== null && waitlistCount > 0 && (
+                  <motion.div
+                    initial={{ opacity: 0 }}
+                    animate={{ opacity: 1 }}
+                    transition={{ delay: 0.5 }}
+                    className="flex items-center gap-1.5 text-gray-500"
+                  >
+                    <Users className="w-3.5 h-3.5" />
+                    <span className="text-xs font-medium">
+                      {waitlistCount.toLocaleString()}+ people waiting
+                    </span>
+                  </motion.div>
+                )}
+              </div>
               
               {/* Mobile scroll nudge */}
               <motion.button

@@ -149,9 +149,9 @@ const IPhoneMockup = ({ currentIndex }: { currentIndex: number }) => {
           
           {/* Screen content */}
           <div className="absolute inset-0 pt-8 md:pt-12 bg-gradient-to-b from-gray-50 to-white flex flex-col">
-            {/* iMessage header */}
+            {/* ChekInn header */}
             <div className="px-4 py-1.5 md:py-2 border-b border-gray-100">
-              <p className="text-[10px] md:text-xs text-gray-500 text-center">iMessage</p>
+              <p className="text-[10px] md:text-xs text-gray-500 text-center">ChekInn</p>
             </div>
 
             {/* Spacer to push reply to bottom */}

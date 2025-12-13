@@ -1,8 +1,9 @@
 import { motion, AnimatePresence } from "framer-motion";
 import { useState, useEffect } from "react";
+import { useNavigate, useSearchParams } from "react-router-dom";
 import { Button } from "@/components/ui/button";
 import { ChevronDown } from "lucide-react";
-
+import { WaitlistModal } from "@/components/waitlist/WaitlistModal";
 // Sample profile data that cycles through
 const profiles = [
   {
@@ -158,6 +159,17 @@ const NetworkVisualization = () => {
 };
 
 export const NetworkHero = () => {
+  const [searchParams] = useSearchParams();
+  const [isModalOpen, setIsModalOpen] = useState(false);
+  const referralCode = searchParams.get("ref");
+
+  // Store referral code silently
+  useEffect(() => {
+    if (referralCode) {
+      sessionStorage.setItem("waitlist_ref", referralCode);
+    }
+  }, [referralCode]);
+
   return (
     <section className="relative min-h-screen bg-white overflow-hidden flex items-center">
       <div className="container-apple relative z-10 py-20 pb-32">
@@ -186,11 +198,9 @@ export const NetworkHero = () => {
             >
               <Button 
                 className="bg-gray-900 text-white border-0 px-8 py-6 text-lg font-medium rounded-full hover:bg-gray-800 transition-colors"
-                asChild
+                onClick={() => setIsModalOpen(true)}
               >
-                <a href="https://app.emergent.sh/share?app=voicechat-companion" target="_blank" rel="noopener noreferrer">
-                  Join the Waitlist
-                </a>
+                Join the Waitlist
               </Button>
             </motion.div>
           </motion.div>
@@ -223,6 +233,13 @@ export const NetworkHero = () => {
           <ChevronDown className="w-5 h-5" />
         </motion.div>
       </motion.button>
+
+      {/* Waitlist Modal */}
+      <WaitlistModal 
+        isOpen={isModalOpen} 
+        onClose={() => setIsModalOpen(false)}
+        referralCode={referralCode}
+      />
     </section>
   );
 };

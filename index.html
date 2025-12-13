@@ -8,10 +8,14 @@
     <meta name="author" content="ChekInn" />
     <link rel="canonical" href="https://chekinn.app" />
 
-    <!-- Preload fonts for faster rendering -->
+    <!-- Preconnect to external domains -->
     <link rel="preconnect" href="https://fonts.googleapis.com" />
     <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
-    <link href="https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700&display=swap" rel="stylesheet" />
+    <link rel="preconnect" href="https://pnyebagcmymrukwjkepz.supabase.co" />
+    
+    <!-- Preload critical font with swap for faster text rendering -->
+    <link rel="preload" href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&display=swap" as="style" />
+    <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&display=swap" rel="stylesheet" />
 
     <meta property="og:title" content="ChekInn — AI-Powered Introductions for Your Career" />
     <meta property="og:description" content="Your next opportunity starts with the right introduction. ChekInn connects you with recruiters, mentors, founders and collaborators." />

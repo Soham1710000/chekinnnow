@@ -6,6 +6,18 @@ import { ChevronDown, Users } from "lucide-react";
 import { WaitlistModal } from "@/components/waitlist/WaitlistModal";
 import { supabase } from "@/integrations/supabase/client";
 
+// Import profile images
+import arnavImg from "@/assets/profiles/arnav.jpg";
+import meeraImg from "@/assets/profiles/meera.jpg";
+import kushalImg from "@/assets/profiles/kushal.jpg";
+import rajatImg from "@/assets/profiles/rajat.jpg";
+import siddharthImg from "@/assets/profiles/siddharth.jpg";
+import ananyaImg from "@/assets/profiles/ananya.jpg";
+import rheaImg from "@/assets/profiles/rhea.jpg";
+import devImg from "@/assets/profiles/dev.jpg";
+import ishaanImg from "@/assets/profiles/ishaan.jpg";
+import pallaviImg from "@/assets/profiles/pallavi.jpg";
+
 // Sample profile data that cycles through
 const profiles = [
   {
@@ -13,10 +25,10 @@ const profiles = [
     name: "Arnav",
     title: "Robotics Student",
     bio: "I'm working on a **robotics project** and exploring **research opportunities** in the US.",
-    image: "https://images.unsplash.com/photo-1531891437562-4301cf35b7e4?w=400&h=500&fit=crop&crop=face",
+    image: arnavImg,
     replyName: "Dr. Meera Iyer",
     replyTitle: "Research Faculty",
-    replyImage: "https://images.unsplash.com/photo-1573496359142-b8d87734a5a2?w=400&h=500&fit=crop&crop=face",
+    replyImage: meeraImg,
     reply: "Sounds interesting. Happy to talk."
   },
   {
@@ -24,10 +36,10 @@ const profiles = [
     name: "Kushal",
     title: "Early-Stage Founder",
     bio: "I'm building in **quick commerce** and testing **unit economics** at a small scale.",
-    image: "https://images.unsplash.com/photo-1519085360753-af0119f7cbe7?w=400&h=500&fit=crop&crop=face",
+    image: kushalImg,
     replyName: "Rajat",
     replyTitle: "Angel Investor",
-    replyImage: "https://images.unsplash.com/photo-1472099645785-5658abf4ff4e?w=400&h=500&fit=crop&crop=face",
+    replyImage: rajatImg,
     reply: "I've spent time studying this sector."
   },
   {
@@ -35,10 +47,10 @@ const profiles = [
     name: "Siddharth",
     title: "Software Engineer",
     bio: "Built **side projects**, trying to break into **gaming** as an SDE.",
-    image: "https://images.unsplash.com/photo-1500648767791-00dcc994a43e?w=400&h=500&fit=crop&crop=face",
+    image: siddharthImg,
     replyName: "Ananya",
     replyTitle: "Talent Lead, Gaming Startup",
-    replyImage: "https://images.unsplash.com/photo-1487412720507-e7ab37603c6f?w=400&h=500&fit=crop&crop=face",
+    replyImage: ananyaImg,
     reply: "That's understandable. Happy to chat."
   },
   {
@@ -46,10 +58,10 @@ const profiles = [
     name: "Rhea",
     title: "College Student & Gamer",
     bio: "I spend a lot of time playing **indie games**. Trying to understand what **paths exist** after college.",
-    image: "https://images.unsplash.com/photo-1534528741775-53994a69daeb?w=400&h=500&fit=crop&crop=face",
+    image: rheaImg,
     replyName: "Dev",
     replyTitle: "Game Studio Team",
-    replyImage: "https://images.unsplash.com/photo-1506794778202-cad84cf45f1d?w=400&h=500&fit=crop&crop=face",
+    replyImage: devImg,
     reply: "We are looking for beta testers in the team."
   },
   {
@@ -57,10 +69,10 @@ const profiles = [
     name: "Ishaan",
     title: "Growth Marketer",
     bio: "Curious how **brand marketing** works at different stages.",
-    image: "https://images.unsplash.com/photo-1507003211169-0a1dd7228f2d?w=400&h=500&fit=crop&crop=face",
+    image: ishaanImg,
     replyName: "Pallavi",
     replyTitle: "Brand Marketer",
-    replyImage: "https://images.unsplash.com/photo-1438761681033-6461ffad8d80?w=400&h=500&fit=crop&crop=face",
+    replyImage: pallaviImg,
     reply: "Happy to share notes."
   }
 ];

@@ -225,6 +225,7 @@ export const NetworkHero = () => {
               initial={{ opacity: 0, y: 20 }}
               animate={{ opacity: 1, y: 0 }}
               transition={{ duration: 0.8, delay: 0.3 }}
+              className="flex flex-col items-center lg:items-start gap-6 md:gap-8"
             >
               <Button 
                 className="bg-gray-900 text-white border-0 px-6 md:px-8 py-5 md:py-6 text-base md:text-lg font-medium rounded-full hover:bg-gray-800 transition-colors w-full sm:w-auto"
@@ -232,6 +233,20 @@ export const NetworkHero = () => {
               >
                 Join the Waitlist
               </Button>
+              
+              {/* Mobile scroll nudge */}
+              <motion.button
+                onClick={() => window.scrollTo({ top: window.innerHeight, behavior: "smooth" })}
+                className="flex flex-col items-center gap-1 text-gray-400 hover:text-gray-900 transition-colors cursor-pointer md:hidden"
+              >
+                <span className="text-xs font-medium tracking-wider uppercase">Scroll</span>
+                <motion.div
+                  animate={{ y: [0, 6, 0] }}
+                  transition={{ duration: 1.5, repeat: Infinity, ease: "easeInOut" }}
+                >
+                  <ChevronDown className="w-5 h-5" />
+                </motion.div>
+              </motion.button>
             </motion.div>
           </motion.div>
 

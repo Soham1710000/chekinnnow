@@ -46,7 +46,7 @@ const profiles = [
   {
     id: 2,
     name: "Kushal",
-    title: "Early-Stage Founder",
+    title: "Founder",
     bio: "I'm building in **quick commerce** and testing **unit economics**.",
     image: kushalImg,
     replyName: "Rajat",
@@ -57,7 +57,7 @@ const profiles = [
   {
     id: 3,
     name: "Siddharth",
-    title: "Software Engineer",
+    title: "College Student",
     bio: "Built **side projects**, trying to break into **gaming** as an SDE.",
     image: siddharthImg,
     replyName: "Ananya",
@@ -68,7 +68,7 @@ const profiles = [
   {
     id: 4,
     name: "Rhea",
-    title: "College Student & Gamer",
+    title: "College Student",
     bio: "I play **indie games** a lot. Not sure what comes **after college**.",
     image: rheaImg,
     replyName: "Dev",

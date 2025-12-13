@@ -113,7 +113,7 @@ const IPhoneMockup = () => {
             <div className="flex-1" />
 
             {/* Reply message */}
-            <div className="px-4 mt-auto mb-24">
+            <div className="px-4 mt-auto mb-32">
               <AnimatePresence mode="wait">
                 <motion.div
                   key={`reply-${currentProfile.id}`}

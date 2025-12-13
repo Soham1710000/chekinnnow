@@ -34,6 +34,37 @@ const profiles = [
   }
 ];
 
+// Floating Profile Card
+const FloatingProfileCard = ({ profile }: { profile: typeof profiles[0] }) => (
+  <motion.div
+    className="absolute -left-16 top-24 z-30 w-[180px]"
+    animate={{ y: [0, -8, 0] }}
+    transition={{ duration: 4, repeat: Infinity, ease: "easeInOut" }}
+  >
+    <AnimatePresence mode="wait">
+      <motion.div
+        key={profile.id}
+        className="bg-white rounded-2xl shadow-2xl border border-gray-100 overflow-hidden"
+        initial={{ opacity: 0, x: -20, scale: 0.95 }}
+        animate={{ opacity: 1, x: 0, scale: 1 }}
+        exit={{ opacity: 0, x: 20, scale: 0.95 }}
+        transition={{ duration: 0.5 }}
+      >
+        <div className="aspect-[4/5] relative overflow-hidden">
+          <img 
+            src={profile.image} 
+            alt={profile.name}
+            className="w-full h-full object-cover"
+          />
+          <div className="absolute bottom-2 left-2 bg-black/70 backdrop-blur-sm text-white text-xs font-semibold px-2 py-1 rounded-lg">
+            {profile.name.split(' ')[0]}
+          </div>
+        </div>
+      </motion.div>
+    </AnimatePresence>
+  </motion.div>
+);
+
 // Half iPhone Mockup with cycling content
 const IPhoneMockup = () => {
   const [currentIndex, setCurrentIndex] = useState(0);
@@ -54,51 +85,29 @@ const IPhoneMockup = () => {
       transition={{ duration: 0.8, delay: 0.3 }}
       className="relative mx-auto"
     >
+      {/* Floating profile card - 30% outside, 70% overlapping phone */}
+      <FloatingProfileCard profile={currentProfile} />
+
       {/* Half iPhone frame */}
-      <div className="relative w-[320px] h-[480px] overflow-hidden">
-        {/* Phone frame - only showing top half */}
+      <div className="relative w-[320px] h-[480px] overflow-visible">
+        {/* Phone frame */}
         <div className="absolute inset-0 bg-white rounded-[45px] rounded-b-3xl border-[8px] border-gray-900 shadow-2xl overflow-hidden">
           {/* Dynamic Island */}
           <div className="absolute top-2 left-1/2 -translate-x-1/2 w-24 h-6 bg-gray-900 rounded-full z-20" />
           
           {/* Screen content */}
           <div className="absolute inset-0 pt-12 bg-gradient-to-b from-gray-50 to-white overflow-hidden">
-            {/* Profile Image with animation */}
-            <div className="relative h-[200px] overflow-hidden">
-              <AnimatePresence mode="wait">
-                <motion.img
-                  key={currentProfile.id}
-                  src={currentProfile.image}
-                  alt={currentProfile.name}
-                  className="w-full h-full object-cover"
-                  initial={{ opacity: 0, scale: 1.1 }}
-                  animate={{ opacity: 1, scale: 1 }}
-                  exit={{ opacity: 0, scale: 0.95 }}
-                  transition={{ duration: 0.5 }}
-                />
-              </AnimatePresence>
-              
-              {/* Name overlay */}
-              <AnimatePresence mode="wait">
-                <motion.div
-                  key={`name-${currentProfile.id}`}
-                  className="absolute bottom-3 left-3 bg-black/70 backdrop-blur-sm text-white text-sm font-semibold px-3 py-1.5 rounded-lg"
-                  initial={{ opacity: 0, y: 10 }}
-                  animate={{ opacity: 1, y: 0 }}
-                  exit={{ opacity: 0, y: -10 }}
-                  transition={{ duration: 0.4, delay: 0.1 }}
-                >
-                  {currentProfile.name}
-                </motion.div>
-              </AnimatePresence>
+            {/* iMessage header */}
+            <div className="px-4 py-2 border-b border-gray-100">
+              <p className="text-xs text-gray-500 text-center">iMessage</p>
             </div>
 
-            {/* Bio text */}
-            <div className="px-4 py-3">
+            {/* Bio text bubble */}
+            <div className="px-4 py-4 mt-8">
               <AnimatePresence mode="wait">
                 <motion.div
                   key={`bio-${currentProfile.id}`}
-                  className="bg-[#E9E9EB] rounded-2xl rounded-bl-md p-3"
+                  className="bg-[#E9E9EB] rounded-2xl rounded-bl-md p-3.5"
                   initial={{ opacity: 0, x: -20 }}
                   animate={{ opacity: 1, x: 0 }}
                   exit={{ opacity: 0, x: 20 }}
@@ -112,7 +121,7 @@ const IPhoneMockup = () => {
             </div>
 
             {/* Reply message */}
-            <div className="px-4">
+            <div className="px-4 mt-2">
               <AnimatePresence mode="wait">
                 <motion.div
                   key={`reply-${currentProfile.id}`}
@@ -131,7 +140,7 @@ const IPhoneMockup = () => {
           </div>
         </div>
 
-        {/* Fade out at bottom to suggest continuation */}
+        {/* Fade out at bottom */}
         <div className="absolute bottom-0 left-0 right-0 h-16 bg-gradient-to-t from-white to-transparent z-10 pointer-events-none" />
       </div>
 
@@ -152,7 +161,7 @@ const IPhoneMockup = () => {
 
 const NetworkVisualization = () => {
   return (
-    <div className="relative w-full flex justify-center">
+    <div className="relative w-full flex justify-center pl-16">
       <IPhoneMockup />
     </div>
   );

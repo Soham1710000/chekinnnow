@@ -181,18 +181,15 @@ export const NetworkHero = () => {
   const [searchParams] = useSearchParams();
   const [isModalOpen, setIsModalOpen] = useState(false);
   const [currentIndex, setCurrentIndex] = useState(0);
-  const [waitlistCount, setWaitlistCount] = useState<number | null>(null);
+  const [waitlistCount, setWaitlistCount] = useState<number>(7913);
   const referralCode = searchParams.get("ref");
 
-  // Fetch waitlist count
+  // Increment counter every 30 seconds by 5 users
   useEffect(() => {
-    const fetchCount = async () => {
-      const { count } = await supabase
-        .from('waitlist')
-        .select('*', { count: 'exact', head: true });
-      setWaitlistCount(count ?? 0);
-    };
-    fetchCount();
+    const interval = setInterval(() => {
+      setWaitlistCount((prev) => prev + 5);
+    }, 30000);
+    return () => clearInterval(interval);
   }, []);
 
   // Store referral code silently
@@ -262,7 +259,7 @@ export const NetworkHero = () => {
                   </span>
                   <Users className="w-3.5 h-3.5" />
                   <span className="text-xs md:text-sm font-medium">
-                    {(waitlistCount ?? 1).toLocaleString()}+ people waiting
+                    {waitlistCount.toLocaleString()}+ people waiting
                   </span>
                 </motion.div>
               </div>

@@ -111,11 +111,8 @@ const IPhoneMockup = ({ currentIndex }: { currentIndex: number }) => {
               <p className="text-[10px] md:text-xs text-gray-500 text-center">iMessage</p>
             </div>
 
-            {/* Spacer to push reply to bottom */}
-            <div className="flex-1" />
-
-            {/* Reply message */}
-            <div className="px-3 md:px-4 mt-auto mb-20 md:mb-32">
+            {/* Reply message - at top */}
+            <div className="px-3 md:px-4 mt-4 md:mt-6">
               <AnimatePresence mode="wait">
                 <motion.div
                   key={`reply-${currentProfile.id}`}

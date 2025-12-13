@@ -254,10 +254,10 @@ export const NetworkHero = () => {
                     initial={{ opacity: 0 }}
                     animate={{ opacity: 1 }}
                     transition={{ delay: 0.5 }}
-                    className="flex items-center gap-1.5 text-gray-500"
+                    className="flex items-center justify-center lg:justify-start gap-1.5 text-gray-500 w-full"
                   >
                     <Users className="w-3.5 h-3.5" />
-                    <span className="text-xs font-medium">
+                    <span className="text-xs md:text-sm font-medium">
                       {waitlistCount.toLocaleString()}+ people waiting
                     </span>
                   </motion.div>
@@ -313,20 +313,16 @@ export const NetworkHero = () => {
           </motion.div>
         </motion.button>
 
-        {/* Waitlisted users logos */}
-        <div className="flex flex-col items-center gap-3">
-          <p className="text-[10px] md:text-xs text-gray-400 uppercase tracking-wider font-medium">
+        {/* Waitlisted users logos - highlighted */}
+        <div className="flex flex-col items-center gap-3 bg-gray-50/80 backdrop-blur-sm px-6 py-4 rounded-2xl border border-gray-100">
+          <p className="text-[10px] md:text-xs text-gray-600 uppercase tracking-wider font-semibold">
             Waitlisted users are from
           </p>
-          <div className="flex items-center justify-center gap-6 md:gap-10 flex-wrap opacity-50 grayscale">
+          <div className="flex items-center justify-center gap-4 md:gap-8 flex-wrap">
             {/* CRED */}
-            <svg className="h-4 md:h-5" viewBox="0 0 80 24" fill="currentColor">
-              <text x="0" y="18" className="text-gray-700" style={{ fontSize: '18px', fontWeight: 900, letterSpacing: '-0.5px' }}>CRED</text>
-            </svg>
+            <span className="text-sm md:text-base font-black text-gray-800 tracking-tight">CRED</span>
             {/* Flipkart */}
-            <svg className="h-4 md:h-5" viewBox="0 0 80 24" fill="currentColor">
-              <text x="0" y="18" className="text-gray-700" style={{ fontSize: '16px', fontWeight: 700, fontStyle: 'italic' }}>flipkart</text>
-            </svg>
+            <span className="text-sm md:text-base font-bold text-gray-800 italic">flipkart</span>
             {/* Google */}
             <div className="flex items-center">
               <span className="text-sm md:text-base font-medium" style={{ color: '#4285F4' }}>G</span>
@@ -337,13 +333,11 @@ export const NetworkHero = () => {
               <span className="text-sm md:text-base font-medium" style={{ color: '#EA4335' }}>e</span>
             </div>
             {/* Amazon */}
-            <svg className="h-4 md:h-5 hidden sm:block" viewBox="0 0 90 24" fill="currentColor">
-              <text x="0" y="18" className="text-gray-700" style={{ fontSize: '16px', fontWeight: 700, letterSpacing: '-0.3px' }}>amazon</text>
-            </svg>
+            <span className="text-sm md:text-base font-bold text-gray-800 tracking-tight hidden sm:block">amazon</span>
             {/* IIT Delhi */}
-            <span className="text-xs md:text-sm font-bold text-gray-600 tracking-tight">IIT Delhi</span>
+            <span className="text-xs md:text-sm font-bold text-gray-800 tracking-tight">IIT Delhi</span>
             {/* IIT Bombay */}
-            <span className="text-xs md:text-sm font-bold text-gray-600 tracking-tight hidden sm:block">IIT Bombay</span>
+            <span className="text-xs md:text-sm font-bold text-gray-800 tracking-tight hidden sm:block">IIT Bombay</span>
           </div>
         </div>
       </motion.div>

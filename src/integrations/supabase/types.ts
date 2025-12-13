@@ -14,16 +14,84 @@ export type Database = {
   }
   public: {
     Tables: {
-      [_ in never]: never
+      user_roles: {
+        Row: {
+          id: string
+          role: Database["public"]["Enums"]["app_role"]
+          user_id: string
+        }
+        Insert: {
+          id?: string
+          role: Database["public"]["Enums"]["app_role"]
+          user_id: string
+        }
+        Update: {
+          id?: string
+          role?: Database["public"]["Enums"]["app_role"]
+          user_id?: string
+        }
+        Relationships: []
+      }
+      waitlist: {
+        Row: {
+          access_granted: boolean
+          created_at: string
+          email: string | null
+          id: string
+          phone: string | null
+          referral_code: string
+          referrals_count: number
+          referred_by: string | null
+          updated_at: string
+          user_id: string
+          waitlist_position: number
+        }
+        Insert: {
+          access_granted?: boolean
+          created_at?: string
+          email?: string | null
+          id?: string
+          phone?: string | null
+          referral_code: string
+          referrals_count?: number
+          referred_by?: string | null
+          updated_at?: string
+          user_id: string
+          waitlist_position: number
+        }
+        Update: {
+          access_granted?: boolean
+          created_at?: string
+          email?: string | null
+          id?: string
+          phone?: string | null
+          referral_code?: string
+          referrals_count?: number
+          referred_by?: string | null
+          updated_at?: string
+          user_id?: string
+          waitlist_position?: number
+        }
+        Relationships: []
+      }
     }
     Views: {
       [_ in never]: never
     }
     Functions: {
-      [_ in never]: never
+      generate_referral_code: { Args: never; Returns: string }
+      get_next_waitlist_position: { Args: never; Returns: number }
+      has_role: {
+        Args: {
+          _role: Database["public"]["Enums"]["app_role"]
+          _user_id: string
+        }
+        Returns: boolean
+      }
+      process_referral: { Args: { referrer_code: string }; Returns: undefined }
     }
     Enums: {
-      [_ in never]: never
+      app_role: "admin" | "user"
     }
     CompositeTypes: {
       [_ in never]: never
@@ -150,6 +218,8 @@ export type CompositeTypes<
 
 export const Constants = {
   public: {
-    Enums: {},
+    Enums: {
+      app_role: ["admin", "user"],
+    },
   },
 } as const

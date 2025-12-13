@@ -95,15 +95,15 @@ const IPhoneMockup = () => {
       {/* Floating profile card - 30% outside, 70% overlapping phone */}
       <FloatingProfileCard profile={currentProfile} />
 
-      {/* Half iPhone frame */}
-      <div className="relative w-[320px] h-[480px] overflow-visible">
-        {/* Phone frame */}
-        <div className="absolute inset-0 bg-white rounded-[45px] rounded-b-3xl border-[8px] border-gray-900 shadow-2xl overflow-hidden">
+      {/* Half iPhone frame - cut off at bottom */}
+      <div className="relative w-[320px] h-[480px] overflow-hidden">
+        {/* Phone frame - extended beyond container so bottom is hidden */}
+        <div className="absolute inset-x-0 top-0 h-[600px] bg-white rounded-t-[45px] border-[8px] border-b-0 border-gray-900 shadow-2xl overflow-hidden">
           {/* Dynamic Island */}
           <div className="absolute top-2 left-1/2 -translate-x-1/2 w-24 h-6 bg-gray-900 rounded-full z-20" />
           
           {/* Screen content */}
-          <div className="absolute inset-0 pt-12 bg-gradient-to-b from-gray-50 to-white overflow-hidden flex flex-col">
+          <div className="absolute inset-0 pt-12 bg-gradient-to-b from-gray-50 to-white flex flex-col">
             {/* iMessage header */}
             <div className="px-4 py-2 border-b border-gray-100">
               <p className="text-xs text-gray-500 text-center">iMessage</p>
@@ -131,9 +131,6 @@ const IPhoneMockup = () => {
             </div>
           </div>
         </div>
-
-        {/* Fade out at bottom */}
-        <div className="absolute bottom-0 left-0 right-0 h-16 bg-gradient-to-t from-white to-transparent z-10 pointer-events-none" />
       </div>
 
       {/* Progress indicators */}

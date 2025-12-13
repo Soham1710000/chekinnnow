@@ -159,23 +159,18 @@ const ReasonTicker = ({ currentIndex }: { currentIndex: number }) => {
   const currentProfile = profiles[currentIndex];
   
   return (
-    <div className="overflow-hidden mb-3 md:mb-4">
+    <div className="overflow-hidden mb-4 md:mb-6">
       <AnimatePresence mode="wait">
-        <motion.div
+        <motion.p
           key={`reason-${currentProfile.id}`}
-          initial={{ opacity: 0, x: 40 }}
-          animate={{ opacity: 1, x: 0 }}
-          exit={{ opacity: 0, x: -40 }}
-          transition={{ duration: 0.4 }}
-          className="flex items-center gap-2"
+          initial={{ opacity: 0, y: 10 }}
+          animate={{ opacity: 1, y: 0 }}
+          exit={{ opacity: 0, y: -10 }}
+          transition={{ duration: 0.3 }}
+          className="text-sm md:text-base text-gray-500 italic"
         >
-          <span className="text-xs md:text-sm font-medium text-gray-500 uppercase tracking-wider">
-            Why ChekInn introduced them:
-          </span>
-          <span className="text-xs md:text-sm font-semibold text-gray-900">
-            {currentProfile.reason}
-          </span>
-        </motion.div>
+          "{currentProfile.reason}"
+        </motion.p>
       </AnimatePresence>
     </div>
   );

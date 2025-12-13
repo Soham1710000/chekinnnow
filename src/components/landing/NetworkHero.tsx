@@ -93,7 +93,7 @@ const profiles = [
     id: 6,
     name: "Aarav",
     title: "Early Career",
-    bio: "I've been trying to meet people who enjoy **long walks** and **good coffee**. Feels nicer when there's something simple in common.",
+    bio: "I've been trying to meet people who enjoy **long runs** and **good coffee**. Feels nicer when there's something simple in common.",
     image: aaravImg,
     replyName: "Nisha",
     replyTitle: "Working Professional",

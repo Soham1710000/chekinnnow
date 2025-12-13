@@ -102,11 +102,11 @@ const FloatingProfileCard = ({ profile }: { profile: typeof profiles[0] }) => (
         transition={{ duration: 0.5 }}
       >
         {/* Photo - smaller */}
-        <div className="aspect-[4/3] relative overflow-hidden">
+        <div className="aspect-[4/3] relative overflow-hidden bg-gray-100">
           <img 
             src={profile.image} 
             alt={profile.name}
-            className="w-full h-full object-cover"
+            className="w-full h-full object-cover object-top"
           />
         </div>
         {/* Name and title - compact inline */}
@@ -177,7 +177,7 @@ const IPhoneMockup = ({ currentIndex }: { currentIndex: number }) => {
                     <img 
                       src={currentProfile.replyImage} 
                       alt={currentProfile.replyName}
-                      className="w-7 h-7 md:w-9 md:h-9 rounded-full object-cover border-2 border-gray-200 shadow-sm"
+                      className="w-7 h-7 md:w-9 md:h-9 rounded-full object-cover object-top border-2 border-gray-200 shadow-sm"
                     />
                   </div>
                   {/* Message bubble */}

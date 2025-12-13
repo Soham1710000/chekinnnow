@@ -321,19 +321,6 @@ export const NetworkHero = () => {
                 </motion.div>
               </div>
               
-              {/* Mobile scroll nudge - hidden on very small screens */}
-              <motion.button
-                onClick={() => window.scrollTo({ top: window.innerHeight, behavior: "smooth" })}
-                className="hidden sm:flex md:hidden flex-col items-center gap-1 text-gray-400 hover:text-gray-900 transition-colors cursor-pointer"
-              >
-                <span className="text-xs font-medium tracking-wider uppercase">Scroll</span>
-                <motion.div
-                  animate={{ y: [0, 6, 0] }}
-                  transition={{ duration: 1.5, repeat: Infinity, ease: "easeInOut" }}
-                >
-                  <ChevronDown className="w-5 h-5" />
-                </motion.div>
-              </motion.button>
             </motion.div>
           </motion.div>
 
@@ -356,17 +343,17 @@ export const NetworkHero = () => {
         transition={{ delay: 1.5 }}
         className="absolute bottom-1 sm:bottom-2 md:bottom-4 left-0 right-0 flex flex-col items-center gap-1 sm:gap-2 md:gap-4 px-3 sm:px-4"
       >
-        {/* Scroll indicator */}
+        {/* Scroll indicator - visible on all screens */}
         <motion.button
           onClick={() => window.scrollTo({ top: window.innerHeight, behavior: "smooth" })}
-          className="flex-col items-center gap-1 text-gray-400 hover:text-gray-900 transition-colors cursor-pointer hidden md:flex"
+          className="flex flex-col items-center gap-0.5 sm:gap-1 text-gray-400 hover:text-gray-900 transition-colors cursor-pointer"
         >
-          <span className="text-xs font-medium tracking-wider uppercase">Scroll</span>
+          <span className="text-[10px] sm:text-xs font-medium tracking-wider uppercase">Scroll</span>
           <motion.div
-            animate={{ y: [0, 6, 0] }}
+            animate={{ y: [0, 4, 0] }}
             transition={{ duration: 1.5, repeat: Infinity, ease: "easeInOut" }}
           >
-            <ChevronDown className="w-5 h-5" />
+            <ChevronDown className="w-4 h-4 sm:w-5 sm:h-5" />
           </motion.div>
         </motion.button>
 

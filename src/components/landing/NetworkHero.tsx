@@ -106,6 +106,8 @@ const FloatingProfileCard = ({ profile }: { profile: typeof profiles[0] }) => (
           <img 
             src={profile.image} 
             alt={profile.name}
+            loading="eager"
+            decoding="async"
             className="w-full h-full object-cover object-top"
           />
         </div>
@@ -177,6 +179,8 @@ const IPhoneMockup = ({ currentIndex }: { currentIndex: number }) => {
                     <img 
                       src={currentProfile.replyImage} 
                       alt={currentProfile.replyName}
+                      loading="eager"
+                      decoding="async"
                       className="w-6 h-6 sm:w-7 sm:h-7 md:w-9 md:h-9 rounded-full object-cover object-top border-2 border-gray-200 shadow-sm"
                     />
                   </div>

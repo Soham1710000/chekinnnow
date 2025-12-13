@@ -283,7 +283,7 @@ export const NetworkHero = () => {
   useEffect(() => {
     const interval = setInterval(() => {
       setCurrentIndex((prev) => (prev + 1) % profiles.length);
-    }, 3500);
+    }, 5000);
     return () => clearInterval(interval);
   }, []);
 

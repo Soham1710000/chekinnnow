@@ -5,6 +5,7 @@ import { useWaitlist } from "@/hooks/useWaitlist";
 import { AuthFlow } from "./AuthFlow";
 import { WaitlistSuccess } from "./WaitlistSuccess";
 import { useEffect, useState } from "react";
+import { useFunnelTracking } from "@/hooks/useFunnelTracking";
 
 interface WaitlistModalProps {
   isOpen: boolean;
@@ -16,6 +17,14 @@ export const WaitlistModal = ({ isOpen, onClose, referralCode }: WaitlistModalPr
   const { user, loading: authLoading } = useAuth();
   const { entry, loading: waitlistLoading, createWaitlistEntry } = useWaitlist();
   const [isCreating, setIsCreating] = useState(false);
+  const { trackEvent } = useFunnelTracking();
+
+  // Track modal open
+  useEffect(() => {
+    if (isOpen) {
+      trackEvent("modal_open", { referral: referralCode });
+    }
+  }, [isOpen, referralCode, trackEvent]);
 
   // Auto-create waitlist entry when user authenticates
   useEffect(() => {
@@ -24,6 +33,7 @@ export const WaitlistModal = ({ isOpen, onClose, referralCode }: WaitlistModalPr
         setIsCreating(true);
         await createWaitlistEntry(referralCode || undefined);
         setIsCreating(false);
+        trackEvent("waitlist_success", { referral: referralCode });
       }
     };
     createEntry();

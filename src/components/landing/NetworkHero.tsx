@@ -5,7 +5,7 @@ import { Button } from "@/components/ui/button";
 import { ChevronDown, Users } from "lucide-react";
 import { WaitlistModal } from "@/components/waitlist/WaitlistModal";
 import { supabase } from "@/integrations/supabase/client";
-
+import { useFunnelTracking } from "@/hooks/useFunnelTracking";
 // Import profile images
 import arnavImg from "@/assets/profiles/arnav.jpg";
 import meeraImg from "@/assets/profiles/meera.jpg";
@@ -243,6 +243,12 @@ export const NetworkHero = () => {
   const [currentIndex, setCurrentIndex] = useState(0);
   const [waitlistCount, setWaitlistCount] = useState<number>(BASE_WAITLIST_COUNT);
   const referralCode = searchParams.get("ref");
+  const { trackEvent } = useFunnelTracking();
+
+  const handleCTAClick = () => {
+    trackEvent("cta_click", { source: "hero", referral: referralCode });
+    setIsModalOpen(true);
+  };
 
   // Fetch waitlist count and subscribe to real-time updates
   useEffect(() => {
@@ -289,7 +295,7 @@ export const NetworkHero = () => {
 
   return (
     <section className="relative min-h-[100svh] bg-white overflow-hidden flex items-center">
-      <div className="container-apple relative z-10 py-8 sm:py-12 md:py-20 pb-24 sm:pb-20 md:pb-28 px-4 md:px-6">
+      <div className="container-apple relative z-10 py-6 sm:py-12 md:py-20 pb-20 sm:pb-20 md:pb-28 px-4 md:px-6">
         <div className="grid lg:grid-cols-2 gap-4 sm:gap-8 md:gap-12 lg:gap-8 items-center">
           {/* Left column - Header with CTA */}
           <motion.div
@@ -326,8 +332,8 @@ export const NetworkHero = () => {
             >
               <div className="flex flex-col items-center lg:items-start gap-2 sm:gap-3 w-full">
                 <Button 
-                  className="bg-gray-900 text-white border-0 px-5 sm:px-6 md:px-8 py-4 sm:py-5 md:py-6 text-sm sm:text-base md:text-lg font-medium rounded-full hover:bg-gray-800 transition-colors w-full sm:w-auto"
-                  onClick={() => setIsModalOpen(true)}
+                  className="bg-gray-900 text-white border-0 px-6 sm:px-6 md:px-8 py-5 sm:py-5 md:py-6 text-base sm:text-base md:text-lg font-semibold rounded-full hover:bg-gray-800 hover:scale-[1.02] active:scale-[0.98] transition-all shadow-lg hover:shadow-xl w-full sm:w-auto"
+                  onClick={handleCTAClick}
                 >
                   Join the Waitlist
                 </Button>

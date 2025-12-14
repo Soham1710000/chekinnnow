@@ -759,7 +759,7 @@ const AdminDashboard = () => {
                           {profile.interests.join(", ")}
                         </p>
                       )}
-                      <div className="flex items-center gap-2 pt-2">
+                      <div className="flex items-center gap-2 pt-2 flex-wrap">
                         <span
                           className={`px-2 py-0.5 rounded-full text-xs ${
                             profile.learning_complete
@@ -769,8 +769,13 @@ const AdminDashboard = () => {
                         >
                           {profile.learning_complete
                             ? "Ready to match"
-                            : `${profile.learning_messages_count || 0} messages`}
+                            : "Learning..."}
                         </span>
+                        {(profile.message_count ?? 0) > 0 && (
+                          <span className="px-2 py-0.5 rounded-full text-xs bg-blue-500/10 text-blue-500">
+                            💬 {profile.message_count} msgs
+                          </span>
+                        )}
                       </div>
                     </div>
                   </div>

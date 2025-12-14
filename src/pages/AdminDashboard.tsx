@@ -16,6 +16,7 @@ import {
   XCircle,
   Loader2,
   RefreshCw,
+  Mail,
 } from "lucide-react";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import {
@@ -95,6 +96,11 @@ const AdminDashboard = () => {
   // View chat modal
   const [viewIntro, setViewIntro] = useState<Introduction | null>(null);
   const [introChats, setIntroChats] = useState<ChatMessage[]>([]);
+
+  // Email sending
+  const [sendingEmail, setSendingEmail] = useState(false);
+  const [emailTestMode, setEmailTestMode] = useState(true);
+  const [testEmail, setTestEmail] = useState("");
 
   const handlePasswordSubmit = (e: React.FormEvent) => {
     e.preventDefault();
@@ -287,6 +293,41 @@ const AdminDashboard = () => {
     setViewIntro(null);
   };
 
+  const handleSendLaunchEmail = async () => {
+    if (emailTestMode && !testEmail.trim()) {
+      toast({
+        title: "Enter test email",
+        description: "Please enter an email address for the test.",
+        variant: "destructive",
+      });
+      return;
+    }
+
+    setSendingEmail(true);
+
+    try {
+      const { data, error } = await supabase.functions.invoke("send-launch-email", {
+        body: emailTestMode ? { testEmail: testEmail.trim() } : {},
+      });
+
+      if (error) throw error;
+
+      toast({
+        title: "Emails sent!",
+        description: `Successfully sent to ${data.sent} users. ${data.failed > 0 ? `${data.failed} failed.` : ""}`,
+      });
+    } catch (error: any) {
+      console.error("Error sending emails:", error);
+      toast({
+        title: "Error",
+        description: error.message || "Failed to send emails",
+        variant: "destructive",
+      });
+    } finally {
+      setSendingEmail(false);
+    }
+  };
+
   const filteredProfiles = profiles.filter(
     (p) =>
       p.full_name?.toLowerCase().includes(searchTerm.toLowerCase()) ||
@@ -413,6 +454,50 @@ const AdminDashboard = () => {
               </div>
             </div>
           </div>
+        </div>
+
+        {/* Email Section */}
+        <div className="bg-card border border-border rounded-xl p-4 mb-6">
+          <div className="flex items-center gap-3 mb-4">
+            <Mail className="w-5 h-5 text-primary" />
+            <h2 className="font-semibold">Send Launch Email</h2>
+          </div>
+          <div className="flex flex-col sm:flex-row gap-3">
+            <label className="flex items-center gap-2">
+              <input
+                type="checkbox"
+                checked={emailTestMode}
+                onChange={(e) => setEmailTestMode(e.target.checked)}
+                className="rounded"
+              />
+              <span className="text-sm">Test mode</span>
+            </label>
+            {emailTestMode && (
+              <Input
+                placeholder="Test email address"
+                value={testEmail}
+                onChange={(e) => setTestEmail(e.target.value)}
+                className="sm:w-64"
+              />
+            )}
+            <Button
+              onClick={handleSendLaunchEmail}
+              disabled={sendingEmail}
+              variant={emailTestMode ? "outline" : "default"}
+            >
+              {sendingEmail ? (
+                <Loader2 className="w-4 h-4 animate-spin mr-2" />
+              ) : (
+                <Mail className="w-4 h-4 mr-2" />
+              )}
+              {emailTestMode ? "Send Test" : `Send to All (${profiles.length})`}
+            </Button>
+          </div>
+          {!emailTestMode && (
+            <p className="text-sm text-destructive mt-2">
+              ⚠️ This will send emails to ALL {profiles.length} users!
+            </p>
+          )}
         </div>
 
         {/* Tabs */}

@@ -84,8 +84,11 @@ const Chat = () => {
     }
 
     if (data.length === 0) {
-      // Start conversation with AI
-      await getAIResponse([]);
+      // Start conversation with AI - get welcome message and save it
+      const welcomeMessage = await getAIResponse([]);
+      if (welcomeMessage) {
+        await sendBotMessage(welcomeMessage);
+      }
     } else {
       setMessages(data as Message[]);
     }

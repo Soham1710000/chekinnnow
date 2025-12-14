@@ -47,6 +47,8 @@ interface Profile {
   learning_messages_count: number;
   ai_insights: any;
   created_at: string;
+  chat_messages?: any[];
+  message_count?: number;
 }
 
 interface Introduction {
@@ -58,6 +60,7 @@ interface Introduction {
   created_at: string;
   user_a?: Profile;
   user_b?: Profile;
+  chats?: ChatMessage[];
 }
 
 interface ChatMessage {
@@ -194,34 +197,30 @@ const AdminDashboard = () => {
     loadData(hours);
   };
 
-  const loadUserMessages = async (userId: string) => {
-    const { data, error } = await supabase
-      .from("chat_messages")
-      .select("*")
-      .eq("user_id", userId)
-      .order("created_at", { ascending: true });
-
-    if (error) {
-      console.error("Error loading messages:", error);
-      return;
+  // Use pre-loaded chat data from edge function
+  const loadUserMessages = (userId: string) => {
+    const profile = profiles.find(p => p.id === userId);
+    if (profile?.chat_messages) {
+      // Sort ascending for display
+      setUserMessages([...profile.chat_messages].sort((a, b) => 
+        new Date(a.created_at).getTime() - new Date(b.created_at).getTime()
+      ));
+    } else {
+      setUserMessages([]);
     }
-
-    setUserMessages(data || []);
   };
 
-  const loadIntroChats = async (introId: string) => {
-    const { data, error } = await supabase
-      .from("user_chats")
-      .select("*")
-      .eq("introduction_id", introId)
-      .order("created_at", { ascending: true });
-
-    if (error) {
-      console.error("Error loading chats:", error);
-      return;
+  // Use pre-loaded chat data from edge function
+  const loadIntroChats = (introId: string) => {
+    const intro = introductions.find(i => i.id === introId);
+    if (intro?.chats) {
+      // Sort ascending for display
+      setIntroChats([...intro.chats].sort((a, b) => 
+        new Date(a.created_at).getTime() - new Date(b.created_at).getTime()
+      ));
+    } else {
+      setIntroChats([]);
     }
-
-    setIntroChats(data as ChatMessage[]);
   };
 
   const handleCreateIntro = async () => {

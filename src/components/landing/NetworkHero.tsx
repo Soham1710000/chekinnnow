@@ -115,7 +115,7 @@ const renderBoldText = (text: string) => {
 // Floating Profile Card with attached message
 const FloatingProfileCard = ({ profile }: { profile: typeof profiles[0] }) => (
   <motion.div
-    className="absolute -left-2 sm:-left-4 md:-left-20 top-4 sm:top-8 md:top-16 z-30 w-[120px] sm:w-[140px] md:w-[200px]"
+    className="absolute -left-4 sm:-left-8 md:-left-24 top-6 sm:top-10 md:top-20 z-30 w-[140px] sm:w-[180px] md:w-[240px]"
     animate={{ y: [0, -6, 0] }}
     transition={{ duration: 4, repeat: Infinity, ease: "easeInOut" }}
   >
@@ -188,7 +188,7 @@ const IPhoneMockup = ({ currentIndex }: { currentIndex: number }) => {
             <div className="flex-1" />
 
             {/* Reply message with profile */}
-            <div className="px-2 sm:px-3 md:px-4 mt-auto mb-20 sm:mb-28 md:mb-40">
+            <div className="px-2 sm:px-3 md:px-4 mt-auto mb-8 sm:mb-12 md:mb-16">
               <AnimatePresence mode="wait">
                 <motion.div
                   key={`reply-${currentProfile.id}`}
@@ -210,12 +210,12 @@ const IPhoneMockup = ({ currentIndex }: { currentIndex: number }) => {
                       loading="eager"
                       decoding="async"
                       fetchPriority="high"
-                      className="w-6 h-6 sm:w-7 sm:h-7 md:w-9 md:h-9 rounded-full object-cover object-top border-2 border-gray-200 shadow-sm"
+                      className="w-7 h-7 sm:w-9 sm:h-9 md:w-11 md:h-11 rounded-full object-cover object-top border-2 border-gray-200 shadow-sm"
                     />
                   </div>
                   {/* Message bubble */}
-                  <div className="bg-[#007AFF] text-white rounded-xl sm:rounded-2xl rounded-br-sm sm:rounded-br-md px-2.5 sm:px-3 md:px-4 py-1.5 sm:py-2">
-                    <p className="text-[10px] sm:text-xs md:text-sm font-medium">{currentProfile.reply}</p>
+                  <div className="bg-[#007AFF] text-white rounded-xl sm:rounded-2xl rounded-br-sm sm:rounded-br-md px-3 sm:px-4 md:px-5 py-2 sm:py-2.5">
+                    <p className="text-xs sm:text-sm md:text-base font-medium">{currentProfile.reply}</p>
                   </div>
                 </motion.div>
               </AnimatePresence>

@@ -324,7 +324,7 @@ export const NetworkHero = () => {
               initial={{ opacity: 0, y: 20 }}
               animate={{ opacity: 1, y: 0 }}
               transition={{ duration: 0.8, delay: 0.1 }}
-              className="text-xl sm:text-2xl md:text-3xl lg:text-4xl xl:text-5xl font-medium text-foreground leading-tight mb-2 sm:mb-3 md:mb-4"
+              className="text-xl sm:text-2xl md:text-3xl lg:text-4xl xl:text-5xl font-medium text-foreground leading-tight mb-6 sm:mb-8 md:mb-10"
             >
               <span className="font-normal text-muted-foreground">Don't know who to reach out to?</span>
               <br />

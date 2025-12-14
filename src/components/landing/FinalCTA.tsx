@@ -1,12 +1,14 @@
-import { useRef, useState } from "react";
+import { useRef } from "react";
 import { motion, useInView } from "framer-motion";
 import { Button } from "@/components/ui/button";
-import { WaitlistModal } from "@/components/waitlist/WaitlistModal";
 
 export const FinalCTA = () => {
   const ref = useRef(null);
   const isInView = useInView(ref, { once: true, margin: "-100px" });
-  const [isModalOpen, setIsModalOpen] = useState(false);
+
+  const handleClick = () => {
+    window.location.href = "/auth";
+  };
 
   return (
     <section ref={ref} className="py-12 md:py-16 lg:py-20 bg-background">
@@ -21,18 +23,13 @@ export const FinalCTA = () => {
             <Button 
               variant="hero" 
               size="hero"
-              onClick={() => setIsModalOpen(true)}
+              onClick={handleClick}
             >
-              Join the Waitlist
+              Join Now
             </Button>
           </motion.div>
         </div>
       </div>
-
-      <WaitlistModal 
-        isOpen={isModalOpen} 
-        onClose={() => setIsModalOpen(false)}
-      />
     </section>
   );
 };

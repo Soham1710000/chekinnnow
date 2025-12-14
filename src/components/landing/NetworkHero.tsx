@@ -115,7 +115,7 @@ const renderBoldText = (text: string) => {
 // Floating Profile Card with attached message
 const FloatingProfileCard = ({ profile }: { profile: typeof profiles[0] }) => (
   <motion.div
-    className="absolute -left-4 sm:-left-8 md:-left-24 top-6 sm:top-10 md:top-20 z-30 w-[140px] sm:w-[180px] md:w-[240px]"
+    className="absolute -left-6 sm:-left-10 md:-left-28 top-8 sm:top-12 md:top-24 z-30 w-[170px] sm:w-[200px] md:w-[260px]"
     animate={{ y: [0, -6, 0] }}
     transition={{ duration: 4, repeat: Infinity, ease: "easeInOut" }}
   >
@@ -140,14 +140,14 @@ const FloatingProfileCard = ({ profile }: { profile: typeof profiles[0] }) => (
           />
         </div>
         {/* Name and title - compact inline */}
-        <div className="px-1.5 py-0.5 sm:px-2 sm:py-1 md:px-2.5 md:py-1.5 bg-white border-b border-gray-100 flex items-center gap-1">
-          <p className="text-[9px] sm:text-[10px] md:text-xs font-semibold text-gray-900">{profile.name}</p>
-          <span className="text-[7px] sm:text-[8px] md:text-[10px] text-gray-400">•</span>
-          <p className="text-[7px] sm:text-[8px] md:text-[10px] text-gray-500 truncate">{profile.title}</p>
+        <div className="px-2 py-1 sm:px-2.5 sm:py-1.5 md:px-3 md:py-2 bg-white border-b border-gray-100 flex items-center gap-1.5">
+          <p className="text-[11px] sm:text-xs md:text-sm font-semibold text-gray-900">{profile.name}</p>
+          <span className="text-[9px] sm:text-[10px] md:text-xs text-gray-400">•</span>
+          <p className="text-[9px] sm:text-[10px] md:text-xs text-gray-500 truncate">{profile.title}</p>
         </div>
         {/* Attached text message - more space */}
-        <div className="p-2 sm:p-2.5 md:p-3 bg-[#E9E9EB]">
-          <p className="text-gray-900 text-[9px] sm:text-[10px] md:text-xs font-normal leading-relaxed line-clamp-3 sm:line-clamp-4">
+        <div className="p-2.5 sm:p-3 md:p-4 bg-[#E9E9EB]">
+          <p className="text-gray-900 text-[11px] sm:text-xs md:text-sm font-normal leading-relaxed line-clamp-3 sm:line-clamp-4">
             "{renderBoldText(profile.bio)}"
           </p>
         </div>

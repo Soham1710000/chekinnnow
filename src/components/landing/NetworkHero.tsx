@@ -115,7 +115,7 @@ const renderBoldText = (text: string) => {
 // Floating Profile Card with attached message
 const FloatingProfileCard = ({ profile }: { profile: typeof profiles[0] }) => (
   <motion.div
-    className="absolute -left-6 sm:-left-10 md:-left-28 top-2 sm:top-4 md:top-10 z-30 w-[170px] sm:w-[200px] md:w-[260px]"
+    className="absolute -left-6 sm:-left-10 md:-left-28 -top-4 sm:-top-2 md:top-4 z-30 w-[170px] sm:w-[200px] md:w-[260px]"
     animate={{ y: [0, -6, 0] }}
     transition={{ duration: 4, repeat: Infinity, ease: "easeInOut" }}
   >

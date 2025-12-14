@@ -324,11 +324,9 @@ export const NetworkHero = () => {
               initial={{ opacity: 0, y: 20 }}
               animate={{ opacity: 1, y: 0 }}
               transition={{ duration: 0.8, delay: 0.1 }}
-              className="text-xl sm:text-2xl md:text-3xl lg:text-4xl xl:text-5xl font-medium text-gray-900 leading-tight mb-2 sm:mb-3 md:mb-4"
+              className="text-2xl sm:text-3xl md:text-4xl lg:text-5xl font-semibold text-gray-900 leading-snug mb-2 sm:mb-3 md:mb-4"
             >
-              <span className="font-normal text-gray-600">When you don't know who to reach out to,</span>
-              <br />
-              <span className="italic">we make the introduction.</span>
+              We make the introduction you need.
             </motion.h1>
             
             <motion.p

@@ -884,14 +884,12 @@ const AdminDashboard = () => {
                   setSelectedUserA(user || null);
                 }}
               >
-                <option value="">Select user...</option>
-                {profiles
-                  .filter((p) => p.learning_complete)
-                  .map((p) => (
-                    <option key={p.id} value={p.id}>
-                      {p.full_name || p.email} - {p.role || "No role"}
-                    </option>
-                  ))}
+              <option value="">Select user...</option>
+                {profiles.map((p) => (
+                  <option key={p.id} value={p.id}>
+                    {p.full_name || p.email} - {p.role || "No role"}
+                  </option>
+                ))}
               </select>
             </div>
 
@@ -905,9 +903,9 @@ const AdminDashboard = () => {
                   setSelectedUserB(user || null);
                 }}
               >
-                <option value="">Select user...</option>
+              <option value="">Select user...</option>
                 {profiles
-                  .filter((p) => p.learning_complete && p.id !== selectedUserA?.id)
+                  .filter((p) => p.id !== selectedUserA?.id)
                   .map((p) => (
                     <option key={p.id} value={p.id}>
                       {p.full_name || p.email} - {p.role || "No role"}

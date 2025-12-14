@@ -309,9 +309,9 @@ export const NetworkHero = () => {
   }, []);
 
   return (
-    <section className="relative min-h-[100svh] bg-white overflow-hidden flex items-center">
-      <div className="container-apple relative z-10 py-6 sm:py-12 md:py-20 pb-20 sm:pb-20 md:pb-28 px-4 md:px-6">
-        <div className="grid lg:grid-cols-2 gap-4 sm:gap-8 md:gap-12 lg:gap-8 items-center">
+    <section className="relative min-h-[100svh] bg-white overflow-hidden flex items-end">
+      <div className="container-apple relative z-10 py-6 sm:py-8 md:py-12 pb-24 sm:pb-28 md:pb-32 px-4 md:px-6">
+        <div className="grid lg:grid-cols-2 gap-4 sm:gap-6 md:gap-8 lg:gap-8 items-end">
           {/* Left column - Header with CTA */}
           <motion.div
             initial={{ opacity: 0, x: -30 }}

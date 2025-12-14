@@ -294,7 +294,7 @@ const AdminDashboard = () => {
       p.industry?.toLowerCase().includes(searchTerm.toLowerCase())
   );
 
-  if (authLoading || checkingAdmin) {
+  if (authLoading) {
     return (
       <div className="min-h-screen bg-background flex items-center justify-center">
         <Loader2 className="w-6 h-6 animate-spin text-muted-foreground" />

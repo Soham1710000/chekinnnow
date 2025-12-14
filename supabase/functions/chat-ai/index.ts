@@ -91,8 +91,14 @@ serve(async (req) => {
 
     // Extract profile insights if we have enough context (5+ user messages)
     const userMessages = messages.filter((m: any) => m.role === "user");
+    console.log(`User ${userId} has ${userMessages.length} user messages`);
+    
     if (userMessages.length >= 5 && userId) {
-      await extractAndSaveInsights(messages, userId);
+      console.log(`Triggering profile extraction for user ${userId}`);
+      // Run extraction asynchronously so we don't delay the response
+      extractAndSaveInsights(messages, userId).catch(err => 
+        console.error("Extraction error:", err)
+      );
     }
 
     return new Response(
@@ -109,12 +115,16 @@ serve(async (req) => {
 });
 
 async function extractAndSaveInsights(messages: any[], userId: string) {
+  console.log(`Starting extraction for user ${userId}`);
   try {
     const LOVABLE_API_KEY = Deno.env.get("LOVABLE_API_KEY");
     const SUPABASE_URL = Deno.env.get("SUPABASE_URL");
     const SUPABASE_SERVICE_ROLE_KEY = Deno.env.get("SUPABASE_SERVICE_ROLE_KEY");
     
-    if (!LOVABLE_API_KEY || !SUPABASE_URL || !SUPABASE_SERVICE_ROLE_KEY) return;
+    if (!LOVABLE_API_KEY || !SUPABASE_URL || !SUPABASE_SERVICE_ROLE_KEY) {
+      console.error("Missing env vars for extraction");
+      return;
+    }
 
     const supabase = createClient(SUPABASE_URL, SUPABASE_SERVICE_ROLE_KEY);
 
@@ -190,8 +200,13 @@ async function extractAndSaveInsights(messages: any[], userId: string) {
     if (profileData.interests) updates.interests = profileData.interests;
     if (profileData.communication_style) updates.communication_style = profileData.communication_style;
 
-    await supabase.from("profiles").update(updates).eq("id", userId);
-    console.log("Profile updated for user:", userId);
+    console.log("Updating profile with:", JSON.stringify(updates));
+    const { error: updateError } = await supabase.from("profiles").update(updates).eq("id", userId);
+    if (updateError) {
+      console.error("Profile update error:", updateError);
+    } else {
+      console.log("Profile updated successfully for user:", userId);
+    }
   } catch (error) {
     console.error("Error extracting insights:", error);
   }

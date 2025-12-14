@@ -14,6 +14,182 @@ export type Database = {
   }
   public: {
     Tables: {
+      chat_messages: {
+        Row: {
+          content: string
+          created_at: string | null
+          id: string
+          message_type: string | null
+          metadata: Json | null
+          role: string
+          user_id: string
+        }
+        Insert: {
+          content: string
+          created_at?: string | null
+          id?: string
+          message_type?: string | null
+          metadata?: Json | null
+          role: string
+          user_id: string
+        }
+        Update: {
+          content?: string
+          created_at?: string | null
+          id?: string
+          message_type?: string | null
+          metadata?: Json | null
+          role?: string
+          user_id?: string
+        }
+        Relationships: []
+      }
+      introductions: {
+        Row: {
+          created_at: string | null
+          created_by: string | null
+          end_reason: string | null
+          ended_by: string | null
+          id: string
+          intro_message: string
+          status: string | null
+          updated_at: string | null
+          user_a_accepted: boolean | null
+          user_a_id: string
+          user_b_accepted: boolean | null
+          user_b_id: string
+        }
+        Insert: {
+          created_at?: string | null
+          created_by?: string | null
+          end_reason?: string | null
+          ended_by?: string | null
+          id?: string
+          intro_message: string
+          status?: string | null
+          updated_at?: string | null
+          user_a_accepted?: boolean | null
+          user_a_id: string
+          user_b_accepted?: boolean | null
+          user_b_id: string
+        }
+        Update: {
+          created_at?: string | null
+          created_by?: string | null
+          end_reason?: string | null
+          ended_by?: string | null
+          id?: string
+          intro_message?: string
+          status?: string | null
+          updated_at?: string | null
+          user_a_accepted?: boolean | null
+          user_a_id?: string
+          user_b_accepted?: boolean | null
+          user_b_id?: string
+        }
+        Relationships: []
+      }
+      profiles: {
+        Row: {
+          ai_insights: Json | null
+          avatar_url: string | null
+          bio: string | null
+          communication_style: string | null
+          connection_intent: string | null
+          created_at: string | null
+          email: string | null
+          full_name: string | null
+          goals: string[] | null
+          id: string
+          industry: string | null
+          interests: string[] | null
+          learning_complete: boolean | null
+          learning_messages_count: number | null
+          looking_for: string | null
+          role: string | null
+          skills: string[] | null
+          updated_at: string | null
+        }
+        Insert: {
+          ai_insights?: Json | null
+          avatar_url?: string | null
+          bio?: string | null
+          communication_style?: string | null
+          connection_intent?: string | null
+          created_at?: string | null
+          email?: string | null
+          full_name?: string | null
+          goals?: string[] | null
+          id: string
+          industry?: string | null
+          interests?: string[] | null
+          learning_complete?: boolean | null
+          learning_messages_count?: number | null
+          looking_for?: string | null
+          role?: string | null
+          skills?: string[] | null
+          updated_at?: string | null
+        }
+        Update: {
+          ai_insights?: Json | null
+          avatar_url?: string | null
+          bio?: string | null
+          communication_style?: string | null
+          connection_intent?: string | null
+          created_at?: string | null
+          email?: string | null
+          full_name?: string | null
+          goals?: string[] | null
+          id?: string
+          industry?: string | null
+          interests?: string[] | null
+          learning_complete?: boolean | null
+          learning_messages_count?: number | null
+          looking_for?: string | null
+          role?: string | null
+          skills?: string[] | null
+          updated_at?: string | null
+        }
+        Relationships: []
+      }
+      user_chats: {
+        Row: {
+          content: string
+          created_at: string | null
+          id: string
+          introduction_id: string
+          read: boolean | null
+          receiver_id: string
+          sender_id: string
+        }
+        Insert: {
+          content: string
+          created_at?: string | null
+          id?: string
+          introduction_id: string
+          read?: boolean | null
+          receiver_id: string
+          sender_id: string
+        }
+        Update: {
+          content?: string
+          created_at?: string | null
+          id?: string
+          introduction_id?: string
+          read?: boolean | null
+          receiver_id?: string
+          sender_id?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "user_chats_introduction_id_fkey"
+            columns: ["introduction_id"]
+            isOneToOne: false
+            referencedRelation: "introductions"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
       user_roles: {
         Row: {
           id: string

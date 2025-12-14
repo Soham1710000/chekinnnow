@@ -262,7 +262,7 @@ export const NetworkHero = () => {
 
   const handleCTAClick = () => {
     trackEvent("cta_click", { source: "hero", referral: referralCode });
-    setIsModalOpen(true);
+    window.location.href = "/auth";
   };
 
   // Fetch waitlist count and subscribe to real-time updates

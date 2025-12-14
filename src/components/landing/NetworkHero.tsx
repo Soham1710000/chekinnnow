@@ -171,9 +171,9 @@ const IPhoneMockup = ({ currentIndex }: { currentIndex: number }) => {
       <FloatingProfileCard profile={currentProfile} />
 
       {/* Half iPhone frame - cut off at bottom */}
-      <div className="relative w-[180px] sm:w-[220px] md:w-[320px] h-[260px] sm:h-[320px] md:h-[480px] overflow-hidden">
+      <div className="relative w-[220px] sm:w-[280px] md:w-[380px] h-[320px] sm:h-[400px] md:h-[560px] overflow-hidden">
         {/* Phone frame - extended beyond container so bottom is hidden */}
-        <div className="absolute inset-x-0 top-0 h-[340px] sm:h-[420px] md:h-[600px] bg-white rounded-t-[24px] sm:rounded-t-[32px] md:rounded-t-[45px] border-[5px] sm:border-[6px] md:border-[8px] border-b-0 border-gray-900 shadow-xl sm:shadow-2xl overflow-hidden">
+        <div className="absolute inset-x-0 top-0 h-[420px] sm:h-[520px] md:h-[700px] bg-white rounded-t-[28px] sm:rounded-t-[36px] md:rounded-t-[50px] border-[6px] sm:border-[7px] md:border-[10px] border-b-0 border-gray-900 shadow-xl sm:shadow-2xl overflow-hidden">
           {/* Dynamic Island */}
           <div className="absolute top-1 sm:top-1.5 md:top-2 left-1/2 -translate-x-1/2 w-12 sm:w-16 md:w-24 h-3 sm:h-4 md:h-6 bg-gray-900 rounded-full z-20" />
           

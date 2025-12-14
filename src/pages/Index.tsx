@@ -1,5 +1,6 @@
-import { lazy, Suspense } from "react";
+import { lazy, Suspense, useEffect } from "react";
 import { NetworkHero } from "@/components/landing/NetworkHero";
+import { useFunnelTracking } from "@/hooks/useFunnelTracking";
 
 // Lazy load sections below the fold for faster initial load
 const WhyChekInn = lazy(() => import("@/components/landing/WhyChekInn").then(m => ({ default: m.WhyChekInn })));
@@ -13,6 +14,12 @@ const SectionLoader = () => (
 );
 
 const Index = () => {
+  const { trackPageView } = useFunnelTracking();
+
+  useEffect(() => {
+    trackPageView();
+  }, [trackPageView]);
+
   return (
     <main className="min-h-screen">
       {/* Network Hero with CTA and scroll nudge */}

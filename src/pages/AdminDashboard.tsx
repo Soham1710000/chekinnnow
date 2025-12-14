@@ -17,6 +17,10 @@ import {
   Loader2,
   RefreshCw,
   Mail,
+  TrendingUp,
+  MousePointer,
+  UserPlus,
+  CheckCircle,
 } from "lucide-react";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import {
@@ -63,6 +67,28 @@ interface ChatMessage {
   content: string;
   created_at: string;
 }
+
+interface FunnelStats {
+  page_view: number;
+  cta_click: number;
+  modal_open: number;
+  auth_start: number;
+  auth_complete: number;
+  waitlist_success: number;
+  unique_sessions: number;
+  sources: Record<string, number>;
+}
+
+interface FunnelEvent {
+  id: string;
+  event_type: string;
+  user_id: string | null;
+  session_id: string;
+  source: string;
+  page_url: string;
+  created_at: string;
+}
+
 const ADMIN_PASSWORD = "chekinn2024";
 
 const AdminDashboard = () => {
@@ -74,6 +100,9 @@ const AdminDashboard = () => {
   const [checkingAdmin, setCheckingAdmin] = useState(true);
   const [profiles, setProfiles] = useState<Profile[]>([]);
   const [introductions, setIntroductions] = useState<Introduction[]>([]);
+  const [funnelStats, setFunnelStats] = useState<FunnelStats | null>(null);
+  const [recentEvents, setRecentEvents] = useState<FunnelEvent[]>([]);
+  const [funnelTimeRange, setFunnelTimeRange] = useState(24);
   const [searchTerm, setSearchTerm] = useState("");
   const [loading, setLoading] = useState(true);
 
@@ -135,17 +164,19 @@ const AdminDashboard = () => {
     }
   };
 
-  const loadData = async () => {
+  const loadData = async (timeRange?: number) => {
     setLoading(true);
     try {
       const { data, error } = await supabase.functions.invoke("admin-data", {
-        body: { password: ADMIN_PASSWORD },
+        body: { password: ADMIN_PASSWORD, timeRange: timeRange || funnelTimeRange },
       });
 
       if (error) throw error;
 
       setProfiles(data.profiles || []);
       setIntroductions(data.introductions || []);
+      setFunnelStats(data.funnelStats || null);
+      setRecentEvents(data.recentEvents || []);
     } catch (error) {
       console.error("Error loading data:", error);
       toast({
@@ -156,6 +187,11 @@ const AdminDashboard = () => {
     } finally {
       setLoading(false);
     }
+  };
+
+  const handleTimeRangeChange = (hours: number) => {
+    setFunnelTimeRange(hours);
+    loadData(hours);
   };
 
   const loadUserMessages = async (userId: string) => {
@@ -366,7 +402,7 @@ const AdminDashboard = () => {
             <h1 className="font-bold text-lg">ChekInn Admin</h1>
           </div>
           <div className="flex items-center gap-2">
-            <Button variant="outline" size="sm" onClick={loadData}>
+            <Button variant="outline" size="sm" onClick={() => loadData()}>
               <RefreshCw className="w-4 h-4 mr-2" />
               Refresh
             </Button>
@@ -475,9 +511,10 @@ const AdminDashboard = () => {
         </div>
 
         {/* Tabs */}
-        <Tabs defaultValue="users" className="space-y-4">
+        <Tabs defaultValue="funnel" className="space-y-4">
           <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-4">
             <TabsList>
+              <TabsTrigger value="funnel">Funnel</TabsTrigger>
               <TabsTrigger value="users">Users</TabsTrigger>
               <TabsTrigger value="introductions">Introductions</TabsTrigger>
             </TabsList>
@@ -497,6 +534,156 @@ const AdminDashboard = () => {
               </Button>
             </div>
           </div>
+
+          {/* Funnel Tab */}
+          <TabsContent value="funnel" className="space-y-4">
+            {/* Time Range Selector */}
+            <div className="flex gap-2 flex-wrap">
+              {[1, 6, 24, 72, 168].map((hours) => (
+                <Button
+                  key={hours}
+                  variant={funnelTimeRange === hours ? "default" : "outline"}
+                  size="sm"
+                  onClick={() => handleTimeRangeChange(hours)}
+                >
+                  {hours === 1 ? "1h" : hours === 6 ? "6h" : hours === 24 ? "24h" : hours === 72 ? "3d" : "7d"}
+                </Button>
+              ))}
+            </div>
+
+            {/* Funnel Stats */}
+            {funnelStats && (
+              <div className="grid grid-cols-2 md:grid-cols-3 lg:grid-cols-6 gap-4">
+                <div className="bg-card border border-border rounded-xl p-4">
+                  <div className="flex items-center gap-2 mb-2">
+                    <Eye className="w-4 h-4 text-blue-500" />
+                    <span className="text-sm text-muted-foreground">Page Views</span>
+                  </div>
+                  <p className="text-2xl font-bold">{funnelStats.page_view}</p>
+                </div>
+                <div className="bg-card border border-border rounded-xl p-4">
+                  <div className="flex items-center gap-2 mb-2">
+                    <MousePointer className="w-4 h-4 text-green-500" />
+                    <span className="text-sm text-muted-foreground">CTA Clicks</span>
+                  </div>
+                  <p className="text-2xl font-bold">{funnelStats.cta_click}</p>
+                </div>
+                <div className="bg-card border border-border rounded-xl p-4">
+                  <div className="flex items-center gap-2 mb-2">
+                    <UserPlus className="w-4 h-4 text-yellow-500" />
+                    <span className="text-sm text-muted-foreground">Auth Started</span>
+                  </div>
+                  <p className="text-2xl font-bold">{funnelStats.auth_start}</p>
+                </div>
+                <div className="bg-card border border-border rounded-xl p-4">
+                  <div className="flex items-center gap-2 mb-2">
+                    <CheckCircle className="w-4 h-4 text-emerald-500" />
+                    <span className="text-sm text-muted-foreground">Auth Complete</span>
+                  </div>
+                  <p className="text-2xl font-bold">{funnelStats.auth_complete}</p>
+                </div>
+                <div className="bg-card border border-border rounded-xl p-4">
+                  <div className="flex items-center gap-2 mb-2">
+                    <TrendingUp className="w-4 h-4 text-purple-500" />
+                    <span className="text-sm text-muted-foreground">Waitlist Success</span>
+                  </div>
+                  <p className="text-2xl font-bold">{funnelStats.waitlist_success}</p>
+                </div>
+                <div className="bg-card border border-border rounded-xl p-4">
+                  <div className="flex items-center gap-2 mb-2">
+                    <Users className="w-4 h-4 text-gray-500" />
+                    <span className="text-sm text-muted-foreground">Sessions</span>
+                  </div>
+                  <p className="text-2xl font-bold">{funnelStats.unique_sessions}</p>
+                </div>
+              </div>
+            )}
+
+            {/* Conversion Rates */}
+            {funnelStats && funnelStats.page_view > 0 && (
+              <div className="bg-card border border-border rounded-xl p-4">
+                <h3 className="font-semibold mb-3">Conversion Rates</h3>
+                <div className="grid grid-cols-2 md:grid-cols-4 gap-4">
+                  <div>
+                    <p className="text-sm text-muted-foreground">View → Click</p>
+                    <p className="text-xl font-bold">
+                      {((funnelStats.cta_click / funnelStats.page_view) * 100).toFixed(1)}%
+                    </p>
+                  </div>
+                  <div>
+                    <p className="text-sm text-muted-foreground">Click → Auth Start</p>
+                    <p className="text-xl font-bold">
+                      {funnelStats.cta_click > 0 
+                        ? ((funnelStats.auth_start / funnelStats.cta_click) * 100).toFixed(1) 
+                        : 0}%
+                    </p>
+                  </div>
+                  <div>
+                    <p className="text-sm text-muted-foreground">Auth Start → Complete</p>
+                    <p className="text-xl font-bold">
+                      {funnelStats.auth_start > 0 
+                        ? ((funnelStats.auth_complete / funnelStats.auth_start) * 100).toFixed(1) 
+                        : 0}%
+                    </p>
+                  </div>
+                  <div>
+                    <p className="text-sm text-muted-foreground">Overall</p>
+                    <p className="text-xl font-bold text-primary">
+                      {((funnelStats.auth_complete / funnelStats.page_view) * 100).toFixed(1)}%
+                    </p>
+                  </div>
+                </div>
+              </div>
+            )}
+
+            {/* Traffic Sources */}
+            {funnelStats && Object.keys(funnelStats.sources).length > 0 && (
+              <div className="bg-card border border-border rounded-xl p-4">
+                <h3 className="font-semibold mb-3">Traffic Sources</h3>
+                <div className="space-y-2">
+                  {Object.entries(funnelStats.sources)
+                    .sort(([, a], [, b]) => b - a)
+                    .slice(0, 10)
+                    .map(([source, count]) => (
+                      <div key={source} className="flex justify-between items-center">
+                        <span className="text-sm truncate max-w-[200px]">{source || 'direct'}</span>
+                        <span className="font-medium">{count}</span>
+                      </div>
+                    ))}
+                </div>
+              </div>
+            )}
+
+            {/* Recent Events */}
+            <div className="bg-card border border-border rounded-xl p-4">
+              <h3 className="font-semibold mb-3">Recent Events</h3>
+              <div className="space-y-2 max-h-[400px] overflow-y-auto">
+                {recentEvents.length === 0 ? (
+                  <p className="text-muted-foreground text-sm">No events yet. Events will appear as users interact with the site.</p>
+                ) : (
+                  recentEvents.map((event) => (
+                    <div key={event.id} className="flex items-center justify-between py-2 border-b border-border last:border-0">
+                      <div className="flex items-center gap-3">
+                        <span className={`px-2 py-1 rounded text-xs font-medium ${
+                          event.event_type === 'page_view' ? 'bg-blue-100 text-blue-700' :
+                          event.event_type === 'cta_click' ? 'bg-green-100 text-green-700' :
+                          event.event_type === 'auth_start' ? 'bg-yellow-100 text-yellow-700' :
+                          event.event_type === 'auth_complete' ? 'bg-emerald-100 text-emerald-700' :
+                          'bg-gray-100 text-gray-700'
+                        }`}>
+                          {event.event_type}
+                        </span>
+                        <span className="text-sm text-muted-foreground">{event.page_url}</span>
+                      </div>
+                      <span className="text-xs text-muted-foreground">
+                        {new Date(event.created_at).toLocaleTimeString()}
+                      </span>
+                    </div>
+                  ))
+                )}
+              </div>
+            </div>
+          </TabsContent>
 
           <TabsContent value="users" className="space-y-4">
             {loading ? (

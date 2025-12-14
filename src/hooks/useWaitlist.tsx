@@ -2,6 +2,7 @@ import { useState, useEffect } from "react";
 import { supabase } from "@/integrations/supabase/client";
 import { useAuth } from "./useAuth";
 import { toast } from "sonner";
+import { useFunnelTracking } from "./useFunnelTracking";
 
 interface WaitlistEntry {
   id: string;
@@ -19,6 +20,7 @@ interface WaitlistEntry {
 
 export const useWaitlist = () => {
   const { user } = useAuth();
+  const { trackEvent } = useFunnelTracking();
   const [entry, setEntry] = useState<WaitlistEntry | null>(null);
   const [loading, setLoading] = useState(true);
   const [initialPosition, setInitialPosition] = useState<number | null>(null);
@@ -91,6 +93,10 @@ export const useWaitlist = () => {
 
       setEntry(data);
       setInitialPosition(data.waitlist_position);
+      trackEvent("waitlist_success", { 
+        position: data.waitlist_position, 
+        referred_by: referredBy || null 
+      });
       return data;
     } catch (error: any) {
       console.error("Error creating waitlist entry:", error);

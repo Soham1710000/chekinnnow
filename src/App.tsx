@@ -12,6 +12,9 @@ import Index from "./pages/Index";
 // Lazy load other routes
 const Waitlist = lazy(() => import("./pages/Waitlist"));
 const Admin = lazy(() => import("./pages/Admin"));
+const Chat = lazy(() => import("./pages/Chat"));
+const Auth = lazy(() => import("./pages/Auth"));
+const AdminDashboard = lazy(() => import("./pages/AdminDashboard"));
 const CarouselDemo = lazy(() => import("./pages/CarouselDemo"));
 const NotFound = lazy(() => import("./pages/NotFound"));
 
@@ -41,6 +44,9 @@ const App = () => (
               <Route path="/" element={<Index />} />
               <Route path="/waitlist" element={<Waitlist />} />
               <Route path="/admin" element={<Admin />} />
+              <Route path="/chat" element={<Chat />} />
+              <Route path="/auth" element={<Auth />} />
+              <Route path="/dashboard" element={<AdminDashboard />} />
               <Route path="/demo/carousel" element={<CarouselDemo />} />
               <Route path="*" element={<NotFound />} />
             </Routes>

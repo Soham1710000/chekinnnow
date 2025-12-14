@@ -143,7 +143,12 @@ const Chat = () => {
           filter: `user_id=eq.${user.id}`,
         },
         (payload) => {
-          setMessages((prev) => [...prev, payload.new as Message]);
+          // Avoid duplicates - only add if not already in messages
+          setMessages((prev) => {
+            const exists = prev.some((m) => m.id === payload.new.id);
+            if (exists) return prev;
+            return [...prev, payload.new as Message];
+          });
         }
       )
       .on(

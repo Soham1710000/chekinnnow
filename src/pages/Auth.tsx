@@ -11,7 +11,7 @@ import { Loader2, ArrowLeft } from "lucide-react";
 import { z } from "zod";
 
 const emailSchema = z.string().email("Please enter a valid email");
-const passwordSchema = z.string().min(6, "Password must be at least 6 characters");
+const passwordSchema = z.string().min(1, "Password is required");
 
 const Auth = () => {
   const { user, loading: authLoading } = useAuth();
@@ -176,7 +176,7 @@ const Auth = () => {
                 onChange={(e) => setPassword(e.target.value)}
                 placeholder="••••••••"
                 required
-                minLength={6}
+                minLength={1}
               />
             </div>
 

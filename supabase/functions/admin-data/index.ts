@@ -41,6 +41,8 @@ Deno.serve(async (req) => {
       .select("*")
       .order("created_at", { ascending: false });
 
+    console.log("Chat messages fetched:", chatMessages?.length || 0, "Error:", chatError);
+
     if (chatError) {
       console.error("Chat messages error:", chatError);
     }
@@ -53,6 +55,8 @@ Deno.serve(async (req) => {
       }
       chatsByUser[msg.user_id].push(msg);
     });
+    
+    console.log("Chats grouped by users:", Object.keys(chatsByUser).length, "users with messages");
 
     // Enrich profiles with chat data
     const enrichedProfiles = (profiles || []).map((profile) => ({

@@ -244,34 +244,38 @@ const AdminDashboard = () => {
 
     setCreating(true);
 
-    const { error } = await supabase.from("introductions").insert({
-      user_a_id: selectedUserA.id,
-      user_b_id: selectedUserB.id,
-      intro_message: introMessage,
-      created_by: user?.id,
-    });
+    try {
+      const { data, error } = await supabase.functions.invoke("admin-create-intro", {
+        body: {
+          password: ADMIN_PASSWORD,
+          user_a_id: selectedUserA.id,
+          user_b_id: selectedUserB.id,
+          intro_message: introMessage,
+        },
+      });
 
-    if (error) {
+      if (error) throw error;
+      if (data?.error) throw new Error(data.error);
+
+      toast({
+        title: "Introduction created!",
+        description: `${selectedUserA.full_name} and ${selectedUserB.full_name} will see the intro card.`,
+      });
+
+      setShowCreateIntro(false);
+      setSelectedUserA(null);
+      setSelectedUserB(null);
+      setIntroMessage("");
+      loadData();
+    } catch (error: any) {
       toast({
         title: "Error",
         description: error.message,
         variant: "destructive",
       });
+    } finally {
       setCreating(false);
-      return;
     }
-
-    toast({
-      title: "Introduction created!",
-      description: `${selectedUserA.full_name} and ${selectedUserB.full_name} will see the intro card.`,
-    });
-
-    setShowCreateIntro(false);
-    setSelectedUserA(null);
-    setSelectedUserB(null);
-    setIntroMessage("");
-    setCreating(false);
-    loadData();
   };
 
   const handleEndIntro = async (intro: Introduction) => {

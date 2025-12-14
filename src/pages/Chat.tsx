@@ -6,6 +6,7 @@ import { Input } from "@/components/ui/input";
 import { Send, ArrowLeft, MessageCircle, Users } from "lucide-react";
 import { motion, AnimatePresence } from "framer-motion";
 import { useNavigate } from "react-router-dom";
+import { useToast } from "@/hooks/use-toast";
 import IntroCard from "@/components/chat/IntroCard";
 import UserChatView from "@/components/chat/UserChatView";
 
@@ -35,19 +36,12 @@ interface Introduction {
   };
 }
 
-const LEARNING_QUESTIONS = [
-  "Hey! Welcome to ChekInn 👋 I'm here to learn about you so we can make great introductions. What's your name and what do you do?",
-  "Nice to meet you! What industry or field are you in, and what's your current role?",
-  "What are you hoping to achieve or who are you looking to connect with?",
-  "What skills or expertise do you bring to the table?",
-  "Tell me about your interests outside of work - hobbies, passions, anything!",
-  "Last one - how would you describe your communication style? Are you more of a direct person or prefer building rapport first?",
-  "Perfect! I've got a good sense of who you are now. I'll be on the lookout for great matches for you. In the meantime, feel free to chat with me anytime! 🎉"
-];
+const CHAT_URL = `${import.meta.env.VITE_SUPABASE_URL}/functions/v1/chat-ai`;
 
 const Chat = () => {
   const { user, loading: authLoading } = useAuth();
   const navigate = useNavigate();
+  const { toast } = useToast();
   const [messages, setMessages] = useState<Message[]>([]);
   const [introductions, setIntroductions] = useState<Introduction[]>([]);
   const [input, setInput] = useState("");
@@ -90,8 +84,8 @@ const Chat = () => {
     }
 
     if (data.length === 0) {
-      // Send first learning question
-      await sendBotMessage(LEARNING_QUESTIONS[0]);
+      // Start conversation with AI
+      await getAIResponse([]);
     } else {
       setMessages(data as Message[]);
     }
@@ -192,6 +186,48 @@ const Chat = () => {
     setMessages((prev) => [...prev, data as Message]);
   };
 
+  const getAIResponse = async (conversationHistory: { role: string; content: string }[]) => {
+    if (!user) return;
+
+    try {
+      const response = await fetch(CHAT_URL, {
+        method: "POST",
+        headers: {
+          "Content-Type": "application/json",
+          Authorization: `Bearer ${import.meta.env.VITE_SUPABASE_PUBLISHABLE_KEY}`,
+        },
+        body: JSON.stringify({
+          messages: conversationHistory,
+          userId: user.id,
+        }),
+      });
+
+      if (!response.ok) {
+        const errorData = await response.json();
+        if (response.status === 429) {
+          toast({
+            title: "Please wait",
+            description: "Too many messages. Try again in a moment.",
+            variant: "destructive",
+          });
+          return null;
+        }
+        throw new Error(errorData.error || "AI request failed");
+      }
+
+      const data = await response.json();
+      return data.message;
+    } catch (error) {
+      console.error("AI error:", error);
+      toast({
+        title: "Connection issue",
+        description: "Couldn't reach ChekInn AI. Please try again.",
+        variant: "destructive",
+      });
+      return null;
+    }
+  };
+
   const handleSend = async () => {
     if (!input.trim() || !user || sending) return;
 
@@ -219,62 +255,20 @@ const Chat = () => {
 
     setMessages((prev) => [...prev, newMsg as Message]);
 
-    // Update learning progress
-    const userMessages = messages.filter((m) => m.role === "user").length + 1;
+    // Build conversation history for AI
+    const conversationHistory = [
+      ...messages.map((m) => ({ role: m.role, content: m.content })),
+      { role: "user", content: userMessage },
+    ];
+
+    // Get AI response
+    const aiResponse = await getAIResponse(conversationHistory);
     
-    if (userMessages < LEARNING_QUESTIONS.length) {
-      // Update profile with extracted info
-      await updateProfileFromMessage(userMessage, userMessages);
-      
-      // Send next learning question
-      setTimeout(async () => {
-        await sendBotMessage(LEARNING_QUESTIONS[userMessages]);
-        
-        if (userMessages === LEARNING_QUESTIONS.length - 1) {
-          // Mark learning as complete
-          await supabase
-            .from("profiles")
-            .update({ learning_complete: true, learning_messages_count: userMessages + 1 })
-            .eq("id", user.id);
-        }
-        setSending(false);
-      }, 1000);
-    } else {
-      // General conversation after learning
-      setTimeout(async () => {
-        await sendBotMessage("Thanks for sharing! I'm always here if you want to chat. Keep an eye out for intro cards - when I find a great match, you'll see it here! 💬");
-        setSending(false);
-      }, 1000);
+    if (aiResponse) {
+      await sendBotMessage(aiResponse);
     }
-  };
-
-  const updateProfileFromMessage = async (message: string, questionIndex: number) => {
-    if (!user) return;
-
-    const updates: Record<string, any> = { learning_messages_count: questionIndex };
-
-    switch (questionIndex) {
-      case 1:
-        updates.full_name = message.split(" ").slice(0, 3).join(" ");
-        break;
-      case 2:
-        updates.industry = message;
-        break;
-      case 3:
-        updates.looking_for = message;
-        break;
-      case 4:
-        updates.skills = [message];
-        break;
-      case 5:
-        updates.interests = [message];
-        break;
-      case 6:
-        updates.communication_style = message;
-        break;
-    }
-
-    await supabase.from("profiles").update(updates).eq("id", user.id);
+    
+    setSending(false);
   };
 
   const handleAcceptIntro = async (intro: Introduction) => {

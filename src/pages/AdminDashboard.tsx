@@ -442,6 +442,14 @@ const AdminDashboard = () => {
                       </Button>
                     </div>
 
+                    {/* AI Summary - highlighted */}
+                    {profile.ai_insights?.summary && (
+                      <div className="bg-primary/5 border border-primary/20 rounded-lg p-3 mb-3">
+                        <p className="text-xs font-medium text-primary mb-1">AI Summary</p>
+                        <p className="text-sm">{profile.ai_insights.summary}</p>
+                      </div>
+                    )}
+
                     <div className="space-y-2 text-sm">
                       {profile.role && (
                         <p>
@@ -461,6 +469,18 @@ const AdminDashboard = () => {
                           {profile.looking_for}
                         </p>
                       )}
+                      {profile.skills && profile.skills.length > 0 && (
+                        <p>
+                          <span className="text-muted-foreground">Skills:</span>{" "}
+                          {profile.skills.join(", ")}
+                        </p>
+                      )}
+                      {profile.interests && profile.interests.length > 0 && (
+                        <p>
+                          <span className="text-muted-foreground">Interests:</span>{" "}
+                          {profile.interests.join(", ")}
+                        </p>
+                      )}
                       <div className="flex items-center gap-2 pt-2">
                         <span
                           className={`px-2 py-0.5 rounded-full text-xs ${
@@ -470,8 +490,8 @@ const AdminDashboard = () => {
                           }`}
                         >
                           {profile.learning_complete
-                            ? "Learning Complete"
-                            : `${profile.learning_messages_count || 0}/6 messages`}
+                            ? "Ready to match"
+                            : `${profile.learning_messages_count || 0} messages`}
                         </span>
                       </div>
                     </div>

@@ -14,6 +14,7 @@ export const AuthFlow = () => {
   const [loading, setLoading] = useState(false);
   const [email, setEmail] = useState("");
   const [password, setPassword] = useState("");
+  const [intent, setIntent] = useState("");
   const [isSignUp, setIsSignUp] = useState(true);
   const [hasStartedAuth, setHasStartedAuth] = useState(false);
   const { trackEvent } = useFunnelTracking();
@@ -47,6 +48,9 @@ export const AuthFlow = () => {
           password,
           options: {
             emailRedirectTo: `${window.location.origin}/waitlist`,
+            data: {
+              connection_intent: intent || null,
+            },
           },
         });
         if (error) {
@@ -84,7 +88,7 @@ export const AuthFlow = () => {
     >
       <div className="text-center mb-8">
         <h2 className="text-2xl font-bold text-gray-900 mb-2">
-          {isSignUp ? "Join the Waitlist" : "Welcome back"}
+          {isSignUp ? "Join Now" : "Welcome back"}
         </h2>
         <p className="text-gray-600">
           {isSignUp ? "Enter your email to secure your spot" : "Sign in to continue"}
@@ -108,6 +112,21 @@ export const AuthFlow = () => {
           className="h-14 text-lg rounded-xl border-2"
           onKeyDown={(e) => e.key === "Enter" && handleEmailAuth()}
         />
+        {isSignUp && (
+          <div className="space-y-1.5">
+            <Input
+              type="text"
+              placeholder="Who do you want to connect with? (optional)"
+              value={intent}
+              onChange={(e) => setIntent(e.target.value)}
+              className="h-14 text-lg rounded-xl border-2"
+              onKeyDown={(e) => e.key === "Enter" && handleEmailAuth()}
+            />
+            <p className="text-xs text-gray-400 text-center">
+              It's fine — we can always figure this out later
+            </p>
+          </div>
+        )}
         <Button
           onClick={handleEmailAuth}
           disabled={loading}

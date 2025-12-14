@@ -35,6 +35,32 @@ Deno.serve(async (req) => {
 
     if (profilesError) throw profilesError;
 
+    // Fetch all chat messages (AI chats)
+    const { data: chatMessages, error: chatError } = await supabase
+      .from("chat_messages")
+      .select("*")
+      .order("created_at", { ascending: false });
+
+    if (chatError) {
+      console.error("Chat messages error:", chatError);
+    }
+
+    // Group chat messages by user
+    const chatsByUser: Record<string, any[]> = {};
+    (chatMessages || []).forEach((msg) => {
+      if (!chatsByUser[msg.user_id]) {
+        chatsByUser[msg.user_id] = [];
+      }
+      chatsByUser[msg.user_id].push(msg);
+    });
+
+    // Enrich profiles with chat data
+    const enrichedProfiles = (profiles || []).map((profile) => ({
+      ...profile,
+      chat_messages: chatsByUser[profile.id] || [],
+      message_count: (chatsByUser[profile.id] || []).length,
+    }));
+
     // Fetch all introductions
     const { data: introductions, error: introsError } = await supabase
       .from("introductions")
@@ -43,14 +69,36 @@ Deno.serve(async (req) => {
 
     if (introsError) throw introsError;
 
-    // Enrich introductions with user data
-    const introsWithUsers = await Promise.all(
-      (introductions || []).map(async (intro) => {
-        const userA = profiles?.find(p => p.id === intro.user_a_id);
-        const userB = profiles?.find(p => p.id === intro.user_b_id);
-        return { ...intro, user_a: userA, user_b: userB };
-      })
-    );
+    // Fetch all user chats (user-to-user)
+    const { data: userChats, error: userChatsError } = await supabase
+      .from("user_chats")
+      .select("*")
+      .order("created_at", { ascending: false });
+
+    if (userChatsError) {
+      console.error("User chats error:", userChatsError);
+    }
+
+    // Group user chats by introduction
+    const chatsByIntro: Record<string, any[]> = {};
+    (userChats || []).forEach((chat) => {
+      if (!chatsByIntro[chat.introduction_id]) {
+        chatsByIntro[chat.introduction_id] = [];
+      }
+      chatsByIntro[chat.introduction_id].push(chat);
+    });
+
+    // Enrich introductions with user data and chats
+    const introsWithUsers = (introductions || []).map((intro) => {
+      const userA = profiles?.find(p => p.id === intro.user_a_id);
+      const userB = profiles?.find(p => p.id === intro.user_b_id);
+      return { 
+        ...intro, 
+        user_a: userA, 
+        user_b: userB,
+        chats: chatsByIntro[intro.id] || [],
+      };
+    });
 
     // Fetch funnel events (last 24h by default, or custom range)
     const hoursAgo = timeRange || 24;
@@ -88,7 +136,7 @@ Deno.serve(async (req) => {
 
     return new Response(
       JSON.stringify({ 
-        profiles, 
+        profiles: enrichedProfiles, 
         introductions: introsWithUsers,
         funnelStats,
         recentEvents,

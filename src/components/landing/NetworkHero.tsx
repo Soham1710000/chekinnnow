@@ -324,9 +324,9 @@ export const NetworkHero = () => {
               initial={{ opacity: 0, y: 20 }}
               animate={{ opacity: 1, y: 0 }}
               transition={{ duration: 0.8, delay: 0.1 }}
-              className="text-2xl sm:text-3xl md:text-4xl lg:text-5xl xl:text-6xl font-bold text-gray-900 leading-tight mb-2 sm:mb-3 md:mb-4"
+              className="text-xl sm:text-2xl md:text-3xl lg:text-4xl xl:text-5xl font-bold text-gray-900 leading-tight mb-2 sm:mb-3 md:mb-4"
             >
-              The right introduction changes everything.
+              When you don't know who to reach out to, we make the introduction.
             </motion.h1>
             
             <motion.p

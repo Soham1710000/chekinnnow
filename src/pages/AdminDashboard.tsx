@@ -137,51 +137,25 @@ const AdminDashboard = () => {
 
   const loadData = async () => {
     setLoading(true);
-    await Promise.all([loadProfiles(), loadIntroductions()]);
-    setLoading(false);
-  };
+    try {
+      const { data, error } = await supabase.functions.invoke("admin-data", {
+        body: { password: ADMIN_PASSWORD },
+      });
 
-  const loadProfiles = async () => {
-    const { data, error } = await supabase
-      .from("profiles")
-      .select("*")
-      .order("created_at", { ascending: false });
+      if (error) throw error;
 
-    if (error) {
-      console.error("Error loading profiles:", error);
-      return;
+      setProfiles(data.profiles || []);
+      setIntroductions(data.introductions || []);
+    } catch (error) {
+      console.error("Error loading data:", error);
+      toast({
+        title: "Error loading data",
+        description: "Could not fetch admin data.",
+        variant: "destructive",
+      });
+    } finally {
+      setLoading(false);
     }
-
-    setProfiles(data as Profile[]);
-  };
-
-  const loadIntroductions = async () => {
-    const { data, error } = await supabase
-      .from("introductions")
-      .select("*")
-      .order("created_at", { ascending: false });
-
-    if (error) {
-      console.error("Error loading introductions:", error);
-      return;
-    }
-
-    // Fetch user profiles for each intro
-    const introsWithUsers = await Promise.all(
-      (data || []).map(async (intro) => {
-        const [userA, userB] = await Promise.all([
-          supabase.from("profiles").select("*").eq("id", intro.user_a_id).maybeSingle(),
-          supabase.from("profiles").select("*").eq("id", intro.user_b_id).maybeSingle(),
-        ]);
-        return {
-          ...intro,
-          user_a: userA.data,
-          user_b: userB.data,
-        };
-      })
-    );
-
-    setIntroductions(introsWithUsers as Introduction[]);
   };
 
   const loadUserMessages = async (userId: string) => {
@@ -262,7 +236,7 @@ const AdminDashboard = () => {
     setSelectedUserB(null);
     setIntroMessage("");
     setCreating(false);
-    loadIntroductions();
+    loadData();
   };
 
   const handleEndIntro = async (intro: Introduction) => {
@@ -289,7 +263,7 @@ const AdminDashboard = () => {
       description: "The conversation has been closed.",
     });
 
-    loadIntroductions();
+    loadData();
     setViewIntro(null);
   };
 

@@ -49,6 +49,7 @@ const Chat = () => {
   const [sending, setSending] = useState(false);
   const [activeChat, setActiveChat] = useState<Introduction | null>(null);
   const [view, setView] = useState<"chekinn" | "connections">("chekinn");
+  const [learningComplete, setLearningComplete] = useState(false);
   const messagesEndRef = useRef<HTMLDivElement>(null);
 
   useEffect(() => {
@@ -62,8 +63,22 @@ const Chat = () => {
       loadMessages();
       loadIntroductions();
       subscribeToMessages();
+      checkLearningStatus();
     }
   }, [user]);
+
+  const checkLearningStatus = async () => {
+    if (!user) return;
+    const { data } = await supabase
+      .from("profiles")
+      .select("learning_complete")
+      .eq("id", user.id)
+      .maybeSingle();
+    
+    if (data?.learning_complete) {
+      setLearningComplete(true);
+    }
+  };
 
   useEffect(() => {
     messagesEndRef.current?.scrollIntoView({ behavior: "smooth" });
@@ -413,6 +428,22 @@ const Chat = () => {
                   onDecline={() => handleDeclineIntro(intro)}
                 />
               ))}
+
+              {/* Nudge when learning is complete but no intros yet */}
+              {learningComplete && pendingIntros.length === 0 && activeIntros.length === 0 && (
+                <motion.div
+                  initial={{ opacity: 0, y: 10 }}
+                  animate={{ opacity: 1, y: 0 }}
+                  className="bg-primary/10 border border-primary/20 rounded-xl p-4 text-center"
+                >
+                  <p className="text-sm text-foreground font-medium">
+                    🎯 We've got your profile!
+                  </p>
+                  <p className="text-xs text-muted-foreground mt-1">
+                    We're working on finding the right introduction for you. Check back soon!
+                  </p>
+                </motion.div>
+              )}
             </AnimatePresence>
             
             {sending && (

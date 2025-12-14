@@ -841,18 +841,21 @@ const AdminDashboard = () => {
                         >
                           {intro.status}
                         </span>
-                        {intro.status === "active" && (
-                          <Button
-                            variant="ghost"
-                            size="sm"
-                            onClick={() => {
-                              setViewIntro(intro);
-                              loadIntroChats(intro.id);
-                            }}
-                          >
-                            <Eye className="w-4 h-4" />
-                          </Button>
+                        {(intro.chats?.length ?? 0) > 0 && (
+                          <span className="px-2 py-0.5 rounded-full text-xs bg-blue-500/10 text-blue-500">
+                            💬 {intro.chats?.length} msgs
+                          </span>
                         )}
+                        <Button
+                          variant="ghost"
+                          size="sm"
+                          onClick={() => {
+                            setViewIntro(intro);
+                            loadIntroChats(intro.id);
+                          }}
+                        >
+                          <Eye className="w-4 h-4" />
+                        </Button>
                       </div>
                     </div>
                   </div>

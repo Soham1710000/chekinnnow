@@ -62,6 +62,7 @@ interface ChatMessage {
   content: string;
   created_at: string;
 }
+const ADMIN_PASSWORD = "chekinn2024";
 
 const AdminDashboard = () => {
   const { user, loading: authLoading, signOut } = useAuth();
@@ -74,6 +75,11 @@ const AdminDashboard = () => {
   const [introductions, setIntroductions] = useState<Introduction[]>([]);
   const [searchTerm, setSearchTerm] = useState("");
   const [loading, setLoading] = useState(true);
+
+  // Password gate
+  const [passwordEntered, setPasswordEntered] = useState(false);
+  const [passwordInput, setPasswordInput] = useState("");
+  const [passwordError, setPasswordError] = useState(false);
 
   // Create intro modal
   const [showCreateIntro, setShowCreateIntro] = useState(false);
@@ -90,13 +96,16 @@ const AdminDashboard = () => {
   const [viewIntro, setViewIntro] = useState<Introduction | null>(null);
   const [introChats, setIntroChats] = useState<ChatMessage[]>([]);
 
-  useEffect(() => {
-    if (!authLoading && !user) {
-      navigate("/auth");
-    } else if (user) {
-      checkAdminStatus();
+  const handlePasswordSubmit = (e: React.FormEvent) => {
+    e.preventDefault();
+    if (passwordInput === ADMIN_PASSWORD) {
+      setPasswordEntered(true);
+      setPasswordError(false);
+      loadData();
+    } else {
+      setPasswordError(true);
     }
-  }, [user, authLoading]);
+  };
 
   const checkAdminStatus = async () => {
     if (!user) return;
@@ -293,12 +302,36 @@ const AdminDashboard = () => {
     );
   }
 
-  if (!isAdmin) {
+  // Password gate screen
+  if (!passwordEntered) {
     return (
       <div className="min-h-screen bg-background flex flex-col items-center justify-center p-4">
-        <h1 className="text-2xl font-bold mb-2">Access Denied</h1>
-        <p className="text-muted-foreground mb-4">You don't have admin access.</p>
-        <Button onClick={() => navigate("/")}>Go Home</Button>
+        <div className="w-full max-w-sm">
+          <h1 className="text-2xl font-bold mb-2 text-center">Admin Access</h1>
+          <p className="text-muted-foreground mb-6 text-center">Enter password to continue</p>
+          <form onSubmit={handlePasswordSubmit} className="space-y-4">
+            <Input
+              type="password"
+              value={passwordInput}
+              onChange={(e) => setPasswordInput(e.target.value)}
+              placeholder="Enter admin password"
+              className={passwordError ? "border-red-500" : ""}
+            />
+            {passwordError && (
+              <p className="text-sm text-red-500">Incorrect password</p>
+            )}
+            <Button type="submit" className="w-full">
+              Access Dashboard
+            </Button>
+          </form>
+          <Button 
+            variant="ghost" 
+            className="w-full mt-4" 
+            onClick={() => navigate("/")}
+          >
+            Go Back
+          </Button>
+        </div>
       </div>
     );
   }

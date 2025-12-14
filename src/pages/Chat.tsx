@@ -3,7 +3,7 @@ import { useAuth } from "@/hooks/useAuth";
 import { supabase } from "@/integrations/supabase/client";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
-import { Send, ArrowLeft, MessageCircle, Users } from "lucide-react";
+import { Send, ArrowLeft, MessageCircle, Users, Clock } from "lucide-react";
 import { motion, AnimatePresence } from "framer-motion";
 import { useNavigate } from "react-router-dom";
 import { useToast } from "@/hooks/use-toast";
@@ -332,6 +332,12 @@ const Chat = () => {
     (i.status === "accepted_b" && i.user_a_id === user?.id)
   );
 
+  // Intros where current user accepted but waiting for other user
+  const waitingIntros = introductions.filter(
+    (i) => (i.status === "accepted_a" && i.user_a_id === user?.id) ||
+           (i.status === "accepted_b" && i.user_b_id === user?.id)
+  );
+
   const activeIntros = introductions.filter((i) => i.status === "active");
 
   if (authLoading || loading) {
@@ -479,15 +485,52 @@ const Chat = () => {
         </>
       ) : (
         /* Connections View */
-        <div className="flex-1 overflow-y-auto p-4">
-          {activeIntros.length === 0 ? (
+        <div className="flex-1 overflow-y-auto p-4 space-y-6">
+          {/* Waiting for acceptance */}
+          {waitingIntros.length > 0 && (
+            <div className="space-y-3">
+              <h3 className="text-sm font-medium text-muted-foreground flex items-center gap-2">
+                <Clock className="w-4 h-4" />
+                Waiting for acceptance
+              </h3>
+              {waitingIntros.map((intro) => (
+                <div
+                  key={intro.id}
+                  className="p-4 bg-yellow-500/5 border border-yellow-500/20 rounded-xl"
+                >
+                  <div className="flex items-center gap-3">
+                    <div className="w-12 h-12 rounded-full bg-yellow-500/10 flex items-center justify-center text-yellow-600 font-semibold">
+                      {intro.other_user?.full_name?.charAt(0) || "?"}
+                    </div>
+                    <div className="flex-1 min-w-0">
+                      <h3 className="font-medium truncate">
+                        {intro.other_user?.full_name || "Someone"}
+                      </h3>
+                      <p className="text-sm text-muted-foreground">
+                        Waiting for them to accept...
+                      </p>
+                    </div>
+                  </div>
+                </div>
+              ))}
+            </div>
+          )}
+
+          {/* Active connections */}
+          {activeIntros.length === 0 && waitingIntros.length === 0 ? (
             <div className="text-center py-12 text-muted-foreground">
               <Users className="w-12 h-12 mx-auto mb-4 opacity-50" />
               <p>No active connections yet</p>
               <p className="text-sm mt-1">Keep chatting with ChekInn to get matched!</p>
             </div>
-          ) : (
+          ) : activeIntros.length > 0 && (
             <div className="space-y-3">
+              {waitingIntros.length > 0 && (
+                <h3 className="text-sm font-medium text-muted-foreground flex items-center gap-2">
+                  <MessageCircle className="w-4 h-4" />
+                  Active chats
+                </h3>
+              )}
               {activeIntros.map((intro) => (
                 <button
                   key={intro.id}

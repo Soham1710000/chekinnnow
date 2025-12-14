@@ -330,15 +330,6 @@ export const NetworkHero = () => {
               <br />
               <span className="font-semibold">We make the introduction.</span>
             </motion.h1>
-            
-            <motion.p
-              initial={{ opacity: 0, y: 20 }}
-              animate={{ opacity: 1, y: 0 }}
-              transition={{ duration: 0.8, delay: 0.2 }}
-              className="text-sm sm:text-base text-muted-foreground/70 mb-4 sm:mb-6 md:mb-8"
-            >
-              An AI social network for context-first introductions
-            </motion.p>
 
             {/* CTA Button */}
             <motion.div

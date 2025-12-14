@@ -1015,7 +1015,7 @@ const AdminDashboard = () => {
         <DialogContent className="max-w-2xl max-h-[80vh] overflow-y-auto">
           <DialogHeader>
             <DialogTitle>
-              {viewIntro?.user_a?.full_name} ↔ {viewIntro?.user_b?.full_name}
+              {viewIntro?.user_a?.full_name || viewIntro?.user_a?.email || "User A"} ↔ {viewIntro?.user_b?.full_name || viewIntro?.user_b?.email || "User B"}
             </DialogTitle>
           </DialogHeader>
 
@@ -1038,8 +1038,8 @@ const AdminDashboard = () => {
                     >
                       <p className="text-xs text-muted-foreground mb-1">
                         {msg.sender_id === viewIntro.user_a_id
-                          ? viewIntro.user_a?.full_name
-                          : viewIntro.user_b?.full_name}
+                          ? (viewIntro.user_a?.full_name || viewIntro.user_a?.email || "User A")
+                          : (viewIntro.user_b?.full_name || viewIntro.user_b?.email || "User B")}
                       </p>
                       {msg.content}
                     </div>

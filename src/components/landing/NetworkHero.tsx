@@ -367,7 +367,7 @@ export const NetworkHero = () => {
                   </span>
                   <Users className="w-3 h-3 sm:w-3.5 sm:h-3.5" />
                   <span className="text-[11px] sm:text-xs md:text-sm font-medium">
-                    {waitlistCount.toLocaleString()}+ people waiting
+                    {waitlistCount.toLocaleString()}+ people in beta
                   </span>
                 </motion.div>
               </div>

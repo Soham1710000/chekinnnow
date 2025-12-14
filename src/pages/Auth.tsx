@@ -1,4 +1,4 @@
-import { useState, useEffect } from "react";
+import { useState, useEffect, useRef } from "react";
 import { useNavigate } from "react-router-dom";
 import { useAuth } from "@/hooks/useAuth";
 import { supabase } from "@/integrations/supabase/client";
@@ -9,6 +9,7 @@ import { useToast } from "@/hooks/use-toast";
 import { motion } from "framer-motion";
 import { Loader2, ArrowLeft } from "lucide-react";
 import { z } from "zod";
+import { useFunnelTracking } from "@/hooks/useFunnelTracking";
 
 const emailSchema = z.string().email("Please enter a valid email");
 const passwordSchema = z.string().min(6, "Password must be at least 6 characters");
@@ -17,12 +18,27 @@ const Auth = () => {
   const { user, loading: authLoading } = useAuth();
   const navigate = useNavigate();
   const { toast } = useToast();
+  const { trackEvent, trackPageView } = useFunnelTracking();
+  const hasTrackedAuthStart = useRef(false);
   
   const [isSignUp, setIsSignUp] = useState(true);
   const [email, setEmail] = useState("");
   const [password, setPassword] = useState("");
   const [fullName, setFullName] = useState("");
   const [loading, setLoading] = useState(false);
+
+  // Track page view
+  useEffect(() => {
+    trackPageView();
+  }, [trackPageView]);
+
+  // Track auth_start when user begins typing
+  useEffect(() => {
+    if ((email || password || fullName) && !hasTrackedAuthStart.current) {
+      hasTrackedAuthStart.current = true;
+      trackEvent("auth_start", { mode: isSignUp ? "signup" : "signin" });
+    }
+  }, [email, password, fullName, isSignUp, trackEvent]);
 
   useEffect(() => {
     if (!authLoading && user) {
@@ -78,7 +94,9 @@ const Auth = () => {
         setLoading(false);
         return;
       }
+      trackEvent("auth_complete", { mode: "signin", email });
 
+      trackEvent("auth_complete", { mode: "signup", email });
       toast({
         title: "Welcome to ChekInn!",
         description: "Your account has been created.",

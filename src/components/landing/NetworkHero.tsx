@@ -323,7 +323,6 @@ export const NetworkHero = () => {
       <span className="text-sm font-bold text-[#E50914] tracking-tight">NETFLIX</span>
       <span className="text-sm font-bold text-gray-800 tracking-tight">BCG</span>
       <span className="text-sm font-bold text-[#8C1515] tracking-tight">Stanford</span>
-      <span className="text-sm font-bold text-[#FF9900] tracking-tight">amazon</span>
       <span className="text-sm font-bold text-[#00A1E0] tracking-tight">Salesforce</span>
       <span className="text-xs font-semibold text-gray-700 tracking-tight">Tier 1 VCs</span>
       <span className="text-sm font-black text-gray-800 tracking-tight">CRED</span>
@@ -346,23 +345,16 @@ export const NetworkHero = () => {
         transition={{ delay: 0.3 }}
         className="w-full py-2.5 bg-gray-50/80 border-b border-gray-100 overflow-hidden"
       >
-        <div className="relative">
-          <div className="flex animate-marquee whitespace-nowrap">
-            <div className="flex items-center gap-6 px-4">
-              <span className="text-[10px] text-gray-500 uppercase tracking-wider font-medium">Users are from</span>
-              <span className="text-gray-300">•</span>
-              {logoItems}
-            </div>
-            <div className="flex items-center gap-6 px-4">
-              <span className="text-[10px] text-gray-500 uppercase tracking-wider font-medium">Users are from</span>
-              <span className="text-gray-300">•</span>
-              {logoItems}
-            </div>
-            <div className="flex items-center gap-6 px-4">
-              <span className="text-[10px] text-gray-500 uppercase tracking-wider font-medium">Users are from</span>
-              <span className="text-gray-300">•</span>
-              {logoItems}
-            </div>
+        <div className="relative flex overflow-hidden">
+          <div className="flex shrink-0 animate-marquee items-center gap-6 px-4">
+            <span className="text-[10px] text-gray-500 uppercase tracking-wider font-medium whitespace-nowrap">Users are from</span>
+            <span className="text-gray-300">•</span>
+            {logoItems}
+          </div>
+          <div className="flex shrink-0 animate-marquee items-center gap-6 px-4">
+            <span className="text-[10px] text-gray-500 uppercase tracking-wider font-medium whitespace-nowrap">Users are from</span>
+            <span className="text-gray-300">•</span>
+            {logoItems}
           </div>
         </div>
       </motion.div>

@@ -144,11 +144,11 @@ const Chat = () => {
   };
 
   const startAnonymousChat = () => {
-    // Use static welcome message for instant load - no API call needed
+    // Use static welcome message for instant load - explains the value
     const msg: Message = {
       id: `local-${Date.now()}`,
       role: "assistant",
-      content: "What's on your mind?",
+      content: "Hey! Tell me a bit about yourself and who you'd like to meet — I'll find the right person and make the intro for you.",
       message_type: "text",
       metadata: {},
       created_at: new Date().toISOString(),
@@ -597,12 +597,8 @@ const Chat = () => {
                   {index === 0 && msg.role === "assistant" && activeMessages.length === 1 && (
                     <div className="flex flex-wrap gap-2 mt-3">
                       {[
-                        "Looking for a cofounder",
-                        "Find me a cute date",
-                        "Find me a project buddy",
-                        "Find me folks in FAANG",
-                        "Want to break into tech",
-                        "Need advice on my startup",
+                        "I want to meet investors",
+                        "Find me a mentor",
                         "Just exploring"
                       ].map((template) => (
                         <button

@@ -612,6 +612,44 @@ const Chat = () => {
                 </motion.div>
               ))}
 
+              {/* Progress Indicator for Anonymous Users */}
+              {!user && !showLoginNudge && (() => {
+                const userMsgCount = localMessages.filter(m => m.role === "user").length;
+                const progress = Math.min(userMsgCount / LOGIN_NUDGE_THRESHOLD, 1);
+                
+                if (userMsgCount > 0 && userMsgCount < LOGIN_NUDGE_THRESHOLD) {
+                  return (
+                    <motion.div
+                      initial={{ opacity: 0, y: 10 }}
+                      animate={{ opacity: 1, y: 0 }}
+                      className="bg-muted/50 border border-border/50 rounded-xl p-3"
+                    >
+                      <div className="flex items-center justify-between mb-2">
+                        <span className="text-xs text-muted-foreground flex items-center gap-1.5">
+                          <Sparkles className="w-3.5 h-3.5 text-primary" />
+                          Learning about you...
+                        </span>
+                        <span className="text-xs font-medium text-primary">
+                          {userMsgCount}/{LOGIN_NUDGE_THRESHOLD}
+                        </span>
+                      </div>
+                      <div className="h-1.5 bg-muted rounded-full overflow-hidden">
+                        <motion.div 
+                          className="h-full bg-primary rounded-full"
+                          initial={{ width: 0 }}
+                          animate={{ width: `${progress * 100}%` }}
+                          transition={{ duration: 0.5, ease: "easeOut" }}
+                        />
+                      </div>
+                      <p className="text-[10px] text-muted-foreground mt-1.5">
+                        {LOGIN_NUDGE_THRESHOLD - userMsgCount} more {LOGIN_NUDGE_THRESHOLD - userMsgCount === 1 ? 'message' : 'messages'} to unlock intros
+                      </p>
+                    </motion.div>
+                  );
+                }
+                return null;
+              })()}
+
               {/* Login Nudge for Anonymous Users */}
               {showLoginNudge && !user && (
                 <motion.div
@@ -621,11 +659,11 @@ const Chat = () => {
                 >
                   <div className="flex items-center gap-2 text-primary mb-3">
                     <Sparkles className="w-5 h-5" />
-                    <span className="font-semibold text-sm">Finding your intros...</span>
+                    <span className="font-semibold text-sm">Ready to find your intros!</span>
                   </div>
                   
                   <p className="text-foreground mb-4">
-                    I've got a good sense of what you're looking for. Quick signup so I can save your profile and find the right connections for you.
+                    I've learned enough about you. Quick signup so I can save your profile and find the right connections for you.
                   </p>
                   
                   <Button 

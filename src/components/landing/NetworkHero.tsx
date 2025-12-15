@@ -337,20 +337,23 @@ export const NetworkHero = () => {
         initial={{ opacity: 0 }}
         animate={{ opacity: 1 }}
         transition={{ delay: 0.3 }}
-        className="w-full py-3 bg-gray-50/80 border-b border-gray-100 overflow-hidden"
+        className="w-full py-2.5 bg-gray-50/80 border-b border-gray-100 overflow-hidden"
       >
-        <div className="flex items-center gap-2 text-[10px] text-gray-500 uppercase tracking-wider font-medium px-4 mb-2">
-          <span>People from these companies are on ChekInn</span>
-        </div>
         <div className="relative">
           <div className="flex animate-marquee whitespace-nowrap">
-            <div className="flex items-center gap-8 px-4">
+            <div className="flex items-center gap-6 px-4">
+              <span className="text-[10px] text-gray-500 uppercase tracking-wider font-medium">Users are from</span>
+              <span className="text-gray-300">•</span>
               {logoItems}
             </div>
-            <div className="flex items-center gap-8 px-4">
+            <div className="flex items-center gap-6 px-4">
+              <span className="text-[10px] text-gray-500 uppercase tracking-wider font-medium">Users are from</span>
+              <span className="text-gray-300">•</span>
               {logoItems}
             </div>
-            <div className="flex items-center gap-8 px-4">
+            <div className="flex items-center gap-6 px-4">
+              <span className="text-[10px] text-gray-500 uppercase tracking-wider font-medium">Users are from</span>
+              <span className="text-gray-300">•</span>
               {logoItems}
             </div>
           </div>

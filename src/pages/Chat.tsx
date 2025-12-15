@@ -56,10 +56,17 @@ const Chat = () => {
   const { toast } = useToast();
   const { trackEvent } = useFunnelTracking();
   const [messages, setMessages] = useState<Message[]>([]);
-  const [localMessages, setLocalMessages] = useState<Message[]>([]); // For anonymous users
+  const [localMessages, setLocalMessages] = useState<Message[]>(() => [{
+    id: `local-${Date.now()}`,
+    role: "assistant" as const,
+    content: "Hey! Tell me a bit about yourself and who you'd like to meet — I'll find the right person and make the intro for you.",
+    message_type: "text",
+    metadata: {},
+    created_at: new Date().toISOString(),
+  }]); // Pre-populate for instant load
   const [introductions, setIntroductions] = useState<Introduction[]>([]);
   const [input, setInput] = useState("");
-  const [loading, setLoading] = useState(true);
+  const [loading, setLoading] = useState(false); // Start false for instant render
   const [sending, setSending] = useState(false);
   const [activeChat, setActiveChat] = useState<Introduction | null>(null);
   const [view, setView] = useState<"chekinn" | "connections">("chekinn");
@@ -80,12 +87,8 @@ const Chat = () => {
   // Get the active messages list based on auth state
   const activeMessages = user ? messages : localMessages;
 
-  // Anonymous user: start conversation immediately
-  useEffect(() => {
-    if (!authLoading && !user) {
-      startAnonymousChat();
-    }
-  }, [authLoading, user]);
+  // Anonymous user: already has message pre-populated, no action needed
+  // Authenticated user loading is handled separately
 
   // Authenticated user: load from DB
   useEffect(() => {
@@ -143,19 +146,6 @@ const Chat = () => {
     }
   };
 
-  const startAnonymousChat = () => {
-    // Use static welcome message for instant load - explains the value
-    const msg: Message = {
-      id: `local-${Date.now()}`,
-      role: "assistant",
-      content: "Hey! Tell me a bit about yourself and who you'd like to meet — I'll find the right person and make the intro for you.",
-      message_type: "text",
-      metadata: {},
-      created_at: new Date().toISOString(),
-    };
-    setLocalMessages([msg]);
-    setLoading(false);
-  };
 
   const checkLearningStatus = async () => {
     if (!user) return;
@@ -508,7 +498,8 @@ const Chat = () => {
 
   const activeIntros = introductions.filter((i) => i.status === "active");
 
-  if (authLoading || loading) {
+  // Only show loading for authenticated users who are still loading data
+  if (user && loading) {
     return (
       <div className="min-h-screen bg-background flex items-center justify-center">
         <div className="animate-pulse text-muted-foreground">Loading...</div>

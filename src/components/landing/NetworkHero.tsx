@@ -1,6 +1,6 @@
 import { motion, AnimatePresence } from "framer-motion";
 import { useState, useEffect, useLayoutEffect, lazy, Suspense } from "react";
-import { useSearchParams } from "react-router-dom";
+import { useSearchParams, useNavigate } from "react-router-dom";
 import { Button } from "@/components/ui/button";
 import { ChevronDown, Users } from "lucide-react";
 import { supabase } from "@/integrations/supabase/client";
@@ -254,6 +254,7 @@ export const NetworkHero = () => {
   usePreloadImages(allImages);
   
   const [searchParams] = useSearchParams();
+  const navigate = useNavigate();
   const [isModalOpen, setIsModalOpen] = useState(false);
   const [currentIndex, setCurrentIndex] = useState(0);
   const [waitlistCount, setWaitlistCount] = useState<number>(BASE_WAITLIST_COUNT);
@@ -262,7 +263,7 @@ export const NetworkHero = () => {
 
   const handleCTAClick = () => {
     trackEvent("cta_click", { source: "hero", referral: referralCode });
-    window.location.href = "/auth";
+    navigate("/auth");
   };
 
   // Fetch waitlist count and subscribe to real-time updates

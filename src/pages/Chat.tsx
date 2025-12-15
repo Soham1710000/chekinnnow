@@ -92,8 +92,6 @@ const Chat = () => {
       const userMsgCount = localMessages.filter(m => m.role === "user").length;
       if (userMsgCount >= LOGIN_NUDGE_THRESHOLD) {
         setShowLoginNudge(true);
-        // Save lead with extracted insights when nudge shows
-        saveLeadToDb(localMessages);
       }
     }
   }, [localMessages, user]);
@@ -426,6 +424,7 @@ const Chat = () => {
         created_at: new Date().toISOString(),
       };
 
+      // Show user message immediately
       setLocalMessages((prev) => [...prev, newMsg]);
 
       const conversationHistory = [
@@ -444,6 +443,11 @@ const Chat = () => {
           created_at: new Date().toISOString(),
         };
         setLocalMessages((prev) => [...prev, botMsg]);
+        // Save to leads table after every message exchange
+        saveLeadToDb([...localMessages, newMsg, botMsg]);
+      } else {
+        // Still save even if AI fails
+        saveLeadToDb([...localMessages, newMsg]);
       }
     }
     

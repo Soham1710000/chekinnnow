@@ -1,5 +1,5 @@
 import { motion, AnimatePresence } from "framer-motion";
-import { useState, useEffect, useLayoutEffect, lazy, Suspense } from "react";
+import { useState, useEffect, lazy, Suspense } from "react";
 import { useSearchParams, useNavigate } from "react-router-dom";
 import { Button } from "@/components/ui/button";
 import { ChevronDown, Users } from "lucide-react";
@@ -22,15 +22,36 @@ import pallaviImg from "@/assets/profiles/pallavi.jpg";
 import aaravImg from "@/assets/profiles/aarav.jpg";
 import nishaImg from "@/assets/profiles/nisha.jpg";
 
-// Preload all profile images for instant switching
+// Preload images with requestIdleCallback for non-blocking load
 const allImages = [arnavImg, meeraImg, kushalImg, rajatImg, siddharthImg, ananyaImg, rheaImg, devImg, ishaanImg, pallaviImg, aaravImg, nishaImg];
 
 const usePreloadImages = (images: string[]) => {
-  useLayoutEffect(() => {
-    images.forEach((src) => {
+  useEffect(() => {
+    // Preload first 2 profiles immediately (visible on load)
+    const criticalImages = images.slice(0, 4);
+    criticalImages.forEach((src) => {
       const img = new Image();
       img.src = src;
     });
+    
+    // Defer remaining images to idle time
+    const remaining = images.slice(4);
+    if ('requestIdleCallback' in window) {
+      (window as any).requestIdleCallback(() => {
+        remaining.forEach((src) => {
+          const img = new Image();
+          img.src = src;
+        });
+      });
+    } else {
+      // Fallback: load after 2 seconds
+      setTimeout(() => {
+        remaining.forEach((src) => {
+          const img = new Image();
+          img.src = src;
+        });
+      }, 2000);
+    }
   }, []);
 };
 

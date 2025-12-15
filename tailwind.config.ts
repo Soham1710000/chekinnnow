@@ -113,6 +113,10 @@ export default {
           "0%": { transform: "translateX(0)" },
           "100%": { transform: "translateX(-50%)" },
         },
+        "marquee": {
+          "0%": { transform: "translateX(0)" },
+          "100%": { transform: "translateX(-33.33%)" },
+        },
       },
       animation: {
         "accordion-down": "accordion-down 0.2s ease-out",
@@ -122,6 +126,7 @@ export default {
         "slide-in-right": "slide-in-right 0.5s ease-out",
         "float": "float 6s ease-in-out infinite",
         "carousel": "carousel 40s linear infinite",
+        "marquee": "marquee 20s linear infinite",
       },
       spacing: {
         '18': '4.5rem',

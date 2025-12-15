@@ -309,10 +309,58 @@ export const NetworkHero = () => {
     return () => clearInterval(interval);
   }, []);
 
+  // Logo items for the marquee
+  const logoItems = (
+    <>
+      <div className="flex items-center">
+        <span className="text-sm font-medium" style={{ color: '#4285F4' }}>G</span>
+        <span className="text-sm font-medium" style={{ color: '#EA4335' }}>o</span>
+        <span className="text-sm font-medium" style={{ color: '#FBBC05' }}>o</span>
+        <span className="text-sm font-medium" style={{ color: '#4285F4' }}>g</span>
+        <span className="text-sm font-medium" style={{ color: '#34A853' }}>l</span>
+        <span className="text-sm font-medium" style={{ color: '#EA4335' }}>e</span>
+      </div>
+      <span className="text-sm font-bold text-[#E50914] tracking-tight">NETFLIX</span>
+      <span className="text-sm font-bold text-gray-800 tracking-tight">BCG</span>
+      <span className="text-sm font-bold text-[#8C1515] tracking-tight">Stanford</span>
+      <span className="text-xs font-semibold text-gray-700 tracking-tight">Tier 1 VCs</span>
+      <span className="text-sm font-black text-gray-800 tracking-tight">CRED</span>
+      <span className="text-sm font-bold text-gray-800 italic">flipkart</span>
+      <span className="text-xs font-bold text-gray-800 tracking-tight">IIT Delhi</span>
+    </>
+  );
+
   return (
-    <section className="relative min-h-[100svh] bg-white overflow-hidden flex items-end">
-      <div className="container-apple relative z-10 py-6 sm:py-8 md:py-12 pb-24 sm:pb-28 md:pb-32 px-4 md:px-6">
-        <div className="grid lg:grid-cols-2 gap-4 sm:gap-6 md:gap-8 lg:gap-8 items-end">
+    <section className="relative min-h-[100svh] bg-white overflow-hidden flex flex-col">
+      {/* Top scrolling logo marquee */}
+      <motion.div
+        initial={{ opacity: 0 }}
+        animate={{ opacity: 1 }}
+        transition={{ delay: 0.3 }}
+        className="w-full py-3 bg-gray-50/80 border-b border-gray-100 overflow-hidden"
+      >
+        <div className="flex items-center gap-2 text-[10px] text-gray-500 uppercase tracking-wider font-medium px-4 mb-2">
+          <span>People from these companies are on ChekInn</span>
+        </div>
+        <div className="relative">
+          <div className="flex animate-marquee whitespace-nowrap">
+            <div className="flex items-center gap-8 px-4">
+              {logoItems}
+            </div>
+            <div className="flex items-center gap-8 px-4">
+              {logoItems}
+            </div>
+            <div className="flex items-center gap-8 px-4">
+              {logoItems}
+            </div>
+          </div>
+        </div>
+      </motion.div>
+
+      {/* Main content - flex grow to fill remaining space */}
+      <div className="flex-1 flex items-end">
+        <div className="container-apple relative z-10 py-6 sm:py-8 md:py-12 pb-8 sm:pb-12 md:pb-16 px-4 md:px-6 w-full">
+          <div className="grid lg:grid-cols-2 gap-4 sm:gap-6 md:gap-8 lg:gap-8 items-end">
           {/* Left column - Header with CTA */}
           <motion.div
             initial={{ opacity: 0, x: -30 }}
@@ -395,47 +443,7 @@ export const NetworkHero = () => {
           </motion.div>
         </div>
       </div>
-
-      {/* Bottom section with scroll + logos */}
-      <motion.div
-        initial={{ opacity: 0 }}
-        animate={{ opacity: 1 }}
-        transition={{ delay: 1.5 }}
-        className="absolute bottom-1 sm:bottom-2 md:bottom-4 left-0 right-0 flex flex-col items-center gap-1 sm:gap-2 md:gap-4 px-3 sm:px-4"
-      >
-
-        {/* Waitlisted users logos - highlighted */}
-        <div className="flex flex-col items-center gap-1.5 sm:gap-2 bg-gray-50/80 backdrop-blur-sm px-3 sm:px-6 py-2 sm:py-3 rounded-xl sm:rounded-2xl border border-gray-100 w-full sm:w-auto">
-          <p className="text-[9px] sm:text-[10px] md:text-xs text-gray-600 uppercase tracking-wider font-semibold">
-            Waitlisted users are from
-          </p>
-          <div className="flex items-center justify-center gap-2 sm:gap-3 md:gap-5 flex-wrap">
-            {/* Google */}
-            <div className="flex items-center">
-              <span className="text-xs sm:text-sm md:text-base font-medium" style={{ color: '#4285F4' }}>G</span>
-              <span className="text-xs sm:text-sm md:text-base font-medium" style={{ color: '#EA4335' }}>o</span>
-              <span className="text-xs sm:text-sm md:text-base font-medium" style={{ color: '#FBBC05' }}>o</span>
-              <span className="text-xs sm:text-sm md:text-base font-medium" style={{ color: '#4285F4' }}>g</span>
-              <span className="text-xs sm:text-sm md:text-base font-medium" style={{ color: '#34A853' }}>l</span>
-              <span className="text-xs sm:text-sm md:text-base font-medium" style={{ color: '#EA4335' }}>e</span>
-            </div>
-            {/* Netflix */}
-            <span className="text-xs sm:text-sm md:text-base font-bold text-[#E50914] tracking-tight">NETFLIX</span>
-            {/* BCG */}
-            <span className="text-xs sm:text-sm md:text-base font-bold text-gray-800 tracking-tight">BCG</span>
-            {/* Stanford */}
-            <span className="text-xs sm:text-sm md:text-base font-bold text-[#8C1515] tracking-tight">Stanford</span>
-            {/* Tier 1 VC */}
-            <span className="text-[10px] sm:text-xs md:text-sm font-semibold text-gray-700 tracking-tight">Tier 1 VCs</span>
-            {/* CRED */}
-            <span className="text-xs sm:text-sm md:text-base font-black text-gray-800 tracking-tight hidden sm:inline">CRED</span>
-            {/* Flipkart */}
-            <span className="text-xs sm:text-sm md:text-base font-bold text-gray-800 italic hidden sm:inline">flipkart</span>
-            {/* IIT Delhi */}
-            <span className="text-[10px] sm:text-xs md:text-sm font-bold text-gray-800 tracking-tight hidden md:inline">IIT Delhi</span>
-          </div>
-        </div>
-      </motion.div>
+    </div>
 
       {/* Waitlist Modal - lazy loaded */}
       {isModalOpen && (

@@ -118,6 +118,16 @@ Deno.serve(async (req) => {
       console.error("Funnel events error:", funnelError);
     }
 
+    // Fetch all leads (anonymous sessions)
+    const { data: leads, error: leadsError } = await supabase
+      .from("leads")
+      .select("*")
+      .order("created_at", { ascending: false });
+
+    if (leadsError) {
+      console.error("Leads error:", leadsError);
+    }
+
     // Calculate funnel stats
     const events = funnelEvents || [];
     const funnelStats = {
@@ -144,6 +154,7 @@ Deno.serve(async (req) => {
         introductions: introsWithUsers,
         funnelStats,
         recentEvents,
+        leads: leads || [],
       }),
       { headers: { ...corsHeaders, "Content-Type": "application/json" } }
     );

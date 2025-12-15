@@ -39,6 +39,16 @@ interface Introduction {
 const CHAT_URL = `${import.meta.env.VITE_SUPABASE_URL}/functions/v1/chat-ai`;
 const LOGIN_NUDGE_THRESHOLD = 5;
 
+// Generate or get session ID for anonymous users
+const getSessionId = () => {
+  let sessionId = sessionStorage.getItem("chekinn_session_id");
+  if (!sessionId) {
+    sessionId = `session_${Date.now()}_${Math.random().toString(36).slice(2, 11)}`;
+    sessionStorage.setItem("chekinn_session_id", sessionId);
+  }
+  return sessionId;
+};
+
 const Chat = () => {
   const { user, loading: authLoading } = useAuth();
   const navigate = useNavigate();
@@ -53,11 +63,11 @@ const Chat = () => {
   const [view, setView] = useState<"chekinn" | "connections">("chekinn");
   const [learningComplete, setLearningComplete] = useState(false);
   const [showLoginNudge, setShowLoginNudge] = useState(false);
+  const [sessionId] = useState(() => getSessionId());
   const messagesEndRef = useRef<HTMLDivElement>(null);
 
   // Get the active messages list based on auth state
   const activeMessages = user ? messages : localMessages;
-  const setActiveMessages = user ? setMessages : setLocalMessages;
 
   // Anonymous user: start conversation immediately
   useEffect(() => {
@@ -82,9 +92,47 @@ const Chat = () => {
       const userMsgCount = localMessages.filter(m => m.role === "user").length;
       if (userMsgCount >= LOGIN_NUDGE_THRESHOLD) {
         setShowLoginNudge(true);
+        // Save lead with extracted insights when nudge shows
+        saveLeadToDb(localMessages);
       }
     }
   }, [localMessages, user]);
+
+  // Save anonymous chat to leads table
+  const saveLeadToDb = async (msgs: Message[]) => {
+    try {
+      const messagesForDb = msgs.map(m => ({
+        role: m.role,
+        content: m.content,
+        created_at: m.created_at,
+      }));
+
+      // Check if lead already exists
+      const { data: existing } = await supabase
+        .from("leads")
+        .select("id")
+        .eq("session_id", sessionId)
+        .maybeSingle();
+
+      if (existing) {
+        // Update existing lead
+        await supabase
+          .from("leads")
+          .update({ messages: messagesForDb })
+          .eq("session_id", sessionId);
+      } else {
+        // Insert new lead
+        await supabase
+          .from("leads")
+          .insert({
+            session_id: sessionId,
+            messages: messagesForDb,
+          });
+      }
+    } catch (error) {
+      console.error("Error saving lead:", error);
+    }
+  };
 
   const startAnonymousChat = async () => {
     // Get initial AI message for anonymous users
@@ -164,6 +212,15 @@ const Chat = () => {
         metadata: msg.metadata,
       });
     }
+
+    // Link lead to user (mark as converted)
+    await supabase
+      .from("leads")
+      .update({ 
+        user_id: user.id, 
+        converted_at: new Date().toISOString() 
+      })
+      .eq("session_id", sessionId);
     
     // Reload from DB
     const { data } = await supabase

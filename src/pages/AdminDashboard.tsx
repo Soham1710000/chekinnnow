@@ -92,6 +92,17 @@ interface FunnelEvent {
   created_at: string;
 }
 
+interface Lead {
+  id: string;
+  session_id: string;
+  messages: { role: string; content: string; created_at: string }[];
+  extracted_insights: any;
+  user_id: string | null;
+  converted_at: string | null;
+  created_at: string;
+  updated_at: string;
+}
+
 const ADMIN_PASSWORD = "chekinn2024";
 
 const AdminDashboard = () => {
@@ -105,6 +116,7 @@ const AdminDashboard = () => {
   const [introductions, setIntroductions] = useState<Introduction[]>([]);
   const [funnelStats, setFunnelStats] = useState<FunnelStats | null>(null);
   const [recentEvents, setRecentEvents] = useState<FunnelEvent[]>([]);
+  const [leads, setLeads] = useState<Lead[]>([]);
   const [funnelTimeRange, setFunnelTimeRange] = useState(24);
   const [searchTerm, setSearchTerm] = useState("");
   const [loading, setLoading] = useState(true);
@@ -180,6 +192,7 @@ const AdminDashboard = () => {
       setIntroductions(data.introductions || []);
       setFunnelStats(data.funnelStats || null);
       setRecentEvents(data.recentEvents || []);
+      setLeads(data.leads || []);
     } catch (error) {
       console.error("Error loading data:", error);
       toast({
@@ -518,6 +531,14 @@ const AdminDashboard = () => {
           <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-4">
             <TabsList>
               <TabsTrigger value="funnel">Funnel</TabsTrigger>
+              <TabsTrigger value="leads">
+                Leads
+                {leads.filter(l => !l.converted_at).length > 0 && (
+                  <span className="ml-1.5 bg-orange-500 text-white text-xs px-1.5 py-0.5 rounded-full">
+                    {leads.filter(l => !l.converted_at).length}
+                  </span>
+                )}
+              </TabsTrigger>
               <TabsTrigger value="users">Users</TabsTrigger>
               <TabsTrigger value="introductions">Introductions</TabsTrigger>
             </TabsList>
@@ -686,6 +707,85 @@ const AdminDashboard = () => {
                 )}
               </div>
             </div>
+          </TabsContent>
+
+          {/* Leads Tab */}
+          <TabsContent value="leads" className="space-y-4">
+            <div className="grid grid-cols-2 md:grid-cols-4 gap-4">
+              <div className="bg-card border border-border rounded-xl p-4">
+                <p className="text-2xl font-bold">{leads.length}</p>
+                <p className="text-sm text-muted-foreground">Total Leads</p>
+              </div>
+              <div className="bg-card border border-border rounded-xl p-4">
+                <p className="text-2xl font-bold text-orange-500">{leads.filter(l => !l.converted_at).length}</p>
+                <p className="text-sm text-muted-foreground">Unconverted</p>
+              </div>
+              <div className="bg-card border border-border rounded-xl p-4">
+                <p className="text-2xl font-bold text-green-500">{leads.filter(l => l.converted_at).length}</p>
+                <p className="text-sm text-muted-foreground">Converted</p>
+              </div>
+              <div className="bg-card border border-border rounded-xl p-4">
+                <p className="text-2xl font-bold">
+                  {leads.length > 0 ? Math.round((leads.filter(l => l.converted_at).length / leads.length) * 100) : 0}%
+                </p>
+                <p className="text-sm text-muted-foreground">Conversion Rate</p>
+              </div>
+            </div>
+
+            {leads.length === 0 ? (
+              <div className="text-center py-12 text-muted-foreground">
+                No leads yet. Anonymous chat sessions will appear here.
+              </div>
+            ) : (
+              <div className="space-y-4">
+                {leads.map((lead) => (
+                  <div
+                    key={lead.id}
+                    className={`bg-card border rounded-xl p-4 ${
+                      lead.converted_at ? 'border-green-500/30' : 'border-orange-500/30'
+                    }`}
+                  >
+                    <div className="flex items-start justify-between mb-3">
+                      <div>
+                        <div className="flex items-center gap-2">
+                          <span className={`px-2 py-0.5 rounded text-xs font-medium ${
+                            lead.converted_at 
+                              ? 'bg-green-100 text-green-700' 
+                              : 'bg-orange-100 text-orange-700'
+                          }`}>
+                            {lead.converted_at ? 'Converted' : 'Pending'}
+                          </span>
+                          <span className="text-xs text-muted-foreground">
+                            {lead.messages?.length || 0} messages
+                          </span>
+                        </div>
+                        <p className="text-xs text-muted-foreground mt-1">
+                          Session: {lead.session_id.slice(0, 20)}...
+                        </p>
+                      </div>
+                      <span className="text-xs text-muted-foreground">
+                        {new Date(lead.created_at).toLocaleDateString()}
+                      </span>
+                    </div>
+                    
+                    {/* Messages preview */}
+                    <div className="bg-muted/50 rounded-lg p-3 max-h-48 overflow-y-auto space-y-2">
+                      {(lead.messages || []).slice(0, 10).map((msg, idx) => (
+                        <div key={idx} className={`text-sm ${msg.role === 'user' ? 'text-primary' : 'text-muted-foreground'}`}>
+                          <span className="font-medium">{msg.role === 'user' ? 'User:' : 'AI:'}</span>{' '}
+                          {msg.content.slice(0, 150)}{msg.content.length > 150 ? '...' : ''}
+                        </div>
+                      ))}
+                      {(lead.messages?.length || 0) > 10 && (
+                        <p className="text-xs text-muted-foreground">
+                          +{lead.messages.length - 10} more messages...
+                        </p>
+                      )}
+                    </div>
+                  </div>
+                ))}
+              </div>
+            )}
           </TabsContent>
 
           <TabsContent value="users" className="space-y-4">

@@ -523,7 +523,7 @@ const Chat = () => {
               <p>No active connections yet</p>
               <p className="text-sm mt-1">Keep chatting with ChekInn to get matched!</p>
             </div>
-          ) : activeIntros.length > 0 && (
+          ) : activeIntros.length > 0 ? (
             <div className="space-y-3">
               {waitingIntros.length > 0 && (
                 <h3 className="text-sm font-medium text-muted-foreground flex items-center gap-2">
@@ -553,7 +553,7 @@ const Chat = () => {
                 </button>
               ))}
             </div>
-          )}
+          ) : null}
         </div>
       )}
     </div>

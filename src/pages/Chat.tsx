@@ -143,32 +143,17 @@ const Chat = () => {
     }
   };
 
-  const startAnonymousChat = async () => {
-    // Get initial AI message for anonymous users
-    try {
-      const welcomeMessage = await getAIResponse([]);
-      const msg: Message = {
-        id: `local-${Date.now()}`,
-        role: "assistant",
-        content: welcomeMessage || "What's on your mind?",
-        message_type: "text",
-        metadata: {},
-        created_at: new Date().toISOString(),
-      };
-      setLocalMessages([msg]);
-    } catch (error) {
-      console.error("Error starting anonymous chat:", error);
-      // Fallback message if AI fails
-      const msg: Message = {
-        id: `local-${Date.now()}`,
-        role: "assistant",
-        content: "What's on your mind?",
-        message_type: "text",
-        metadata: {},
-        created_at: new Date().toISOString(),
-      };
-      setLocalMessages([msg]);
-    }
+  const startAnonymousChat = () => {
+    // Use static welcome message for instant load - no API call needed
+    const msg: Message = {
+      id: `local-${Date.now()}`,
+      role: "assistant",
+      content: "What's on your mind?",
+      message_type: "text",
+      metadata: {},
+      created_at: new Date().toISOString(),
+    };
+    setLocalMessages([msg]);
     setLoading(false);
   };
 

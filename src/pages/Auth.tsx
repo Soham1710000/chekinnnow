@@ -4,10 +4,9 @@ import { useAuth } from "@/hooks/useAuth";
 import { supabase } from "@/integrations/supabase/client";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
-import { Label } from "@/components/ui/label";
 import { useToast } from "@/hooks/use-toast";
 import { motion } from "framer-motion";
-import { Loader2, ArrowLeft } from "lucide-react";
+import { Loader2, ArrowLeft, Sparkles } from "lucide-react";
 import { z } from "zod";
 import { useFunnelTracking } from "@/hooks/useFunnelTracking";
 
@@ -24,7 +23,6 @@ const Auth = () => {
   const [isSignUp, setIsSignUp] = useState(true);
   const [email, setEmail] = useState("");
   const [password, setPassword] = useState("");
-  const [fullName, setFullName] = useState("");
   const [loading, setLoading] = useState(false);
 
   // Track page view
@@ -34,11 +32,11 @@ const Auth = () => {
 
   // Track auth_start when user begins typing
   useEffect(() => {
-    if ((email || password || fullName) && !hasTrackedAuthStart.current) {
+    if ((email || password) && !hasTrackedAuthStart.current) {
       hasTrackedAuthStart.current = true;
       trackEvent("auth_start", { mode: isSignUp ? "signup" : "signin" });
     }
-  }, [email, password, fullName, isSignUp, trackEvent]);
+  }, [email, password, isSignUp, trackEvent]);
 
   useEffect(() => {
     if (!authLoading && user) {
@@ -71,9 +69,6 @@ const Auth = () => {
         password,
         options: {
           emailRedirectTo: `${window.location.origin}/chat`,
-          data: {
-            full_name: fullName,
-          },
         },
       });
 
@@ -84,6 +79,7 @@ const Auth = () => {
             description: "This email is already registered. Try signing in instead.",
             variant: "destructive",
           });
+          setIsSignUp(false);
         } else {
           toast({
             title: "Sign up failed",
@@ -94,12 +90,10 @@ const Auth = () => {
         setLoading(false);
         return;
       }
-      trackEvent("auth_complete", { mode: "signin", email });
-
       trackEvent("auth_complete", { mode: "signup", email });
       toast({
-        title: "Welcome to ChekInn!",
-        description: "Your account has been created.",
+        title: "You're in! 🎉",
+        description: "Let's get to know you.",
       });
     } else {
       const { error } = await supabase.auth.signInWithPassword({
@@ -116,6 +110,7 @@ const Auth = () => {
         setLoading(false);
         return;
       }
+      trackEvent("auth_complete", { mode: "signin", email });
     }
 
     setLoading(false);
@@ -147,63 +142,57 @@ const Auth = () => {
           animate={{ opacity: 1, y: 0 }}
           className="w-full max-w-sm"
         >
+          {/* Quick step indicator */}
+          <div className="flex items-center justify-center gap-2 mb-6">
+            <div className="flex items-center gap-1.5 px-3 py-1.5 bg-primary/10 rounded-full">
+              <Sparkles className="w-3.5 h-3.5 text-primary" />
+              <span className="text-xs font-medium text-primary">30 seconds</span>
+            </div>
+          </div>
+
           <div className="text-center mb-8">
-            <h1 className="text-2xl font-bold mb-2">
-              {isSignUp ? "Join ChekInn" : "Welcome back"}
+            <h1 className="text-2xl font-bold mb-3">
+              {isSignUp ? "Quick step to get intros" : "Welcome back"}
             </h1>
-            <p className="text-muted-foreground">
+            <p className="text-muted-foreground text-sm leading-relaxed">
               {isSignUp 
-                ? "Create your account to start making connections" 
-                : "Sign in to continue your journey"}
+                ? "Just an email so we can nudge you when we find someone great for you to meet" 
+                : "Sign in to see your intros"}
             </p>
           </div>
 
-          <form onSubmit={handleAuth} className="space-y-4">
-            {isSignUp && (
-              <div className="space-y-2">
-                <Label htmlFor="fullName">Full Name</Label>
-                <Input
-                  id="fullName"
-                  type="text"
-                  value={fullName}
-                  onChange={(e) => setFullName(e.target.value)}
-                  placeholder="Your name"
-                  required={isSignUp}
-                />
-              </div>
-            )}
+          <form onSubmit={handleAuth} className="space-y-3">
+            <Input
+              id="email"
+              type="email"
+              value={email}
+              onChange={(e) => setEmail(e.target.value)}
+              placeholder="Your email"
+              required
+              className="h-12 text-base rounded-xl border-2 border-muted focus:border-primary transition-colors"
+            />
 
-            <div className="space-y-2">
-              <Label htmlFor="email">Email</Label>
-              <Input
-                id="email"
-                type="email"
-                value={email}
-                onChange={(e) => setEmail(e.target.value)}
-                placeholder="you@example.com"
-                required
-              />
-            </div>
+            <Input
+              id="password"
+              type="password"
+              value={password}
+              onChange={(e) => setPassword(e.target.value)}
+              placeholder="Create a password"
+              required
+              minLength={6}
+              className="h-12 text-base rounded-xl border-2 border-muted focus:border-primary transition-colors"
+            />
+            <p className="text-xs text-muted-foreground text-center">Min 6 characters — we keep it simple</p>
 
-            <div className="space-y-2">
-              <Label htmlFor="password">Password</Label>
-              <Input
-                id="password"
-                type="password"
-                value={password}
-                onChange={(e) => setPassword(e.target.value)}
-                placeholder="••••••••"
-                required
-                minLength={6}
-              />
-              <p className="text-xs text-muted-foreground">Minimum 6 characters</p>
-            </div>
-
-            <Button type="submit" className="w-full" disabled={loading}>
+            <Button 
+              type="submit" 
+              className="w-full h-12 text-base font-semibold rounded-xl mt-2" 
+              disabled={loading}
+            >
               {loading ? (
                 <Loader2 className="w-4 h-4 animate-spin" />
               ) : isSignUp ? (
-                "Create Account"
+                "Get Started →"
               ) : (
                 "Sign In"
               )}
@@ -217,10 +206,17 @@ const Auth = () => {
               className="text-sm text-muted-foreground hover:text-foreground transition-colors"
             >
               {isSignUp 
-                ? "Already have an account? Sign in" 
-                : "Don't have an account? Sign up"}
+                ? "Already signed up? Sign in" 
+                : "New here? Sign up"}
             </button>
           </div>
+
+          {/* Trust indicator */}
+          {isSignUp && (
+            <p className="mt-8 text-xs text-center text-muted-foreground/70">
+              No spam. We only reach out when we find a match.
+            </p>
+          )}
         </motion.div>
       </div>
     </div>

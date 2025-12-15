@@ -133,6 +133,7 @@ Deno.serve(async (req) => {
     const funnelStats = {
       page_view: events.filter(e => e.event_type === "page_view").length,
       cta_click: events.filter(e => e.event_type === "cta_click").length,
+      chat_page_loaded: events.filter(e => e.event_type === "chat_page_loaded").length,
       modal_open: events.filter(e => e.event_type === "modal_open").length,
       auth_start: events.filter(e => e.event_type === "auth_start").length,
       auth_complete: events.filter(e => e.event_type === "auth_complete").length,

@@ -602,6 +602,9 @@ const Chat = () => {
                     <div className="flex flex-wrap gap-2 mt-3">
                       {[
                         "Looking for a cofounder",
+                        "Find me a cute date",
+                        "Find me a project buddy",
+                        "Find me folks in FAANG",
                         "Want to break into tech",
                         "Need advice on my startup",
                         "Just exploring"

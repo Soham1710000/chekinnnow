@@ -3,7 +3,7 @@ import { useAuth } from "@/hooks/useAuth";
 import { supabase } from "@/integrations/supabase/client";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
-import { Send, ArrowLeft, MessageCircle, Users, Clock } from "lucide-react";
+import { Send, ArrowLeft, MessageCircle, Users, Clock, Sparkles } from "lucide-react";
 import { motion, AnimatePresence } from "framer-motion";
 import { useNavigate } from "react-router-dom";
 import { useToast } from "@/hooks/use-toast";
@@ -37,12 +37,14 @@ interface Introduction {
 }
 
 const CHAT_URL = `${import.meta.env.VITE_SUPABASE_URL}/functions/v1/chat-ai`;
+const LOGIN_NUDGE_THRESHOLD = 5;
 
 const Chat = () => {
   const { user, loading: authLoading } = useAuth();
   const navigate = useNavigate();
   const { toast } = useToast();
   const [messages, setMessages] = useState<Message[]>([]);
+  const [localMessages, setLocalMessages] = useState<Message[]>([]); // For anonymous users
   const [introductions, setIntroductions] = useState<Introduction[]>([]);
   const [input, setInput] = useState("");
   const [loading, setLoading] = useState(true);
@@ -50,14 +52,21 @@ const Chat = () => {
   const [activeChat, setActiveChat] = useState<Introduction | null>(null);
   const [view, setView] = useState<"chekinn" | "connections">("chekinn");
   const [learningComplete, setLearningComplete] = useState(false);
+  const [showLoginNudge, setShowLoginNudge] = useState(false);
   const messagesEndRef = useRef<HTMLDivElement>(null);
 
+  // Get the active messages list based on auth state
+  const activeMessages = user ? messages : localMessages;
+  const setActiveMessages = user ? setMessages : setLocalMessages;
+
+  // Anonymous user: start conversation immediately
   useEffect(() => {
     if (!authLoading && !user) {
-      navigate("/auth");
+      startAnonymousChat();
     }
-  }, [user, authLoading, navigate]);
+  }, [authLoading, user]);
 
+  // Authenticated user: load from DB
   useEffect(() => {
     if (user) {
       loadMessages();
@@ -66,6 +75,33 @@ const Chat = () => {
       checkLearningStatus();
     }
   }, [user]);
+
+  // Check if we should show login nudge for anonymous users
+  useEffect(() => {
+    if (!user) {
+      const userMsgCount = localMessages.filter(m => m.role === "user").length;
+      if (userMsgCount >= LOGIN_NUDGE_THRESHOLD) {
+        setShowLoginNudge(true);
+      }
+    }
+  }, [localMessages, user]);
+
+  const startAnonymousChat = async () => {
+    // Get initial AI message for anonymous users
+    const welcomeMessage = await getAIResponse([]);
+    if (welcomeMessage) {
+      const msg: Message = {
+        id: `local-${Date.now()}`,
+        role: "assistant",
+        content: welcomeMessage,
+        message_type: "text",
+        metadata: {},
+        created_at: new Date().toISOString(),
+      };
+      setLocalMessages([msg]);
+    }
+    setLoading(false);
+  };
 
   const checkLearningStatus = async () => {
     if (!user) return;
@@ -82,7 +118,7 @@ const Chat = () => {
 
   useEffect(() => {
     messagesEndRef.current?.scrollIntoView({ behavior: "smooth" });
-  }, [messages]);
+  }, [activeMessages]);
 
   const loadMessages = async () => {
     if (!user) return;
@@ -99,15 +135,48 @@ const Chat = () => {
     }
 
     if (data.length === 0) {
-      // Start conversation with AI - get welcome message and save it
-      const welcomeMessage = await getAIResponse([]);
-      if (welcomeMessage) {
-        await sendBotMessage(welcomeMessage);
+      // Check if we have local messages to migrate
+      if (localMessages.length > 0) {
+        await migrateLocalMessages();
+      } else {
+        // Start conversation with AI
+        const welcomeMessage = await getAIResponse([]);
+        if (welcomeMessage) {
+          await sendBotMessage(welcomeMessage);
+        }
       }
     } else {
       setMessages(data as Message[]);
     }
     setLoading(false);
+  };
+
+  const migrateLocalMessages = async () => {
+    if (!user || localMessages.length === 0) return;
+    
+    // Save all local messages to DB
+    for (const msg of localMessages) {
+      await supabase.from("chat_messages").insert({
+        user_id: user.id,
+        role: msg.role,
+        content: msg.content,
+        message_type: msg.message_type,
+        metadata: msg.metadata,
+      });
+    }
+    
+    // Reload from DB
+    const { data } = await supabase
+      .from("chat_messages")
+      .select("*")
+      .eq("user_id", user.id)
+      .order("created_at", { ascending: true });
+    
+    if (data) {
+      setMessages(data as Message[]);
+    }
+    setLocalMessages([]);
+    setShowLoginNudge(false);
   };
 
   const loadIntroductions = async () => {
@@ -155,7 +224,6 @@ const Chat = () => {
           filter: `user_id=eq.${user.id}`,
         },
         (payload) => {
-          // Avoid duplicates - only add if not already in messages
           setMessages((prev) => {
             const exists = prev.some((m) => m.id === payload.new.id);
             if (exists) return prev;
@@ -205,8 +273,6 @@ const Chat = () => {
   };
 
   const getAIResponse = async (conversationHistory: { role: string; content: string }[]) => {
-    if (!user) return;
-
     try {
       const response = await fetch(CHAT_URL, {
         method: "POST",
@@ -216,7 +282,7 @@ const Chat = () => {
         },
         body: JSON.stringify({
           messages: conversationHistory,
-          userId: user.id,
+          userId: user?.id || null, // null for anonymous
         }),
       });
 
@@ -247,43 +313,81 @@ const Chat = () => {
   };
 
   const handleSend = async () => {
-    if (!input.trim() || !user || sending) return;
+    if (!input.trim() || sending) return;
+
+    // If showing login nudge, don't allow more messages
+    if (showLoginNudge && !user) {
+      toast({
+        title: "Quick step needed",
+        description: "Sign up to continue and get your introductions!",
+      });
+      return;
+    }
 
     setSending(true);
     const userMessage = input.trim();
     setInput("");
 
-    // Insert user message
-    const { data: newMsg, error } = await supabase
-      .from("chat_messages")
-      .insert({
-        user_id: user.id,
+    if (user) {
+      // Authenticated: save to DB
+      const { data: newMsg, error } = await supabase
+        .from("chat_messages")
+        .insert({
+          user_id: user.id,
+          role: "user",
+          content: userMessage,
+          message_type: "text",
+        })
+        .select()
+        .single();
+
+      if (error) {
+        console.error("Error sending message:", error);
+        setSending(false);
+        return;
+      }
+
+      setMessages((prev) => [...prev, newMsg as Message]);
+
+      const conversationHistory = [
+        ...messages.map((m) => ({ role: m.role, content: m.content })),
+        { role: "user", content: userMessage },
+      ];
+
+      const aiResponse = await getAIResponse(conversationHistory);
+      if (aiResponse) {
+        await sendBotMessage(aiResponse);
+      }
+    } else {
+      // Anonymous: store locally
+      const newMsg: Message = {
+        id: `local-${Date.now()}`,
         role: "user",
         content: userMessage,
         message_type: "text",
-      })
-      .select()
-      .single();
+        metadata: {},
+        created_at: new Date().toISOString(),
+      };
 
-    if (error) {
-      console.error("Error sending message:", error);
-      setSending(false);
-      return;
-    }
+      setLocalMessages((prev) => [...prev, newMsg]);
 
-    setMessages((prev) => [...prev, newMsg as Message]);
+      const conversationHistory = [
+        ...localMessages.map((m) => ({ role: m.role, content: m.content })),
+        { role: "user", content: userMessage },
+      ];
 
-    // Build conversation history for AI
-    const conversationHistory = [
-      ...messages.map((m) => ({ role: m.role, content: m.content })),
-      { role: "user", content: userMessage },
-    ];
-
-    // Get AI response
-    const aiResponse = await getAIResponse(conversationHistory);
-    
-    if (aiResponse) {
-      await sendBotMessage(aiResponse);
+      const aiResponse = await getAIResponse(conversationHistory);
+      if (aiResponse) {
+        const botMsg: Message = {
+          id: `local-${Date.now() + 1}`,
+          role: "assistant",
+          content: aiResponse,
+          message_type: "text",
+          metadata: {},
+          created_at: new Date().toISOString(),
+        };
+        setLocalMessages((prev) => [...prev, botMsg]);
+      }
     }
     
     setSending(false);
@@ -293,11 +397,7 @@ const Chat = () => {
     if (!user) return;
 
     const isUserA = intro.user_a_id === user.id;
-    
-    // Check if both will have accepted
-    const bothAccepted = isUserA 
-      ? intro.user_b_accepted 
-      : intro.user_a_accepted;
+    const bothAccepted = isUserA ? intro.user_b_accepted : intro.user_a_accepted;
 
     const updates: Record<string, any> = isUserA 
       ? { user_a_accepted: true } 
@@ -332,7 +432,6 @@ const Chat = () => {
     (i.status === "accepted_b" && i.user_a_id === user?.id)
   );
 
-  // Intros where current user accepted but waiting for other user
   const waitingIntros = introductions.filter(
     (i) => (i.status === "accepted_a" && i.user_a_id === user?.id) ||
            (i.status === "accepted_b" && i.user_b_id === user?.id)
@@ -369,44 +468,46 @@ const Chat = () => {
           <div className="w-5" />
         </div>
         
-        {/* Tabs */}
-        <div className="flex border-t border-border">
-          <button
-            onClick={() => setView("chekinn")}
-            className={`flex-1 py-3 text-sm font-medium transition-colors flex items-center justify-center gap-2 ${
-              view === "chekinn" 
-                ? "text-primary border-b-2 border-primary" 
-                : "text-muted-foreground hover:text-foreground"
-            }`}
-          >
-            <MessageCircle className="w-4 h-4" />
-            Chat with ChekInn
-          </button>
-          <button
-            onClick={() => setView("connections")}
-            className={`flex-1 py-3 text-sm font-medium transition-colors flex items-center justify-center gap-2 ${
-              view === "connections" 
-                ? "text-primary border-b-2 border-primary" 
-                : "text-muted-foreground hover:text-foreground"
-            }`}
-          >
-            <Users className="w-4 h-4" />
-            Connections
-            {activeIntros.length > 0 && (
-              <span className="bg-primary text-primary-foreground text-xs px-1.5 py-0.5 rounded-full">
-                {activeIntros.length}
-              </span>
-            )}
-          </button>
-        </div>
+        {/* Tabs - only show for authenticated users */}
+        {user && (
+          <div className="flex border-t border-border">
+            <button
+              onClick={() => setView("chekinn")}
+              className={`flex-1 py-3 text-sm font-medium transition-colors flex items-center justify-center gap-2 ${
+                view === "chekinn" 
+                  ? "text-primary border-b-2 border-primary" 
+                  : "text-muted-foreground hover:text-foreground"
+              }`}
+            >
+              <MessageCircle className="w-4 h-4" />
+              Chat with ChekInn
+            </button>
+            <button
+              onClick={() => setView("connections")}
+              className={`flex-1 py-3 text-sm font-medium transition-colors flex items-center justify-center gap-2 ${
+                view === "connections" 
+                  ? "text-primary border-b-2 border-primary" 
+                  : "text-muted-foreground hover:text-foreground"
+              }`}
+            >
+              <Users className="w-4 h-4" />
+              Connections
+              {activeIntros.length > 0 && (
+                <span className="bg-primary text-primary-foreground text-xs px-1.5 py-0.5 rounded-full">
+                  {activeIntros.length}
+                </span>
+              )}
+            </button>
+          </div>
+        )}
       </header>
 
-      {view === "chekinn" ? (
+      {view === "chekinn" || !user ? (
         <>
           {/* Messages */}
           <div className="flex-1 overflow-y-auto p-4 space-y-4">
             <AnimatePresence mode="popLayout">
-              {messages.map((msg) => (
+              {activeMessages.map((msg) => (
                 <motion.div
                   key={msg.id}
                   initial={{ opacity: 0, y: 10 }}
@@ -425,8 +526,38 @@ const Chat = () => {
                 </motion.div>
               ))}
 
-              {/* Pending Intro Cards */}
-              {pendingIntros.map((intro) => (
+              {/* Login Nudge for Anonymous Users */}
+              {showLoginNudge && !user && (
+                <motion.div
+                  initial={{ opacity: 0, scale: 0.95, y: 20 }}
+                  animate={{ opacity: 1, scale: 1, y: 0 }}
+                  className="bg-gradient-to-br from-primary/10 to-primary/20 border border-primary/30 rounded-2xl p-5"
+                >
+                  <div className="flex items-center gap-2 text-primary mb-3">
+                    <Sparkles className="w-5 h-5" />
+                    <span className="font-semibold text-sm">Finding your intros...</span>
+                  </div>
+                  
+                  <p className="text-foreground mb-4">
+                    I've got a good sense of what you're looking for. Quick signup so I can save your profile and find the right connections for you.
+                  </p>
+                  
+                  <Button 
+                    onClick={() => navigate("/auth")} 
+                    className="w-full"
+                    size="lg"
+                  >
+                    Continue with Email →
+                  </Button>
+                  
+                  <p className="text-xs text-muted-foreground text-center mt-3">
+                    Takes 30 seconds • Your conversation is saved
+                  </p>
+                </motion.div>
+              )}
+
+              {/* Pending Intro Cards - only for authenticated users */}
+              {user && pendingIntros.map((intro) => (
                 <IntroCard
                   key={intro.id}
                   introduction={intro}
@@ -436,7 +567,7 @@ const Chat = () => {
               ))}
 
               {/* Nudge when learning is complete but no intros yet */}
-              {learningComplete && pendingIntros.length === 0 && activeIntros.length === 0 && (
+              {user && learningComplete && pendingIntros.length === 0 && activeIntros.length === 0 && (
                 <motion.div
                   initial={{ opacity: 0, y: 10 }}
                   animate={{ opacity: 1, y: 0 }}
@@ -473,11 +604,11 @@ const Chat = () => {
                 value={input}
                 onChange={(e) => setInput(e.target.value)}
                 onKeyDown={(e) => e.key === "Enter" && !e.shiftKey && handleSend()}
-                placeholder="Type a message..."
+                placeholder={showLoginNudge && !user ? "Sign up to continue..." : "Type a message..."}
                 className="flex-1"
-                disabled={sending}
+                disabled={sending || (showLoginNudge && !user)}
               />
-              <Button onClick={handleSend} disabled={!input.trim() || sending} size="icon">
+              <Button onClick={handleSend} disabled={!input.trim() || sending || (showLoginNudge && !user)} size="icon">
                 <Send className="w-4 h-4" />
               </Button>
             </div>

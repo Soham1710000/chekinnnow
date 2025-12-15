@@ -589,7 +589,7 @@ const Chat = () => {
                     <div className="flex flex-wrap gap-1.5 mt-3 max-w-[300px] animate-fade-in">
                       {[
                         "Interview prep buddy",
-                        "Test my project",
+                        "Test my project on real users",
                         "Explore a career",
                         "Break into tech",
                         "Get some advice",

@@ -344,7 +344,7 @@ export const NetworkHero = () => {
                   className="bg-gray-900 text-white border-0 px-6 sm:px-6 md:px-8 py-5 sm:py-5 md:py-6 text-base sm:text-base md:text-lg font-semibold rounded-full hover:bg-gray-800 hover:scale-[1.02] active:scale-[0.98] transition-all shadow-lg hover:shadow-xl w-full sm:w-auto"
                   onClick={handleCTAClick}
                 >
-                  Join Now
+                  Let's Talk
                 </Button>
                 
                 {/* Waitlist counter with live indicator */}

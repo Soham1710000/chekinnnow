@@ -27,7 +27,7 @@ export const FinalCTA = () => {
               size="hero"
               onClick={handleClick}
             >
-              Join Now
+              Let's Talk
             </Button>
           </motion.div>
         </div>

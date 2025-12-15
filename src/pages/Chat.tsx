@@ -9,6 +9,7 @@ import { useNavigate } from "react-router-dom";
 import { useToast } from "@/hooks/use-toast";
 import IntroCard from "@/components/chat/IntroCard";
 import UserChatView from "@/components/chat/UserChatView";
+import { useFunnelTracking } from "@/hooks/useFunnelTracking";
 
 interface Message {
   id: string;
@@ -53,6 +54,7 @@ const Chat = () => {
   const { user, loading: authLoading } = useAuth();
   const navigate = useNavigate();
   const { toast } = useToast();
+  const { trackEvent } = useFunnelTracking();
   const [messages, setMessages] = useState<Message[]>([]);
   const [localMessages, setLocalMessages] = useState<Message[]>([]); // For anonymous users
   const [introductions, setIntroductions] = useState<Introduction[]>([]);
@@ -65,6 +67,15 @@ const Chat = () => {
   const [showLoginNudge, setShowLoginNudge] = useState(false);
   const [sessionId] = useState(() => getSessionId());
   const messagesEndRef = useRef<HTMLDivElement>(null);
+  const hasTrackedPageLoad = useRef(false);
+
+  // Track chat page loaded
+  useEffect(() => {
+    if (!hasTrackedPageLoad.current && !authLoading) {
+      hasTrackedPageLoad.current = true;
+      trackEvent("chat_page_loaded" as any, { isAuthenticated: !!user });
+    }
+  }, [authLoading, user, trackEvent]);
 
   // Get the active messages list based on auth state
   const activeMessages = user ? messages : localMessages;

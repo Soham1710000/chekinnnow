@@ -1,13 +1,15 @@
 import { useRef } from "react";
 import { motion, useInView } from "framer-motion";
+import { useNavigate } from "react-router-dom";
 import { Button } from "@/components/ui/button";
 
 export const FinalCTA = () => {
   const ref = useRef(null);
   const isInView = useInView(ref, { once: true, margin: "-100px" });
+  const navigate = useNavigate();
 
   const handleClick = () => {
-    window.location.href = "/auth";
+    navigate("/auth");
   };
 
   return (

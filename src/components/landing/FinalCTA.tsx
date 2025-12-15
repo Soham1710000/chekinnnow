@@ -9,7 +9,7 @@ export const FinalCTA = () => {
   const navigate = useNavigate();
 
   const handleClick = () => {
-    navigate("/auth");
+    navigate("/chat");
   };
 
   return (

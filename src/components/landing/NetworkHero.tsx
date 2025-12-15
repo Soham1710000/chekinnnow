@@ -284,7 +284,7 @@ export const NetworkHero = () => {
 
   const handleCTAClick = () => {
     trackEvent("cta_click", { source: "hero", referral: referralCode });
-    navigate("/auth");
+    navigate("/chat");
   };
 
   // Fetch waitlist count and subscribe to real-time updates

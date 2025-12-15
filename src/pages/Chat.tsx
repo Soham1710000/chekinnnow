@@ -586,7 +586,7 @@ const Chat = () => {
                   
                   {/* Template buttons after first AI message */}
                   {index === 0 && msg.role === "assistant" && activeMessages.length === 1 && (
-                    <div className="flex flex-wrap gap-1.5 mt-3 max-w-[280px]">
+                    <div className="flex flex-wrap gap-1.5 mt-3 max-w-[300px] animate-fade-in">
                       {[
                         "Interview prep buddy",
                         "Test my project",
@@ -594,14 +594,14 @@ const Chat = () => {
                         "Break into tech",
                         "Get some advice",
                         "Pitch my startup",
-                        "Find co-builder"
+                        "Find co-builder for project"
                       ].map((template) => (
                         <button
                           key={template}
                           onClick={() => {
                             setInput(template);
                           }}
-                          className="text-xs px-2.5 py-1 rounded-full border border-border/60 bg-background hover:bg-muted transition-colors text-muted-foreground hover:text-foreground"
+                          className="text-xs px-3 py-1.5 rounded-full border border-primary/40 bg-primary/10 hover:bg-primary/20 transition-all text-primary font-medium hover:scale-105 hover:shadow-sm"
                         >
                           {template}
                         </button>

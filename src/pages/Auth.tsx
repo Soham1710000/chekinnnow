@@ -209,16 +209,6 @@ const Auth = () => {
                 ? "Already signed up? Sign in" 
                 : "New here? Sign up"}
             </button>
-            
-            <div>
-              <button
-                type="button"
-                onClick={() => navigate("/chat")}
-                className="text-sm text-muted-foreground/60 hover:text-muted-foreground transition-colors underline underline-offset-2"
-              >
-                Skip for now →
-              </button>
-            </div>
           </div>
 
           {/* Trust indicator */}

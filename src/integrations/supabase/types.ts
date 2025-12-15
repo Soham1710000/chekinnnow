@@ -125,6 +125,39 @@ export type Database = {
         }
         Relationships: []
       }
+      leads: {
+        Row: {
+          converted_at: string | null
+          created_at: string
+          extracted_insights: Json | null
+          id: string
+          messages: Json
+          session_id: string
+          updated_at: string
+          user_id: string | null
+        }
+        Insert: {
+          converted_at?: string | null
+          created_at?: string
+          extracted_insights?: Json | null
+          id?: string
+          messages?: Json
+          session_id: string
+          updated_at?: string
+          user_id?: string | null
+        }
+        Update: {
+          converted_at?: string | null
+          created_at?: string
+          extracted_insights?: Json | null
+          id?: string
+          messages?: Json
+          session_id?: string
+          updated_at?: string
+          user_id?: string | null
+        }
+        Relationships: []
+      }
       profiles: {
         Row: {
           ai_insights: Json | null

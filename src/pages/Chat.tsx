@@ -588,9 +588,11 @@ const Chat = () => {
                   {index === 0 && msg.role === "assistant" && activeMessages.length === 1 && (
                     <div className="flex flex-wrap gap-2 mt-3">
                       {[
-                        "I want to meet investors",
-                        "Find me a mentor",
-                        "Just exploring"
+                        "Find me someone to prep for interviews with",
+                        "Test my project on real users",
+                        "Learn about a new career field",
+                        "Want to break into tech roles",
+                        "Need some advice on few things"
                       ].map((template) => (
                         <button
                           key={template}

@@ -588,7 +588,8 @@ const Chat = () => {
                   {index === 0 && msg.role === "assistant" && activeMessages.length === 1 && (
                     <div className="flex flex-wrap gap-1.5 mt-3 max-w-[300px] animate-fade-in">
                       {[
-                        "Interview prep buddy",
+                        "Prep for an interview",
+                        "Questions about UPSC",
                         "Test my project on real users",
                         "Explore a career",
                         "Break into tech",

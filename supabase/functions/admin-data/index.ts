@@ -11,7 +11,7 @@ Deno.serve(async (req) => {
   }
 
   try {
-    const { password, timeRange } = await req.json();
+    const { password, timeRange, action, user_id, full_name } = await req.json();
 
     // Verify admin password
     if (password !== "chekinn2024") {
@@ -26,6 +26,21 @@ Deno.serve(async (req) => {
       Deno.env.get("SUPABASE_URL")!,
       Deno.env.get("SUPABASE_SERVICE_ROLE_KEY")!
     );
+
+    // Handle update_profile_name action
+    if (action === "update_profile_name" && user_id && full_name) {
+      const { error } = await supabase
+        .from("profiles")
+        .update({ full_name })
+        .eq("id", user_id);
+      
+      if (error) throw error;
+      
+      return new Response(
+        JSON.stringify({ success: true }),
+        { headers: { ...corsHeaders, "Content-Type": "application/json" } }
+      );
+    }
 
     // Fetch all profiles
     const { data: profiles, error: profilesError } = await supabase

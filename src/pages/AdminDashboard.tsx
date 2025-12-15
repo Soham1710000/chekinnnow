@@ -131,6 +131,8 @@ const AdminDashboard = () => {
   const [showCreateIntro, setShowCreateIntro] = useState(false);
   const [selectedUserA, setSelectedUserA] = useState<Profile | null>(null);
   const [selectedUserB, setSelectedUserB] = useState<Profile | null>(null);
+  const [userANameOverride, setUserANameOverride] = useState("");
+  const [userBNameOverride, setUserBNameOverride] = useState("");
   const [introMessage, setIntroMessage] = useState("");
   const [creating, setCreating] = useState(false);
 
@@ -259,6 +261,28 @@ const AdminDashboard = () => {
     setCreating(true);
 
     try {
+      // Update names if overrides provided
+      if (userANameOverride.trim()) {
+        await supabase.functions.invoke("admin-data", {
+          body: {
+            password: ADMIN_PASSWORD,
+            action: "update_profile_name",
+            user_id: selectedUserA.id,
+            full_name: userANameOverride.trim(),
+          },
+        });
+      }
+      if (userBNameOverride.trim()) {
+        await supabase.functions.invoke("admin-data", {
+          body: {
+            password: ADMIN_PASSWORD,
+            action: "update_profile_name",
+            user_id: selectedUserB.id,
+            full_name: userBNameOverride.trim(),
+          },
+        });
+      }
+
       const { data, error } = await supabase.functions.invoke("admin-create-intro", {
         body: {
           password: ADMIN_PASSWORD,
@@ -271,14 +295,19 @@ const AdminDashboard = () => {
       if (error) throw error;
       if (data?.error) throw new Error(data.error);
 
+      const nameA = userANameOverride.trim() || selectedUserA.full_name || selectedUserA.email;
+      const nameB = userBNameOverride.trim() || selectedUserB.full_name || selectedUserB.email;
+
       toast({
         title: "Introduction created!",
-        description: `${selectedUserA.full_name} and ${selectedUserB.full_name} will see the intro card.`,
+        description: `${nameA} and ${nameB} will see the intro card.`,
       });
 
       setShowCreateIntro(false);
       setSelectedUserA(null);
       setSelectedUserB(null);
+      setUserANameOverride("");
+      setUserBNameOverride("");
       setIntroMessage("");
       loadData();
     } catch (error: any) {
@@ -1004,14 +1033,15 @@ const AdminDashboard = () => {
           </DialogHeader>
 
           <div className="space-y-4">
-            <div>
-              <label className="text-sm font-medium mb-2 block">User A</label>
+            <div className="space-y-2">
+              <label className="text-sm font-medium block">User A</label>
               <select
                 className="w-full p-2 border border-border rounded-lg bg-background"
                 value={selectedUserA?.id || ""}
                 onChange={(e) => {
                   const user = profiles.find((p) => p.id === e.target.value);
                   setSelectedUserA(user || null);
+                  setUserANameOverride("");
                 }}
               >
               <option value="">Select user...</option>
@@ -1021,16 +1051,25 @@ const AdminDashboard = () => {
                   </option>
                 ))}
               </select>
+              {selectedUserA && (
+                <Input
+                  placeholder={`Name override (current: ${selectedUserA.full_name || "none"})`}
+                  value={userANameOverride}
+                  onChange={(e) => setUserANameOverride(e.target.value)}
+                  className="text-sm"
+                />
+              )}
             </div>
 
-            <div>
-              <label className="text-sm font-medium mb-2 block">User B</label>
+            <div className="space-y-2">
+              <label className="text-sm font-medium block">User B</label>
               <select
                 className="w-full p-2 border border-border rounded-lg bg-background"
                 value={selectedUserB?.id || ""}
                 onChange={(e) => {
                   const user = profiles.find((p) => p.id === e.target.value);
                   setSelectedUserB(user || null);
+                  setUserBNameOverride("");
                 }}
               >
               <option value="">Select user...</option>
@@ -1042,6 +1081,14 @@ const AdminDashboard = () => {
                     </option>
                   ))}
               </select>
+              {selectedUserB && (
+                <Input
+                  placeholder={`Name override (current: ${selectedUserB.full_name || "none"})`}
+                  value={userBNameOverride}
+                  onChange={(e) => setUserBNameOverride(e.target.value)}
+                  className="text-sm"
+                />
+              )}
             </div>
 
             <div>

@@ -973,6 +973,16 @@ const AdminDashboard = () => {
                         >
                           <Eye className="w-4 h-4" />
                         </Button>
+                        {intro.status === "active" && (
+                          <Button
+                            variant="ghost"
+                            size="sm"
+                            className="text-red-500 hover:text-red-600 hover:bg-red-500/10"
+                            onClick={() => handleEndIntro(intro)}
+                          >
+                            <XCircle className="w-4 h-4" />
+                          </Button>
+                        )}
                       </div>
                     </div>
                   </div>

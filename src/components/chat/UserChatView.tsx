@@ -182,8 +182,9 @@ const UserChatView = ({ introduction, onBack }: UserChatViewProps) => {
 
       {/* Input */}
       {isEnded ? (
-        <div className="border-t border-border p-4 bg-muted/50 text-center text-muted-foreground">
-          This conversation has been ended.
+        <div className="border-t border-border p-6 bg-muted/50 text-center">
+          <p className="text-muted-foreground font-medium">Chat ended</p>
+          <p className="text-sm text-muted-foreground mt-1">We'll find you more folks 🤝</p>
         </div>
       ) : (
         <div className="border-t border-border p-4 bg-background">

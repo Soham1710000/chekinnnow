@@ -405,12 +405,24 @@ export const NetworkHero = () => {
               className="flex flex-col items-center lg:items-start gap-2 sm:gap-3 md:gap-4"
             >
               <div className="flex flex-col items-center lg:items-start gap-2 sm:gap-3 w-full">
-                <Button 
-                  className="bg-gray-900 text-white border-0 px-6 sm:px-6 md:px-8 py-5 sm:py-5 md:py-6 text-base sm:text-base md:text-lg font-semibold rounded-full hover:bg-gray-800 hover:scale-[1.02] active:scale-[0.98] transition-all shadow-lg hover:shadow-xl w-full sm:w-auto"
-                  onClick={handleCTAClick}
+                <motion.div
+                  animate={{ 
+                    boxShadow: [
+                      "0 0 0 0 rgba(0, 0, 0, 0.4)",
+                      "0 0 0 12px rgba(0, 0, 0, 0)",
+                      "0 0 0 0 rgba(0, 0, 0, 0)"
+                    ]
+                  }}
+                  transition={{ duration: 2, repeat: Infinity, ease: "easeOut" }}
+                  className="rounded-full"
                 >
-                  Let's Talk
-                </Button>
+                  <Button 
+                    className="bg-gray-900 text-white border-0 px-8 sm:px-10 md:px-12 py-6 sm:py-7 md:py-8 text-lg sm:text-xl md:text-2xl font-bold rounded-full hover:bg-gray-800 hover:scale-[1.03] active:scale-[0.98] transition-all shadow-2xl hover:shadow-3xl w-full sm:w-auto"
+                    onClick={handleCTAClick}
+                  >
+                    Let's Talk →
+                  </Button>
+                </motion.div>
                 
                 {/* Waitlist counter with live indicator */}
                 <motion.div

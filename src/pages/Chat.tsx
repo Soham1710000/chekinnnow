@@ -66,7 +66,6 @@ const Chat = () => {
     created_at: new Date().toISOString(),
   }]); // Pre-populate for instant load
   const [introductions, setIntroductions] = useState<Introduction[]>([]);
-  const [userName, setUserName] = useState<string | null>(null);
   const [input, setInput] = useState("");
   const [loading, setLoading] = useState(false); // Start false for instant render
   const [sending, setSending] = useState(false);
@@ -100,21 +99,8 @@ const Chat = () => {
       loadIntroductions();
       subscribeToMessages();
       checkLearningStatus();
-      loadUserProfile();
     }
   }, [user]);
-
-  const loadUserProfile = async () => {
-    if (!user) return;
-    const { data } = await supabase
-      .from("profiles")
-      .select("full_name")
-      .eq("id", user.id)
-      .single();
-    if (data?.full_name) {
-      setUserName(data.full_name);
-    }
-  };
 
   // Check in on active intros when user comes back from a user-to-user chat
   const prevActiveChat = useRef<Introduction | null>(null);
@@ -579,7 +565,7 @@ const Chat = () => {
           <button onClick={() => navigate("/")} className="flex items-center gap-2 text-muted-foreground hover:text-foreground transition-colors">
             <ArrowLeft className="w-5 h-5" />
           </button>
-          <h1 className="font-semibold text-lg">{userName || (user ? user.email?.split('@')[0] : "ChekInn")}</h1>
+          <h1 className="font-semibold text-lg">ChekInn</h1>
           <div className="w-5" />
         </div>
         

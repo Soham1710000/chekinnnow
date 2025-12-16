@@ -59,6 +59,28 @@ const usePreloadImages = (images: string[]) => {
 const profiles = [
   {
     id: 1,
+    name: "Rhea",
+    title: "Engineer",
+    bio: "Anyone interviewing for **Amazon SDE II**?",
+    image: rheaImg,
+    replyName: "Dev",
+    replyTitle: "Engineer",
+    replyImage: devImg,
+    reply: "Yes I just interviewed last week"
+  },
+  {
+    id: 2,
+    name: "Kushal",
+    title: "UPSC Aspirant",
+    bio: "Anyone who **cleared mains**?",
+    image: kushalImg,
+    replyName: "Rajat",
+    replyTitle: "Cleared Mains Twice",
+    replyImage: rajatImg,
+    reply: "Yes happy to chat"
+  },
+  {
+    id: 3,
     name: "Arnav",
     title: "Robotics Student",
     bio: "Working on a **robotics project** and exploring **US research paths**.",
@@ -69,18 +91,7 @@ const profiles = [
     reply: "Sounds interesting. Happy to talk."
   },
   {
-    id: 2,
-    name: "Kushal",
-    title: "Founder",
-    bio: "I'm building in **quick commerce** and testing **unit economics**.",
-    image: kushalImg,
-    replyName: "Rajat",
-    replyTitle: "Angel Investor",
-    replyImage: rajatImg,
-    reply: "I've spent time studying this sector."
-  },
-  {
-    id: 3,
+    id: 4,
     name: "Siddharth",
     title: "College Student",
     bio: "Built **side projects**, trying to break into **gaming** as an SDE.",
@@ -89,17 +100,6 @@ const profiles = [
     replyTitle: "Talent Lead, Gaming Startup",
     replyImage: ananyaImg,
     reply: "That's understandable. Happy to chat."
-  },
-  {
-    id: 4,
-    name: "Rhea",
-    title: "College Student",
-    bio: "I play **indie games** a lot. Not sure what comes **after college**.",
-    image: rheaImg,
-    replyName: "Dev",
-    replyTitle: "Game Studio Team",
-    replyImage: devImg,
-    reply: "We are looking for beta testers in the team."
   },
   {
     id: 5,

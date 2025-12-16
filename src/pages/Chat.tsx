@@ -59,7 +59,7 @@ const Chat = () => {
   const [localMessages, setLocalMessages] = useState<Message[]>(() => [{
     id: `local-${Date.now()}`,
     role: "assistant" as const,
-    content: "Hey! Tell me a bit about yourself and who you'd like to meet — I'll find the right person and make the intro for you.",
+    content: "Hey! I have a few people in mind who might be perfect for you. What are you looking for?",
     message_type: "text",
     metadata: {},
     created_at: new Date().toISOString(),
@@ -584,29 +584,47 @@ const Chat = () => {
                     {msg.content}
                   </div>
                   
-                  {/* Template buttons after first AI message */}
+                  {/* Template buttons and blurred match preview after first AI message */}
                   {index === 0 && msg.role === "assistant" && activeMessages.length === 1 && (
-                    <div className="flex flex-wrap gap-1.5 mt-3 max-w-[300px] animate-fade-in">
-                      {[
-                        "Prep for an interview",
-                        "Questions about UPSC",
-                        "Test my project on real users",
-                        "Explore a career",
-                        "Break into tech",
-                        "Get some advice",
-                        "Pitch my startup",
-                        "Find co-builder for project"
-                      ].map((template) => (
-                        <button
-                          key={template}
-                          onClick={() => {
-                            setInput(template);
-                          }}
-                          className="text-xs px-3 py-1.5 rounded-full border border-primary/40 bg-primary/10 hover:bg-primary/20 transition-all text-primary font-medium hover:scale-105 hover:shadow-sm"
-                        >
-                          {template}
-                        </button>
-                      ))}
+                    <div className="mt-3 space-y-3 animate-fade-in">
+                      {/* Blurred potential match preview */}
+                      <div className="relative overflow-hidden rounded-xl border border-primary/20 bg-gradient-to-br from-primary/5 to-primary/10 p-3">
+                        <div className="flex items-center gap-3">
+                          <div className="w-12 h-12 rounded-full bg-gradient-to-br from-gray-300 to-gray-400 blur-[6px]" />
+                          <div className="flex-1 space-y-1.5">
+                            <div className="h-3 w-24 bg-gray-400/60 rounded blur-[4px]" />
+                            <div className="h-2.5 w-32 bg-gray-300/50 rounded blur-[4px]" />
+                          </div>
+                          <div className="text-xs font-medium text-primary bg-primary/10 px-2 py-1 rounded-full">
+                            Potential match
+                          </div>
+                        </div>
+                        <p className="text-xs text-muted-foreground mt-2">
+                          Tell me more to unlock who I have in mind for you...
+                        </p>
+                      </div>
+                      
+                      {/* Template buttons */}
+                      <div className="flex flex-wrap gap-1.5 max-w-[300px]">
+                        {[
+                          "Prep for an interview",
+                          "Questions about UPSC",
+                          "Explore a career",
+                          "Break into tech",
+                          "Get some advice",
+                          "Find co-builder"
+                        ].map((template) => (
+                          <button
+                            key={template}
+                            onClick={() => {
+                              setInput(template);
+                            }}
+                            className="text-xs px-3 py-1.5 rounded-full border border-primary/40 bg-primary/10 hover:bg-primary/20 transition-all text-primary font-medium hover:scale-105 hover:shadow-sm"
+                          >
+                            {template}
+                          </button>
+                        ))}
+                      </div>
                     </div>
                   )}
                 </motion.div>

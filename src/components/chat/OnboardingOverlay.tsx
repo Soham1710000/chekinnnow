@@ -1,28 +1,18 @@
 import { motion } from "framer-motion";
 import { Button } from "@/components/ui/button";
-import { MessageCircle, User, Sparkles, ArrowRight } from "lucide-react";
+import { MessageCircle, Sparkles, ArrowRight } from "lucide-react";
 
 interface OnboardingOverlayProps {
   onStart: () => void;
 }
 
 const OnboardingOverlay = ({ onStart }: OnboardingOverlayProps) => {
-  const steps = [
-    {
-      icon: MessageCircle,
-      title: "Quick chat with ChekInn AI",
-      description: "Answer 4-5 questions about yourself and who you want to meet.",
-    },
-    {
-      icon: User,
-      title: "Create your profile",
-      description: "Just enter your email — we'll build your profile from the conversation.",
-    },
-    {
-      icon: Sparkles,
-      title: "We find you the right person",
-      description: "A recruiter, mentor, referral, co-founder — whoever can actually help you.",
-    },
+  const exampleConnections = [
+    "Product Manager at Google",
+    "Founder who just raised Series A", 
+    "UPSC topper from 2023",
+    "Engineer at Stripe",
+    "Someone who switched from consulting to tech"
   ];
 
   return (
@@ -36,46 +26,68 @@ const OnboardingOverlay = ({ onStart }: OnboardingOverlayProps) => {
         initial={{ opacity: 0, y: 20 }}
         animate={{ opacity: 1, y: 0 }}
         transition={{ delay: 0.1 }}
-        className="max-w-md w-full space-y-8"
+        className="max-w-md w-full space-y-6"
       >
         {/* Header */}
         <div className="text-center space-y-2">
-          <h1 className="text-2xl font-bold">How ChekInn works</h1>
-          <p className="text-muted-foreground">3 simple steps to your next connection</p>
+          <div className="inline-flex items-center gap-2 bg-primary/10 text-primary px-3 py-1 rounded-full text-sm font-medium mb-2">
+            <Sparkles className="w-4 h-4" />
+            Takes ~2 min
+          </div>
+          <h1 className="text-2xl font-bold">We'll find the right person for you</h1>
+          <p className="text-muted-foreground">Answer a few quick questions so we can connect you with someone who can actually help.</p>
         </div>
 
-        {/* Steps */}
-        <div className="space-y-4">
-          {steps.map((step, index) => (
-            <motion.div
-              key={step.title}
-              initial={{ opacity: 0, x: -20 }}
-              animate={{ opacity: 1, x: 0 }}
-              transition={{ delay: 0.2 + index * 0.15 }}
-              className="flex gap-4 items-start"
-            >
-              <div className="flex-shrink-0 w-12 h-12 rounded-full bg-primary/10 flex items-center justify-center">
-                <step.icon className="w-5 h-5 text-primary" />
-              </div>
-              <div className="flex-1 pt-1">
-                <div className="flex items-center gap-2">
-                  <span className="text-xs font-medium text-primary bg-primary/10 px-2 py-0.5 rounded-full">
-                    Step {index + 1}
-                  </span>
-                </div>
-                <h3 className="font-semibold mt-1">{step.title}</h3>
-                <p className="text-sm text-muted-foreground mt-0.5">{step.description}</p>
-              </div>
-            </motion.div>
-          ))}
-        </div>
+        {/* Example connections */}
+        <motion.div
+          initial={{ opacity: 0, y: 10 }}
+          animate={{ opacity: 1, y: 0 }}
+          transition={{ delay: 0.25 }}
+          className="bg-muted/50 rounded-xl p-4 space-y-3"
+        >
+          <p className="text-sm font-medium text-muted-foreground">People in our network include:</p>
+          <div className="flex flex-wrap gap-2">
+            {exampleConnections.map((connection, index) => (
+              <motion.span
+                key={connection}
+                initial={{ opacity: 0, scale: 0.9 }}
+                animate={{ opacity: 1, scale: 1 }}
+                transition={{ delay: 0.3 + index * 0.08 }}
+                className="text-xs bg-background border border-border px-2.5 py-1.5 rounded-full"
+              >
+                {connection}
+              </motion.span>
+            ))}
+          </div>
+        </motion.div>
+
+        {/* What we'll ask */}
+        <motion.div
+          initial={{ opacity: 0, y: 10 }}
+          animate={{ opacity: 1, y: 0 }}
+          transition={{ delay: 0.5 }}
+          className="space-y-2"
+        >
+          <div className="flex items-center gap-3 text-sm">
+            <div className="w-6 h-6 rounded-full bg-primary/10 flex items-center justify-center flex-shrink-0">
+              <MessageCircle className="w-3 h-3 text-primary" />
+            </div>
+            <span className="text-muted-foreground">What you're working on or looking for</span>
+          </div>
+          <div className="flex items-center gap-3 text-sm">
+            <div className="w-6 h-6 rounded-full bg-primary/10 flex items-center justify-center flex-shrink-0">
+              <MessageCircle className="w-3 h-3 text-primary" />
+            </div>
+            <span className="text-muted-foreground">Who would be most helpful to meet</span>
+          </div>
+        </motion.div>
 
         {/* CTA */}
         <motion.div
           initial={{ opacity: 0, y: 10 }}
           animate={{ opacity: 1, y: 0 }}
           transition={{ delay: 0.6 }}
-          className="pt-4"
+          className="pt-2"
         >
           <Button
             onClick={onStart}
@@ -85,9 +97,6 @@ const OnboardingOverlay = ({ onStart }: OnboardingOverlayProps) => {
             Let's go
             <ArrowRight className="w-4 h-4 ml-2 group-hover:translate-x-1 transition-transform" />
           </Button>
-          <p className="text-xs text-center text-muted-foreground mt-3">
-            Takes ~2 minutes • No forms to fill
-          </p>
         </motion.div>
       </motion.div>
     </motion.div>

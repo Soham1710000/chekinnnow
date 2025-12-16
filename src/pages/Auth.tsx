@@ -22,8 +22,12 @@ const Auth = () => {
   
   const [isSignUp, setIsSignUp] = useState(true);
   const [isForgotPassword, setIsForgotPassword] = useState(false);
+  const [forgotStep, setForgotStep] = useState<"request" | "reset">("request");
   const [email, setEmail] = useState("");
   const [password, setPassword] = useState("");
+  const [tempPassword, setTempPassword] = useState("");
+  const [newPassword, setNewPassword] = useState("");
+  const [newPasswordConfirm, setNewPasswordConfirm] = useState("");
   const [loading, setLoading] = useState(false);
 
   const handleForgotPassword = async (e: React.FormEvent) => {
@@ -55,10 +59,14 @@ const Auth = () => {
 
       toast({
         title: "Check your email",
-        description: "We sent you a temporary password.",
+        description: "We sent a temporary password (if an account exists).",
       });
-      setIsForgotPassword(false);
-      setIsSignUp(false); // Switch to sign-in mode
+
+      setForgotStep("reset");
+      setTempPassword("");
+      setNewPassword("");
+      setNewPasswordConfirm("");
+      setIsSignUp(false);
     } catch (error: any) {
       toast({
         title: "Error",
@@ -66,8 +74,60 @@ const Auth = () => {
         variant: "destructive",
       });
     }
+
     setLoading(false);
   };
+
+  const handleSetNewPassword = async (e: React.FormEvent) => {
+    e.preventDefault();
+    setLoading(true);
+
+    try {
+      emailSchema.parse(email);
+      passwordSchema.parse(newPassword);
+
+      if (!tempPassword) {
+        throw new Error("Please enter the temporary password from your email");
+      }
+
+      if (newPassword !== newPasswordConfirm) {
+        throw new Error("Passwords don't match");
+      }
+
+      const { error: signInError } = await supabase.auth.signInWithPassword({
+        email,
+        password: tempPassword,
+      });
+
+      if (signInError) {
+        throw new Error("That temporary password is invalid or expired");
+      }
+
+      const { error: updateError } = await supabase.auth.updateUser({
+        password: newPassword,
+      });
+
+      if (updateError) {
+        throw new Error(updateError.message);
+      }
+
+      toast({
+        title: "Password updated",
+        description: "You're signed in with your new password.",
+      });
+
+      navigate("/chat");
+    } catch (err: any) {
+      toast({
+        title: "Couldn't reset password",
+        description: err?.message || "Please try again",
+        variant: "destructive",
+      });
+    }
+
+    setLoading(false);
+  };
+
 
   // Track page view
   useEffect(() => {
@@ -196,53 +256,131 @@ const Auth = () => {
 
           <div className="text-center mb-8">
             <h1 className="text-2xl font-bold mb-3">
-              {isForgotPassword 
-                ? "Reset your password" 
-                : isSignUp 
-                  ? "Quick step to get intros" 
+              {isForgotPassword
+                ? forgotStep === "request"
+                  ? "Get a temporary password"
+                  : "Set a new password"
+                : isSignUp
+                  ? "Quick step to get intros"
                   : "Welcome back"}
             </h1>
             <p className="text-muted-foreground text-sm leading-relaxed">
               {isForgotPassword
-                ? "Enter your email and we'll send you a reset link"
-                : isSignUp 
-                  ? "Just an email so we can nudge you when we find someone great for you to meet" 
+                ? forgotStep === "request"
+                  ? "Enter your email — we'll send you a temporary password."
+                  : "Enter the temporary password from your email, then set a new one."
+                : isSignUp
+                  ? "Just an email so we can nudge you when we find someone great for you to meet"
                   : "Sign in to see your intros"}
             </p>
           </div>
 
           {isForgotPassword ? (
-            <form onSubmit={handleForgotPassword} className="space-y-3">
-              <Input
-                id="email"
-                type="email"
-                value={email}
-                onChange={(e) => setEmail(e.target.value)}
-                placeholder="Your email"
-                required
-                className="h-12 text-base rounded-xl border-2 border-muted focus:border-primary transition-colors"
-              />
+            forgotStep === "request" ? (
+              <form onSubmit={handleForgotPassword} className="space-y-3">
+                <Input
+                  id="email"
+                  type="email"
+                  value={email}
+                  onChange={(e) => setEmail(e.target.value)}
+                  placeholder="Your email"
+                  required
+                  className="h-12 text-base rounded-xl border-2 border-muted focus:border-primary transition-colors"
+                />
 
-              <Button 
-                type="submit" 
-                className="w-full h-12 text-base font-semibold rounded-xl mt-2" 
-                disabled={loading}
-              >
-                {loading ? (
-                  <Loader2 className="w-4 h-4 animate-spin" />
-                ) : (
-                  "Send Temporary Password"
-                )}
-              </Button>
+                <Button
+                  type="submit"
+                  className="w-full h-12 text-base font-semibold rounded-xl mt-2"
+                  disabled={loading}
+                >
+                  {loading ? (
+                    <Loader2 className="w-4 h-4 animate-spin" />
+                  ) : (
+                    "Email me a temporary password"
+                  )}
+                </Button>
 
-              <button
-                type="button"
-                onClick={() => setIsForgotPassword(false)}
-                className="w-full text-sm text-muted-foreground hover:text-foreground transition-colors mt-4"
-              >
-                ← Back to sign in
-              </button>
-            </form>
+                <button
+                  type="button"
+                  onClick={() => {
+                    setIsForgotPassword(false);
+                    setForgotStep("request");
+                  }}
+                  className="w-full text-sm text-muted-foreground hover:text-foreground transition-colors mt-4"
+                >
+                  ← Back to sign in
+                </button>
+              </form>
+            ) : (
+              <form onSubmit={handleSetNewPassword} className="space-y-3">
+                <Input
+                  id="email"
+                  type="email"
+                  value={email}
+                  onChange={(e) => setEmail(e.target.value)}
+                  placeholder="Your email"
+                  required
+                  className="h-12 text-base rounded-xl border-2 border-muted focus:border-primary transition-colors"
+                />
+
+                <Input
+                  id="tempPassword"
+                  type="text"
+                  value={tempPassword}
+                  onChange={(e) => setTempPassword(e.target.value)}
+                  placeholder="Temporary password"
+                  required
+                  className="h-12 text-base rounded-xl border-2 border-muted focus:border-primary transition-colors"
+                />
+
+                <Input
+                  id="newPassword"
+                  type="password"
+                  value={newPassword}
+                  onChange={(e) => setNewPassword(e.target.value)}
+                  placeholder="New password"
+                  required
+                  minLength={6}
+                  className="h-12 text-base rounded-xl border-2 border-muted focus:border-primary transition-colors"
+                />
+
+                <Input
+                  id="newPasswordConfirm"
+                  type="password"
+                  value={newPasswordConfirm}
+                  onChange={(e) => setNewPasswordConfirm(e.target.value)}
+                  placeholder="Confirm new password"
+                  required
+                  minLength={6}
+                  className="h-12 text-base rounded-xl border-2 border-muted focus:border-primary transition-colors"
+                />
+
+                <Button
+                  type="submit"
+                  className="w-full h-12 text-base font-semibold rounded-xl mt-2"
+                  disabled={loading}
+                >
+                  {loading ? (
+                    <Loader2 className="w-4 h-4 animate-spin" />
+                  ) : (
+                    "Set new password"
+                  )}
+                </Button>
+
+                <button
+                  type="button"
+                  onClick={() => {
+                    setForgotStep("request");
+                    setTempPassword("");
+                    setNewPassword("");
+                    setNewPasswordConfirm("");
+                  }}
+                  className="w-full text-sm text-muted-foreground hover:text-foreground transition-colors mt-4"
+                >
+                  ← Start over
+                </button>
+              </form>
+            )
           ) : (
             <>
               <form onSubmit={handleAuth} className="space-y-3">
@@ -286,7 +424,13 @@ const Auth = () => {
               <div className="mt-6 text-center space-y-3">
                 <button
                   type="button"
-                  onClick={() => setIsForgotPassword(true)}
+                  onClick={() => {
+                    setIsForgotPassword(true);
+                    setForgotStep("request");
+                    setTempPassword("");
+                    setNewPassword("");
+                    setNewPasswordConfirm("");
+                  }}
                   className="text-sm text-primary hover:underline transition-colors block mx-auto"
                 >
                   Forgot password?

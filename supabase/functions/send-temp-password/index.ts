@@ -20,6 +20,7 @@ function generateTempPassword(): string {
 }
 
 serve(async (req) => {
+  // Handle CORS preflight requests
   if (req.method === "OPTIONS") {
     return new Response(null, { headers: corsHeaders });
   }
@@ -27,59 +28,76 @@ serve(async (req) => {
   try {
     const { email } = await req.json();
 
-    if (!email) {
-      return new Response(
-        JSON.stringify({ error: "Email is required" }),
-        { status: 400, headers: { ...corsHeaders, "Content-Type": "application/json" } }
-      );
+    if (!email || typeof email !== "string") {
+      return new Response(JSON.stringify({ error: "Email is required" }), {
+        status: 400,
+        headers: { ...corsHeaders, "Content-Type": "application/json" },
+      });
     }
 
-    // Create admin client
-    const supabaseAdmin = createClient(
-      Deno.env.get("SUPABASE_URL") ?? "",
-      Deno.env.get("SUPABASE_SERVICE_ROLE_KEY") ?? "",
-      { auth: { autoRefreshToken: false, persistSession: false } }
+    const supabaseUrl = Deno.env.get("SUPABASE_URL") ?? "";
+    const supabaseServiceKey = Deno.env.get("SUPABASE_SERVICE_ROLE_KEY") ?? "";
+
+    if (!supabaseUrl || !supabaseServiceKey) {
+      console.error("Missing backend env vars");
+      return new Response(JSON.stringify({ error: "Server misconfigured" }), {
+        status: 500,
+        headers: { ...corsHeaders, "Content-Type": "application/json" },
+      });
+    }
+
+    console.log("send-temp-password request", {
+      email_domain: email.includes("@"),
+    });
+
+    const supabaseAdmin = createClient(supabaseUrl, supabaseServiceKey, {
+      auth: { autoRefreshToken: false, persistSession: false },
+    });
+
+    // Find user by email (do not leak existence)
+    const { data: userData, error: userError } = await supabaseAdmin.auth.admin.listUsers({
+      page: 1,
+      perPage: 1000,
+    });
+
+    if (userError) {
+      console.error("listUsers error", userError);
+      return new Response(JSON.stringify({ error: "Failed to process request" }), {
+        status: 500,
+        headers: { ...corsHeaders, "Content-Type": "application/json" },
+      });
+    }
+
+    const user = userData?.users?.find(
+      (u) => (u.email ?? "").toLowerCase() === email.toLowerCase()
     );
 
-    // Find user by email
-    const { data: userData, error: userError } = await supabaseAdmin.auth.admin.listUsers();
-    
-    if (userError) {
-      console.error("Error listing users:", userError);
-      return new Response(
-        JSON.stringify({ error: "Failed to process request" }),
-        { status: 500, headers: { ...corsHeaders, "Content-Type": "application/json" } }
-      );
-    }
-
-    const user = userData.users.find(u => u.email?.toLowerCase() === email.toLowerCase());
-    
     if (!user) {
-      // Don't reveal if user exists or not for security
       return new Response(
-        JSON.stringify({ success: true, message: "If an account exists, a temporary password will be sent." }),
+        JSON.stringify({
+          success: true,
+          message:
+            "If an account exists for this email, a temporary password will be sent.",
+        }),
         { status: 200, headers: { ...corsHeaders, "Content-Type": "application/json" } }
       );
     }
 
-    // Generate temporary password
     const tempPassword = generateTempPassword();
 
-    // Update user's password
     const { error: updateError } = await supabaseAdmin.auth.admin.updateUserById(
       user.id,
       { password: tempPassword }
     );
 
     if (updateError) {
-      console.error("Error updating password:", updateError);
-      return new Response(
-        JSON.stringify({ error: "Failed to reset password" }),
-        { status: 500, headers: { ...corsHeaders, "Content-Type": "application/json" } }
-      );
+      console.error("updateUserById error", updateError);
+      return new Response(JSON.stringify({ error: "Failed to reset password" }), {
+        status: 500,
+        headers: { ...corsHeaders, "Content-Type": "application/json" },
+      });
     }
 
-    // Send email with temporary password
     const { error: emailError } = await resend.emails.send({
       from: "ChekInn <onboarding@resend.dev>",
       to: [email],
@@ -87,40 +105,35 @@ serve(async (req) => {
       html: `
         <div style="font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif; max-width: 480px; margin: 0 auto; padding: 40px 20px;">
           <h1 style="font-size: 24px; font-weight: 600; margin-bottom: 24px; color: #111;">Your temporary password</h1>
-          <p style="font-size: 16px; color: #444; line-height: 1.6; margin-bottom: 24px;">
-            Here's your temporary password to sign in to ChekInn:
-          </p>
+          <p style="font-size: 16px; color: #444; line-height: 1.6; margin-bottom: 24px;">Use this temporary password to sign in, then set a new password in the app.</p>
           <div style="background: #f4f4f4; border-radius: 8px; padding: 20px; text-align: center; margin-bottom: 24px;">
             <code style="font-size: 24px; font-weight: 600; letter-spacing: 2px; color: #111;">${tempPassword}</code>
           </div>
-          <p style="font-size: 14px; color: #666; line-height: 1.6;">
-            Use this password to sign in, then you can change it in your settings.
-          </p>
-          <p style="font-size: 12px; color: #999; margin-top: 32px;">
-            If you didn't request this, please ignore this email.
-          </p>
+          <p style="font-size: 12px; color: #999; margin-top: 32px;">If you didn't request this, please ignore this email.</p>
         </div>
       `,
     });
 
     if (emailError) {
-      console.error("Error sending email:", emailError);
-      return new Response(
-        JSON.stringify({ error: "Failed to send email" }),
-        { status: 500, headers: { ...corsHeaders, "Content-Type": "application/json" } }
-      );
+      console.error("resend error", emailError);
+      return new Response(JSON.stringify({ error: "Failed to send email" }), {
+        status: 500,
+        headers: { ...corsHeaders, "Content-Type": "application/json" },
+      });
     }
 
     return new Response(
-      JSON.stringify({ success: true, message: "Temporary password sent to your email" }),
+      JSON.stringify({
+        success: true,
+        message: "Temporary password sent (if the account exists).",
+      }),
       { status: 200, headers: { ...corsHeaders, "Content-Type": "application/json" } }
     );
-
   } catch (error: any) {
     console.error("Error in send-temp-password:", error);
-    return new Response(
-      JSON.stringify({ error: error?.message || "Unknown error" }),
-      { status: 500, headers: { ...corsHeaders, "Content-Type": "application/json" } }
-    );
+    return new Response(JSON.stringify({ error: error?.message || "Unknown error" }), {
+      status: 500,
+      headers: { ...corsHeaders, "Content-Type": "application/json" },
+    });
   }
 });

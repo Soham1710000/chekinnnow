@@ -99,18 +99,13 @@ const Chat = () => {
   // Anonymous user: already has message pre-populated, no action needed
   // Authenticated user loading is handled separately
 
-  // Authenticated user: load from DB and show onboarding if first time
+  // Authenticated user: load from DB
   useEffect(() => {
     if (user) {
       loadMessages();
       loadIntroductions();
       subscribeToMessages();
       checkLearningStatus();
-      
-      // Show onboarding for authenticated users who haven't seen it
-      if (!sessionStorage.getItem("chekinn_onboarding_seen")) {
-        setShowOnboarding(true);
-      }
     }
   }, [user]);
 

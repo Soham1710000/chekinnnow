@@ -850,13 +850,16 @@ const Chat = () => {
                 <motion.div
                   initial={{ opacity: 0, y: 10 }}
                   animate={{ opacity: 1, y: 0 }}
-                  className="bg-primary/10 border border-primary/20 rounded-xl p-4 text-center"
+                  className="bg-primary/10 border border-primary/20 rounded-xl p-4"
                 >
-                  <p className="text-sm text-foreground font-medium">
-                    🎯 We've got your profile!
-                  </p>
-                  <p className="text-xs text-muted-foreground mt-1">
-                    We're working on finding the right introduction for you. Check back soon!
+                  <div className="flex items-center gap-2 mb-2">
+                    <Clock className="w-4 h-4 text-primary" />
+                    <p className="text-sm text-foreground font-medium">
+                      Finding your match...
+                    </p>
+                  </div>
+                  <p className="text-xs text-muted-foreground">
+                    We're working on finding the right person for you. You'll get an email + it'll show up right here — usually within 12 hours!
                   </p>
                 </motion.div>
               )}

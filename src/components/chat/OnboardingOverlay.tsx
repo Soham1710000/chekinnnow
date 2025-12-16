@@ -30,7 +30,7 @@ const OnboardingOverlay = ({ onStart }: OnboardingOverlayProps) => {
       initial={{ opacity: 0 }}
       animate={{ opacity: 1 }}
       exit={{ opacity: 0 }}
-      className="absolute inset-0 z-50 bg-background/98 backdrop-blur-sm flex flex-col items-center justify-center p-6"
+      className="absolute inset-0 z-50 bg-background flex flex-col items-center justify-center p-6"
     >
       <motion.div
         initial={{ opacity: 0, y: 20 }}

@@ -199,6 +199,8 @@ const Auth = () => {
         title: "You're in! 🎉",
         description: "Let's get to know you.",
       });
+      // Navigate immediately after successful signup
+      navigate("/chat");
     } else {
       const { error } = await supabase.auth.signInWithPassword({
         email,
@@ -215,6 +217,8 @@ const Auth = () => {
         return;
       }
       trackEvent("auth_complete", { mode: "signin", email });
+      // Navigate immediately after successful signin
+      navigate("/chat");
     }
 
     setLoading(false);

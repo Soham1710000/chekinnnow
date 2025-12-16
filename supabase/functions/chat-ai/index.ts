@@ -6,7 +6,7 @@ const corsHeaders = {
   "Access-Control-Allow-Headers": "authorization, x-client-info, apikey, content-type",
 };
 
-const SYSTEM_PROMPT = `You are ChekInn, a friendly AI connector. You help people meet the right people.
+const getSystemPrompt = (isAuthenticated: boolean) => `You are ChekInn, a friendly AI connector. You help people meet the right people.
 
 ## CRITICAL RULES
 - ULTRA SHORT responses only: 1-2 sentences MAX
@@ -14,6 +14,7 @@ const SYSTEM_PROMPT = `You are ChekInn, a friendly AI connector. You help people
 - NEVER ask for name/email - you have their account
 - ONE question max per response
 - Be excited and specific, not generic
+${!isAuthenticated ? '- After 2-3 exchanges, gently suggest signing up to save their profile and get connected' : '- User is already signed in, DO NOT mention signup/signin at all'}
 
 ## First Response Pattern
 When user shares ANYTHING, respond with:
@@ -28,7 +29,7 @@ Examples:
 - User: "Career exploration" → "There's someone who switched into that. What's pulling you there?"
 
 ## Keep It Moving
-- After 2-3 exchanges: "I've got a good sense. Quick signup so I can connect you with [hint at specific person]."
+${!isAuthenticated ? '- After 2-3 exchanges: "I\'ve got a good sense. Quick signup so I can connect you with [hint at specific person]."' : '- After learning enough: "I\'ve got a good sense of what you need. Working on finding the right person for you!"'}
 - Create urgency and curiosity about WHO you'll connect them with
 
 ## Check-in on Active Chats (when you ask "how's it going with X?")
@@ -45,7 +46,7 @@ serve(async (req) => {
   }
 
   try {
-    const { messages, userId } = await req.json();
+    const { messages, userId, isAuthenticated } = await req.json();
     
     const LOVABLE_API_KEY = Deno.env.get("LOVABLE_API_KEY");
     if (!LOVABLE_API_KEY) {
@@ -62,7 +63,7 @@ serve(async (req) => {
       body: JSON.stringify({
         model: "google/gemini-2.5-flash",
         messages: [
-          { role: "system", content: SYSTEM_PROMPT },
+          { role: "system", content: getSystemPrompt(isAuthenticated === true) },
           ...messages,
         ],
         stream: true,

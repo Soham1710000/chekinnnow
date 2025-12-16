@@ -3,6 +3,7 @@ import { motion, useInView, AnimatePresence } from "framer-motion";
 import { useNavigate } from "react-router-dom";
 import { Button } from "@/components/ui/button";
 import OnboardingOverlay from "@/components/chat/OnboardingOverlay";
+import { supabase } from "@/integrations/supabase/client";
 
 export const FinalCTA = () => {
   const ref = useRef(null);
@@ -10,8 +11,16 @@ export const FinalCTA = () => {
   const navigate = useNavigate();
   const [showExplainer, setShowExplainer] = useState(false);
 
-  const handleClick = () => {
-    setShowExplainer(true);
+  const handleClick = async () => {
+    // Check if user is already logged in
+    const { data: { user } } = await supabase.auth.getUser();
+    if (user) {
+      // Already logged in, go straight to chat
+      navigate("/chat");
+    } else {
+      // Not logged in, show explainer first
+      setShowExplainer(true);
+    }
   };
 
   const handleExplainerContinue = () => {

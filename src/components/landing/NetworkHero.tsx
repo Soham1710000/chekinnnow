@@ -284,9 +284,18 @@ export const NetworkHero = () => {
   const referralCode = searchParams.get("ref");
   const { trackEvent } = useFunnelTracking();
 
-  const handleCTAClick = () => {
+  const handleCTAClick = async () => {
     trackEvent("cta_click", { source: "hero", referral: referralCode });
-    setShowExplainer(true);
+    
+    // Check if user is already logged in
+    const { data: { user } } = await supabase.auth.getUser();
+    if (user) {
+      // Already logged in, go straight to chat
+      navigate("/chat");
+    } else {
+      // Not logged in, show explainer first
+      setShowExplainer(true);
+    }
   };
 
   const handleExplainerContinue = () => {

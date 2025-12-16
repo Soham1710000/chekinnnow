@@ -44,22 +44,27 @@ const Auth = () => {
       }
     }
 
-    const { error } = await supabase.auth.resetPasswordForEmail(email, {
-      redirectTo: `${window.location.origin}/auth?reset=true`,
-    });
-
-    if (error) {
-      toast({
-        title: "Error",
-        description: error.message,
-        variant: "destructive",
+    try {
+      const response = await supabase.functions.invoke("send-temp-password", {
+        body: { email },
       });
-    } else {
+
+      if (response.error) {
+        throw new Error(response.error.message);
+      }
+
       toast({
         title: "Check your email",
-        description: "We sent you a password reset link.",
+        description: "We sent you a temporary password.",
       });
       setIsForgotPassword(false);
+      setIsSignUp(false); // Switch to sign-in mode
+    } catch (error: any) {
+      toast({
+        title: "Error",
+        description: error.message || "Failed to send temporary password",
+        variant: "destructive",
+      });
     }
     setLoading(false);
   };
@@ -226,7 +231,7 @@ const Auth = () => {
                 {loading ? (
                   <Loader2 className="w-4 h-4 animate-spin" />
                 ) : (
-                  "Send Reset Link"
+                  "Send Temporary Password"
                 )}
               </Button>
 

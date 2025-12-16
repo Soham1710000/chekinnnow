@@ -6,10 +6,11 @@ import { QueryClient, QueryClientProvider } from "@tanstack/react-query";
 import { BrowserRouter, Routes, Route } from "react-router-dom";
 import { AuthProvider } from "@/hooks/useAuth";
 
-// Eager load Index for fastest initial paint
-import Index from "./pages/Index";
+// Eager load ABRouter for fastest initial paint
+import ABRouter from "./pages/ABRouter";
 
 // Lazy load other routes
+const Index = lazy(() => import("./pages/Index"));
 const IndexB = lazy(() => import("./pages/IndexB"));
 const Waitlist = lazy(() => import("./pages/Waitlist"));
 const Admin = lazy(() => import("./pages/Admin"));
@@ -42,7 +43,8 @@ const App = () => (
         <BrowserRouter>
           <Suspense fallback={<RouteLoader />}>
             <Routes>
-              <Route path="/" element={<Index />} />
+              <Route path="/" element={<ABRouter />} />
+              <Route path="/a" element={<Index />} />
               <Route path="/b" element={<IndexB />} />
               <Route path="/waitlist" element={<Waitlist />} />
               <Route path="/admin" element={<Admin />} />

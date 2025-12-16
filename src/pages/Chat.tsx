@@ -198,11 +198,8 @@ const Chat = () => {
       if (localMessages.length > 0) {
         await migrateLocalMessages();
       } else {
-        // Start conversation with AI
-        const welcomeMessage = await getAIResponse([]);
-        if (welcomeMessage) {
-          await sendBotMessage(welcomeMessage);
-        }
+        // Send welcome message for new authenticated users
+        await sendBotMessage("Hey! A few quick questions and I'll find you the right person. What brings you here?");
       }
     } else {
       setMessages(data as Message[]);
@@ -365,7 +362,10 @@ const Chat = () => {
     setMessages((prev) => [...prev, data as Message]);
   };
 
-  const getAIResponse = async (conversationHistory: { role: string; content: string }[]) => {
+  const getAIResponseStreaming = async (
+    conversationHistory: { role: string; content: string }[],
+    onDelta: (text: string) => void
+  ): Promise<string | null> => {
     try {
       const response = await fetch(CHAT_URL, {
         method: "POST",
@@ -375,12 +375,11 @@ const Chat = () => {
         },
         body: JSON.stringify({
           messages: conversationHistory,
-          userId: user?.id || null, // null for anonymous
+          userId: user?.id || null,
         }),
       });
 
       if (!response.ok) {
-        const errorData = await response.json();
         if (response.status === 429) {
           toast({
             title: "Please wait",
@@ -389,11 +388,49 @@ const Chat = () => {
           });
           return null;
         }
-        throw new Error(errorData.error || "AI request failed");
+        throw new Error("AI request failed");
       }
 
-      const data = await response.json();
-      return data.message;
+      if (!response.body) throw new Error("No response body");
+
+      const reader = response.body.getReader();
+      const decoder = new TextDecoder();
+      let fullMessage = "";
+      let buffer = "";
+
+      while (true) {
+        const { done, value } = await reader.read();
+        if (done) break;
+
+        buffer += decoder.decode(value, { stream: true });
+
+        // Process complete lines
+        let newlineIndex: number;
+        while ((newlineIndex = buffer.indexOf("\n")) !== -1) {
+          let line = buffer.slice(0, newlineIndex);
+          buffer = buffer.slice(newlineIndex + 1);
+
+          if (line.endsWith("\r")) line = line.slice(0, -1);
+          if (line.startsWith(":") || line.trim() === "") continue;
+          if (!line.startsWith("data: ")) continue;
+
+          const jsonStr = line.slice(6).trim();
+          if (jsonStr === "[DONE]") break;
+
+          try {
+            const parsed = JSON.parse(jsonStr);
+            const content = parsed.choices?.[0]?.delta?.content;
+            if (content) {
+              fullMessage += content;
+              onDelta(content);
+            }
+          } catch {
+            // Incomplete JSON, skip
+          }
+        }
+      }
+
+      return fullMessage || null;
     } catch (error) {
       console.error("AI error:", error);
       toast({
@@ -448,8 +485,33 @@ const Chat = () => {
         { role: "user", content: userMessage },
       ];
 
-      const aiResponse = await getAIResponse(conversationHistory);
+      // Stream the AI response
+      let streamingContent = "";
+      const streamingMsgId = `streaming-${Date.now()}`;
+      
+      const aiResponse = await getAIResponseStreaming(conversationHistory, (delta) => {
+        streamingContent += delta;
+        setMessages((prev) => {
+          const last = prev[prev.length - 1];
+          if (last?.id === streamingMsgId) {
+            return prev.map((m, i) => 
+              i === prev.length - 1 ? { ...m, content: streamingContent } : m
+            );
+          }
+          return [...prev, {
+            id: streamingMsgId,
+            role: "assistant" as const,
+            content: streamingContent,
+            message_type: "text",
+            metadata: {},
+            created_at: new Date().toISOString(),
+          }];
+        });
+      });
+      
       if (aiResponse) {
+        // Save final message to DB (replace streaming placeholder)
+        setMessages((prev) => prev.filter(m => m.id !== streamingMsgId));
         await sendBotMessage(aiResponse);
       }
     } else {
@@ -471,19 +533,46 @@ const Chat = () => {
         { role: "user", content: userMessage },
       ];
 
-      const aiResponse = await getAIResponse(conversationHistory);
+      // Stream the AI response for anonymous users
+      let streamingContent = "";
+      const streamingMsgId = `local-streaming-${Date.now()}`;
+      
+      const aiResponse = await getAIResponseStreaming(conversationHistory, (delta) => {
+        streamingContent += delta;
+        setLocalMessages((prev) => {
+          const last = prev[prev.length - 1];
+          if (last?.id === streamingMsgId) {
+            return prev.map((m, i) => 
+              i === prev.length - 1 ? { ...m, content: streamingContent } : m
+            );
+          }
+          return [...prev, {
+            id: streamingMsgId,
+            role: "assistant" as const,
+            content: streamingContent,
+            message_type: "text",
+            metadata: {},
+            created_at: new Date().toISOString(),
+          }];
+        });
+      });
+      
       if (aiResponse) {
-        const botMsg: Message = {
-          id: `local-${Date.now() + 1}`,
-          role: "assistant",
-          content: aiResponse,
-          message_type: "text",
-          metadata: {},
-          created_at: new Date().toISOString(),
-        };
-        setLocalMessages((prev) => [...prev, botMsg]);
+        // Replace streaming message with final
+        setLocalMessages((prev) => {
+          const filtered = prev.filter(m => m.id !== streamingMsgId);
+          const botMsg: Message = {
+            id: `local-${Date.now() + 1}`,
+            role: "assistant",
+            content: aiResponse,
+            message_type: "text",
+            metadata: {},
+            created_at: new Date().toISOString(),
+          };
+          return [...filtered, botMsg];
+        });
         // Save to leads table after every message exchange
-        saveLeadToDb([...localMessages, newMsg, botMsg]);
+        saveLeadToDb([...localMessages, newMsg, { id: '', role: 'assistant', content: aiResponse, message_type: 'text', metadata: {}, created_at: new Date().toISOString() }]);
       } else {
         // Still save even if AI fails
         saveLeadToDb([...localMessages, newMsg]);

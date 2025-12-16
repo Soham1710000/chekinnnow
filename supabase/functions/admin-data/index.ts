@@ -13,8 +13,9 @@ Deno.serve(async (req) => {
   try {
     const { password, timeRange, action, user_id, full_name } = await req.json();
 
-    // Verify admin password
-    if (password !== "chekinn2024") {
+    // Verify admin password from secure secret
+    const adminPassword = Deno.env.get("ADMIN_PASSWORD");
+    if (!adminPassword || password !== adminPassword) {
       return new Response(
         JSON.stringify({ error: "Unauthorized" }),
         { status: 401, headers: { ...corsHeaders, "Content-Type": "application/json" } }

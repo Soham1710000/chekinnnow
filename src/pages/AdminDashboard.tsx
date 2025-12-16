@@ -106,7 +106,7 @@ interface Lead {
   updated_at: string;
 }
 
-const ADMIN_PASSWORD = "chekinn2024";
+// Password is verified server-side only - not stored in client code
 
 const AdminDashboard = () => {
   const { user, loading: authLoading, signOut } = useAuth();
@@ -130,6 +130,7 @@ const AdminDashboard = () => {
   // Password gate
   const [passwordEntered, setPasswordEntered] = useState(false);
   const [passwordInput, setPasswordInput] = useState("");
+  const [adminPassword, setAdminPassword] = useState(""); // Store verified password for API calls
   const [passwordError, setPasswordError] = useState(false);
 
   // Create intro modal
@@ -154,13 +155,33 @@ const AdminDashboard = () => {
   const [emailTestMode, setEmailTestMode] = useState(true);
   const [testEmail, setTestEmail] = useState("");
 
-  const handlePasswordSubmit = (e: React.FormEvent) => {
+  const handlePasswordSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
-    if (passwordInput === ADMIN_PASSWORD) {
+    setPasswordError(false);
+    
+    // Verify password server-side
+    try {
+      const { data, error } = await supabase.functions.invoke("admin-data", {
+        body: { password: passwordInput, timeRange: funnelTimeRange },
+      });
+      
+      if (error || data?.error) {
+        setPasswordError(true);
+        return;
+      }
+      
+      // Password verified - store it and load data
+      setAdminPassword(passwordInput);
       setPasswordEntered(true);
-      setPasswordError(false);
-      loadData();
-    } else {
+      setProfiles(data.profiles || []);
+      setIntroductions(data.introductions || []);
+      setFunnelStats(data.funnelStats || null);
+      setFunnelStatsA(data.funnelStatsA || null);
+      setFunnelStatsB(data.funnelStatsB || null);
+      setRecentEvents(data.recentEvents || []);
+      setLeads(data.leads || []);
+      setLoading(false);
+    } catch {
       setPasswordError(true);
     }
   };
@@ -188,10 +209,11 @@ const AdminDashboard = () => {
   };
 
   const loadData = async (timeRange?: number) => {
+    if (!adminPassword) return;
     setLoading(true);
     try {
       const { data, error } = await supabase.functions.invoke("admin-data", {
-        body: { password: ADMIN_PASSWORD, timeRange: timeRange || funnelTimeRange },
+        body: { password: adminPassword, timeRange: timeRange || funnelTimeRange },
       });
 
       if (error) throw error;
@@ -272,7 +294,7 @@ const AdminDashboard = () => {
       if (userANameOverride.trim()) {
         await supabase.functions.invoke("admin-data", {
           body: {
-            password: ADMIN_PASSWORD,
+            password: adminPassword,
             action: "update_profile_name",
             user_id: selectedUserA.id,
             full_name: userANameOverride.trim(),
@@ -282,7 +304,7 @@ const AdminDashboard = () => {
       if (userBNameOverride.trim()) {
         await supabase.functions.invoke("admin-data", {
           body: {
-            password: ADMIN_PASSWORD,
+            password: adminPassword,
             action: "update_profile_name",
             user_id: selectedUserB.id,
             full_name: userBNameOverride.trim(),
@@ -292,7 +314,7 @@ const AdminDashboard = () => {
 
       const { data, error } = await supabase.functions.invoke("admin-create-intro", {
         body: {
-          password: ADMIN_PASSWORD,
+          password: adminPassword,
           user_a_id: selectedUserA.id,
           user_b_id: selectedUserB.id,
           intro_message: introMessage,

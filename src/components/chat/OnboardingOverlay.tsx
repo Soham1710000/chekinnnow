@@ -10,18 +10,18 @@ const OnboardingOverlay = ({ onStart }: OnboardingOverlayProps) => {
   const steps = [
     {
       icon: MessageCircle,
-      title: "Chat with ChekInn",
-      description: "Tell us what you're looking for — career advice, co-founders, mentors, anything.",
+      title: "Quick chat with ChekInn AI",
+      description: "Answer 4-5 questions about yourself and who you want to meet.",
     },
     {
       icon: User,
-      title: "We build your profile",
-      description: "No forms. We learn about you through conversation and create your profile.",
+      title: "Create your profile",
+      description: "Just enter your email — we'll build your profile from the conversation.",
     },
     {
       icon: Sparkles,
-      title: "Get matched",
-      description: "We find the right person and make the introduction. You chat, we connect.",
+      title: "We find you the right person",
+      description: "A recruiter, mentor, referral, co-founder — whoever can actually help you.",
     },
   ];
 

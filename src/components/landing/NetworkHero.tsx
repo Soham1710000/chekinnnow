@@ -5,6 +5,7 @@ import { Button } from "@/components/ui/button";
 import { ChevronDown, Users } from "lucide-react";
 import { supabase } from "@/integrations/supabase/client";
 import { useFunnelTracking } from "@/hooks/useFunnelTracking";
+import OnboardingOverlay from "@/components/chat/OnboardingOverlay";
 
 // Lazy load the modal - only needed on click
 const WaitlistModal = lazy(() => import("@/components/waitlist/WaitlistModal").then(m => ({ default: m.WaitlistModal })));
@@ -277,6 +278,7 @@ export const NetworkHero = () => {
   const [searchParams] = useSearchParams();
   const navigate = useNavigate();
   const [isModalOpen, setIsModalOpen] = useState(false);
+  const [showExplainer, setShowExplainer] = useState(false);
   const [currentIndex, setCurrentIndex] = useState(0);
   const [waitlistCount, setWaitlistCount] = useState<number>(BASE_WAITLIST_COUNT);
   const referralCode = searchParams.get("ref");
@@ -284,6 +286,11 @@ export const NetworkHero = () => {
 
   const handleCTAClick = () => {
     trackEvent("cta_click", { source: "hero", referral: referralCode });
+    setShowExplainer(true);
+  };
+
+  const handleExplainerContinue = () => {
+    setShowExplainer(false);
     navigate("/auth");
   };
 
@@ -475,6 +482,15 @@ export const NetworkHero = () => {
           />
         </Suspense>
       )}
+
+      {/* Explainer Overlay */}
+      <AnimatePresence>
+        {showExplainer && (
+          <div className="fixed inset-0 z-50 bg-background">
+            <OnboardingOverlay onStart={handleExplainerContinue} />
+          </div>
+        )}
+      </AnimatePresence>
     </section>
   );
 };

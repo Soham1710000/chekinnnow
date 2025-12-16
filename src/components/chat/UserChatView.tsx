@@ -3,8 +3,9 @@ import { useAuth } from "@/hooks/useAuth";
 import { supabase } from "@/integrations/supabase/client";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
-import { Send, ArrowLeft } from "lucide-react";
+import { Send, ArrowLeft, Paperclip, X, FileText, Image as ImageIcon } from "lucide-react";
 import { motion, AnimatePresence } from "framer-motion";
+import { useToast } from "@/hooks/use-toast";
 
 interface ChatMessage {
   id: string;
@@ -35,10 +36,15 @@ interface UserChatViewProps {
 
 const UserChatView = ({ introduction, onBack }: UserChatViewProps) => {
   const { user } = useAuth();
+  const { toast } = useToast();
   const [messages, setMessages] = useState<ChatMessage[]>([]);
   const [input, setInput] = useState("");
   const [sending, setSending] = useState(false);
+  const [uploading, setUploading] = useState(false);
+  const [selectedFile, setSelectedFile] = useState<File | null>(null);
+  const [previewUrl, setPreviewUrl] = useState<string | null>(null);
   const messagesEndRef = useRef<HTMLDivElement>(null);
+  const fileInputRef = useRef<HTMLInputElement>(null);
 
   const otherUserId = introduction.user_a_id === user?.id 
     ? introduction.user_b_id 
@@ -52,6 +58,13 @@ const UserChatView = ({ introduction, onBack }: UserChatViewProps) => {
   useEffect(() => {
     messagesEndRef.current?.scrollIntoView({ behavior: "smooth" });
   }, [messages]);
+
+  // Clean up preview URL on unmount
+  useEffect(() => {
+    return () => {
+      if (previewUrl) URL.revokeObjectURL(previewUrl);
+    };
+  }, [previewUrl]);
 
   const loadMessages = async () => {
     const { data, error } = await supabase
@@ -99,12 +112,99 @@ const UserChatView = ({ introduction, onBack }: UserChatViewProps) => {
     };
   };
 
+  const handleFileSelect = (e: React.ChangeEvent<HTMLInputElement>) => {
+    const file = e.target.files?.[0];
+    if (!file) return;
+
+    // Check file size (10MB limit)
+    if (file.size > 10 * 1024 * 1024) {
+      toast({
+        title: "File too large",
+        description: "Maximum file size is 10MB",
+        variant: "destructive",
+      });
+      return;
+    }
+
+    setSelectedFile(file);
+    
+    // Create preview for images
+    if (file.type.startsWith("image/")) {
+      const url = URL.createObjectURL(file);
+      setPreviewUrl(url);
+    } else {
+      setPreviewUrl(null);
+    }
+  };
+
+  const clearSelectedFile = () => {
+    setSelectedFile(null);
+    if (previewUrl) {
+      URL.revokeObjectURL(previewUrl);
+      setPreviewUrl(null);
+    }
+    if (fileInputRef.current) {
+      fileInputRef.current.value = "";
+    }
+  };
+
+  const uploadFile = async (file: File): Promise<string | null> => {
+    if (!user) return null;
+    
+    const fileExt = file.name.split(".").pop();
+    const fileName = `${user.id}/${Date.now()}.${fileExt}`;
+    
+    const { error } = await supabase.storage
+      .from("chat-attachments")
+      .upload(fileName, file);
+
+    if (error) {
+      console.error("Upload error:", error);
+      toast({
+        title: "Upload failed",
+        description: "Couldn't upload file. Please try again.",
+        variant: "destructive",
+      });
+      return null;
+    }
+
+    const { data: { publicUrl } } = supabase.storage
+      .from("chat-attachments")
+      .getPublicUrl(fileName);
+
+    return publicUrl;
+  };
+
   const handleSend = async () => {
-    if (!input.trim() || !user || sending) return;
+    if ((!input.trim() && !selectedFile) || !user || sending) return;
 
     setSending(true);
-    const content = input.trim();
+    setUploading(!!selectedFile);
+    
+    let content = input.trim();
     setInput("");
+
+    // Upload file if selected
+    if (selectedFile) {
+      const fileUrl = await uploadFile(selectedFile);
+      if (fileUrl) {
+        const isImage = selectedFile.type.startsWith("image/");
+        content = isImage 
+          ? `[image:${fileUrl}]` 
+          : `[file:${selectedFile.name}:${fileUrl}]`;
+        if (input.trim()) {
+          content = `${input.trim()}\n${content}`;
+        }
+      }
+      clearSelectedFile();
+    }
+
+    setUploading(false);
+
+    if (!content) {
+      setSending(false);
+      return;
+    }
 
     const { error } = await supabase.from("user_chats").insert({
       introduction_id: introduction.id,
@@ -118,6 +218,48 @@ const UserChatView = ({ introduction, onBack }: UserChatViewProps) => {
     }
 
     setSending(false);
+  };
+
+  // Parse message content for attachments
+  const renderMessageContent = (content: string) => {
+    // Check for image
+    const imageMatch = content.match(/\[image:(.*?)\]/);
+    if (imageMatch) {
+      const textBefore = content.split("[image:")[0].trim();
+      return (
+        <div className="space-y-2">
+          {textBefore && <p>{textBefore}</p>}
+          <img 
+            src={imageMatch[1]} 
+            alt="Shared image" 
+            className="max-w-full rounded-lg max-h-60 object-cover cursor-pointer"
+            onClick={() => window.open(imageMatch[1], "_blank")}
+          />
+        </div>
+      );
+    }
+
+    // Check for file
+    const fileMatch = content.match(/\[file:(.*?):(.*?)\]/);
+    if (fileMatch) {
+      const textBefore = content.split("[file:")[0].trim();
+      return (
+        <div className="space-y-2">
+          {textBefore && <p>{textBefore}</p>}
+          <a 
+            href={fileMatch[2]} 
+            target="_blank" 
+            rel="noopener noreferrer"
+            className="flex items-center gap-2 bg-background/50 rounded-lg px-3 py-2 hover:bg-background/70 transition-colors"
+          >
+            <FileText className="w-4 h-4 flex-shrink-0" />
+            <span className="text-sm truncate">{fileMatch[1]}</span>
+          </a>
+        </div>
+      );
+    }
+
+    return <p>{content}</p>;
   };
 
   const isEnded = introduction.status === "ended";
@@ -164,7 +306,7 @@ const UserChatView = ({ introduction, onBack }: UserChatViewProps) => {
                     : "bg-muted text-foreground"
                 }`}
               >
-                {msg.content}
+                {renderMessageContent(msg.content)}
               </div>
             </motion.div>
           ))}
@@ -180,6 +322,33 @@ const UserChatView = ({ introduction, onBack }: UserChatViewProps) => {
         <div ref={messagesEndRef} />
       </div>
 
+      {/* File preview */}
+      {selectedFile && (
+        <div className="border-t border-border px-4 py-2 bg-muted/30">
+          <div className="flex items-center gap-3">
+            {previewUrl ? (
+              <img src={previewUrl} alt="Preview" className="w-16 h-16 object-cover rounded-lg" />
+            ) : (
+              <div className="w-16 h-16 bg-muted rounded-lg flex items-center justify-center">
+                <FileText className="w-6 h-6 text-muted-foreground" />
+              </div>
+            )}
+            <div className="flex-1 min-w-0">
+              <p className="text-sm font-medium truncate">{selectedFile.name}</p>
+              <p className="text-xs text-muted-foreground">
+                {(selectedFile.size / 1024).toFixed(1)} KB
+              </p>
+            </div>
+            <button 
+              onClick={clearSelectedFile}
+              className="p-1 hover:bg-muted rounded-full transition-colors"
+            >
+              <X className="w-4 h-4 text-muted-foreground" />
+            </button>
+          </div>
+        </div>
+      )}
+
       {/* Input */}
       {isEnded ? (
         <div className="border-t border-border p-6 bg-muted/50 text-center">
@@ -188,16 +357,36 @@ const UserChatView = ({ introduction, onBack }: UserChatViewProps) => {
         </div>
       ) : (
         <div className="border-t border-border p-4 bg-background">
-          <div className="flex gap-2">
+          <div className="flex gap-2 items-end">
+            <input
+              type="file"
+              ref={fileInputRef}
+              onChange={handleFileSelect}
+              className="hidden"
+              accept="image/*,.pdf,.doc,.docx,.txt"
+            />
+            <Button
+              variant="ghost"
+              size="icon"
+              onClick={() => fileInputRef.current?.click()}
+              disabled={sending || uploading}
+              className="flex-shrink-0"
+            >
+              <Paperclip className="w-4 h-4" />
+            </Button>
             <Input
               value={input}
               onChange={(e) => setInput(e.target.value)}
               onKeyDown={(e) => e.key === "Enter" && !e.shiftKey && handleSend()}
-              placeholder="Type a message..."
+              placeholder={uploading ? "Uploading..." : "Type a message..."}
               className="flex-1"
-              disabled={sending}
+              disabled={sending || uploading}
             />
-            <Button onClick={handleSend} disabled={!input.trim() || sending} size="icon">
+            <Button 
+              onClick={handleSend} 
+              disabled={(!input.trim() && !selectedFile) || sending || uploading} 
+              size="icon"
+            >
               <Send className="w-4 h-4" />
             </Button>
           </div>

@@ -52,7 +52,7 @@ serve(async (req) => {
       throw new Error("LOVABLE_API_KEY is not configured");
     }
 
-    // Call Lovable AI
+    // Call Lovable AI with streaming
     const response = await fetch("https://ai.gateway.lovable.dev/v1/chat/completions", {
       method: "POST",
       headers: {
@@ -65,6 +65,7 @@ serve(async (req) => {
           { role: "system", content: SYSTEM_PROMPT },
           ...messages,
         ],
+        stream: true,
       }),
     });
 
@@ -88,13 +89,6 @@ serve(async (req) => {
       throw new Error(`AI gateway error: ${response.status}`);
     }
 
-    const data = await response.json();
-    const aiMessage = data.choices?.[0]?.message?.content;
-
-    if (!aiMessage) {
-      throw new Error("No response from AI");
-    }
-
     // Extract profile insights if we have enough context (5+ user messages)
     const userMessages = messages.filter((m: any) => m.role === "user");
     console.log(`User ${userId} has ${userMessages.length} user messages`);
@@ -107,10 +101,10 @@ serve(async (req) => {
       );
     }
 
-    return new Response(
-      JSON.stringify({ message: aiMessage }),
-      { headers: { ...corsHeaders, "Content-Type": "application/json" } }
-    );
+    // Return the stream directly
+    return new Response(response.body, {
+      headers: { ...corsHeaders, "Content-Type": "text/event-stream" },
+    });
   } catch (error) {
     console.error("Chat AI error:", error);
     return new Response(

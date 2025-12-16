@@ -21,9 +21,48 @@ const Auth = () => {
   const hasTrackedAuthStart = useRef(false);
   
   const [isSignUp, setIsSignUp] = useState(true);
+  const [isForgotPassword, setIsForgotPassword] = useState(false);
   const [email, setEmail] = useState("");
   const [password, setPassword] = useState("");
   const [loading, setLoading] = useState(false);
+
+  const handleForgotPassword = async (e: React.FormEvent) => {
+    e.preventDefault();
+    setLoading(true);
+
+    try {
+      emailSchema.parse(email);
+    } catch (err) {
+      if (err instanceof z.ZodError) {
+        toast({
+          title: "Validation Error",
+          description: err.errors[0].message,
+          variant: "destructive",
+        });
+        setLoading(false);
+        return;
+      }
+    }
+
+    const { error } = await supabase.auth.resetPasswordForEmail(email, {
+      redirectTo: `${window.location.origin}/auth?reset=true`,
+    });
+
+    if (error) {
+      toast({
+        title: "Error",
+        description: error.message,
+        variant: "destructive",
+      });
+    } else {
+      toast({
+        title: "Check your email",
+        description: "We sent you a password reset link.",
+      });
+      setIsForgotPassword(false);
+    }
+    setLoading(false);
+  };
 
   // Track page view
   useEffect(() => {
@@ -152,70 +191,121 @@ const Auth = () => {
 
           <div className="text-center mb-8">
             <h1 className="text-2xl font-bold mb-3">
-              {isSignUp ? "Quick step to get intros" : "Welcome back"}
+              {isForgotPassword 
+                ? "Reset your password" 
+                : isSignUp 
+                  ? "Quick step to get intros" 
+                  : "Welcome back"}
             </h1>
             <p className="text-muted-foreground text-sm leading-relaxed">
-              {isSignUp 
-                ? "Just an email so we can nudge you when we find someone great for you to meet" 
-                : "Sign in to see your intros"}
+              {isForgotPassword
+                ? "Enter your email and we'll send you a reset link"
+                : isSignUp 
+                  ? "Just an email so we can nudge you when we find someone great for you to meet" 
+                  : "Sign in to see your intros"}
             </p>
           </div>
 
-          <form onSubmit={handleAuth} className="space-y-3">
-            <Input
-              id="email"
-              type="email"
-              value={email}
-              onChange={(e) => setEmail(e.target.value)}
-              placeholder="Your email"
-              required
-              className="h-12 text-base rounded-xl border-2 border-muted focus:border-primary transition-colors"
-            />
+          {isForgotPassword ? (
+            <form onSubmit={handleForgotPassword} className="space-y-3">
+              <Input
+                id="email"
+                type="email"
+                value={email}
+                onChange={(e) => setEmail(e.target.value)}
+                placeholder="Your email"
+                required
+                className="h-12 text-base rounded-xl border-2 border-muted focus:border-primary transition-colors"
+              />
 
-            <Input
-              id="password"
-              type="password"
-              value={password}
-              onChange={(e) => setPassword(e.target.value)}
-              placeholder="Create a password"
-              required
-              minLength={6}
-              className="h-12 text-base rounded-xl border-2 border-muted focus:border-primary transition-colors"
-            />
-            <p className="text-xs text-muted-foreground text-center">Min 6 characters — we keep it simple</p>
+              <Button 
+                type="submit" 
+                className="w-full h-12 text-base font-semibold rounded-xl mt-2" 
+                disabled={loading}
+              >
+                {loading ? (
+                  <Loader2 className="w-4 h-4 animate-spin" />
+                ) : (
+                  "Send Reset Link"
+                )}
+              </Button>
 
-            <Button 
-              type="submit" 
-              className="w-full h-12 text-base font-semibold rounded-xl mt-2" 
-              disabled={loading}
-            >
-              {loading ? (
-                <Loader2 className="w-4 h-4 animate-spin" />
-              ) : isSignUp ? (
-                "Get Started →"
-              ) : (
-                "Sign In"
+              <button
+                type="button"
+                onClick={() => setIsForgotPassword(false)}
+                className="w-full text-sm text-muted-foreground hover:text-foreground transition-colors mt-4"
+              >
+                ← Back to sign in
+              </button>
+            </form>
+          ) : (
+            <>
+              <form onSubmit={handleAuth} className="space-y-3">
+                <Input
+                  id="email"
+                  type="email"
+                  value={email}
+                  onChange={(e) => setEmail(e.target.value)}
+                  placeholder="Your email"
+                  required
+                  className="h-12 text-base rounded-xl border-2 border-muted focus:border-primary transition-colors"
+                />
+
+                <Input
+                  id="password"
+                  type="password"
+                  value={password}
+                  onChange={(e) => setPassword(e.target.value)}
+                  placeholder="Create a password"
+                  required
+                  minLength={6}
+                  className="h-12 text-base rounded-xl border-2 border-muted focus:border-primary transition-colors"
+                />
+                <p className="text-xs text-muted-foreground text-center">Min 6 characters — we keep it simple</p>
+
+                <Button 
+                  type="submit" 
+                  className="w-full h-12 text-base font-semibold rounded-xl mt-2" 
+                  disabled={loading}
+                >
+                  {loading ? (
+                    <Loader2 className="w-4 h-4 animate-spin" />
+                  ) : isSignUp ? (
+                    "Get Started →"
+                  ) : (
+                    "Sign In"
+                  )}
+                </Button>
+              </form>
+
+              <div className="mt-6 text-center space-y-3">
+                {!isSignUp && (
+                  <button
+                    type="button"
+                    onClick={() => setIsForgotPassword(true)}
+                    className="text-sm text-primary hover:underline transition-colors block mx-auto"
+                  >
+                    Forgot password?
+                  </button>
+                )}
+                <button
+                  type="button"
+                  onClick={() => setIsSignUp(!isSignUp)}
+                  className="text-sm text-muted-foreground hover:text-foreground transition-colors"
+                >
+                  {isSignUp 
+                    ? "Already signed up? Sign in" 
+                    : "New here? Sign up"}
+                </button>
+              </div>
+
+              {/* Trust indicator */}
+              {isSignUp && (
+                <p className="mt-8 text-xs text-center text-muted-foreground/70">
+                  No spam. We only reach out when we find a match.
+                </p>
               )}
-            </Button>
-          </form>
-
-          <div className="mt-6 text-center space-y-3">
-            <button
-              type="button"
-              onClick={() => setIsSignUp(!isSignUp)}
-              className="text-sm text-muted-foreground hover:text-foreground transition-colors"
-            >
-              {isSignUp 
-                ? "Already signed up? Sign in" 
-                : "New here? Sign up"}
-            </button>
-          </div>
-
-          {/* Trust indicator */}
-          {isSignUp && (
-            <p className="mt-8 text-xs text-center text-muted-foreground/70">
-              No spam. We only reach out when we find a match.
-            </p>
+            </>
           )}
         </motion.div>
       </div>

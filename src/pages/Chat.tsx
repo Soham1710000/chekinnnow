@@ -75,6 +75,7 @@ const Chat = () => {
   const [sessionId] = useState(() => getSessionId());
   const messagesEndRef = useRef<HTMLDivElement>(null);
   const hasTrackedPageLoad = useRef(false);
+  const debriefedIntros = useRef<Set<string>>(new Set()); // Track intros we've already debriefed
 
   // Track chat page loaded
   useEffect(() => {
@@ -232,7 +233,7 @@ const Chat = () => {
     setShowLoginNudge(false);
   };
 
-  const loadIntroductions = async () => {
+  const loadIntroductions = async (checkForEndedChats = false) => {
     if (!user) return;
 
     const { data, error } = await supabase
@@ -260,7 +261,41 @@ const Chat = () => {
       })
     );
 
+    // Check for newly ended chats and send debrief message
+    if (checkForEndedChats) {
+      for (const intro of introsWithProfiles) {
+        if (intro.status === "ended" && !debriefedIntros.current.has(intro.id)) {
+          debriefedIntros.current.add(intro.id);
+          const otherName = intro.other_user?.full_name || "them";
+          // Send debrief message after a short delay
+          setTimeout(() => {
+            sendDebriefMessage(otherName);
+          }, 1000);
+        }
+      }
+    } else {
+      // On initial load, just mark all ended intros as already debriefed
+      for (const intro of introsWithProfiles) {
+        if (intro.status === "ended") {
+          debriefedIntros.current.add(intro.id);
+        }
+      }
+    }
+
     setIntroductions(introsWithProfiles as Introduction[]);
+  };
+
+  const sendDebriefMessage = async (otherName: string) => {
+    if (!user) return;
+    
+    const debriefMessages = [
+      `Hey! How was the chat with ${otherName}? 👀`,
+      `So... how'd it go with ${otherName}? Tell me everything!`,
+      `Chat wrapped up with ${otherName}! How was it?`,
+    ];
+    const randomMessage = debriefMessages[Math.floor(Math.random() * debriefMessages.length)];
+    
+    await sendBotMessage(randomMessage);
   };
 
   const subscribeToMessages = () => {
@@ -292,7 +327,7 @@ const Chat = () => {
           table: "introductions",
         },
         () => {
-          loadIntroductions();
+          loadIntroductions(true); // Check for newly ended chats
         }
       )
       .subscribe();

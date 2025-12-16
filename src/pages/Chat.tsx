@@ -10,6 +10,7 @@ import { useToast } from "@/hooks/use-toast";
 import IntroCard from "@/components/chat/IntroCard";
 import UserChatView from "@/components/chat/UserChatView";
 import LearningProgress from "@/components/chat/LearningProgress";
+import OnboardingOverlay from "@/components/chat/OnboardingOverlay";
 import { useFunnelTracking } from "@/hooks/useFunnelTracking";
 
 interface Message {
@@ -74,9 +75,18 @@ const Chat = () => {
   const [learningComplete, setLearningComplete] = useState(false);
   const [showLoginNudge, setShowLoginNudge] = useState(false);
   const [sessionId] = useState(() => getSessionId());
+  const [showOnboarding, setShowOnboarding] = useState(() => {
+    // Only show onboarding if user hasn't seen it before
+    return !sessionStorage.getItem("chekinn_onboarding_seen");
+  });
   const messagesEndRef = useRef<HTMLDivElement>(null);
   const hasTrackedPageLoad = useRef(false);
   const debriefedIntros = useRef<Set<string>>(new Set()); // Track intros we've already debriefed
+
+  const handleOnboardingComplete = () => {
+    sessionStorage.setItem("chekinn_onboarding_seen", "true");
+    setShowOnboarding(false);
+  };
 
   // Track chat page loaded
   useEffect(() => {
@@ -647,7 +657,14 @@ const Chat = () => {
   }
 
   return (
-    <div className="min-h-screen bg-background flex flex-col">
+    <div className="min-h-screen bg-background flex flex-col relative">
+      {/* Onboarding overlay for new users */}
+      <AnimatePresence>
+        {showOnboarding && (
+          <OnboardingOverlay onStart={handleOnboardingComplete} />
+        )}
+      </AnimatePresence>
+
       {/* Header */}
       <header className="border-b border-border bg-background/95 backdrop-blur sticky top-0 z-50">
         <div className="flex items-center justify-between px-4 py-3">

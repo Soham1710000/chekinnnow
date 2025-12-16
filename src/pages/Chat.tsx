@@ -9,6 +9,7 @@ import { useNavigate } from "react-router-dom";
 import { useToast } from "@/hooks/use-toast";
 import IntroCard from "@/components/chat/IntroCard";
 import UserChatView from "@/components/chat/UserChatView";
+import LearningProgress from "@/components/chat/LearningProgress";
 import { useFunnelTracking } from "@/hooks/useFunnelTracking";
 
 interface Message {
@@ -604,6 +605,12 @@ const Chat = () => {
 
       {view === "chekinn" || !user ? (
         <>
+          {/* Learning Progress */}
+          <LearningProgress 
+            messageCount={activeMessages.filter(m => m.role === "user").length}
+            learningComplete={learningComplete}
+          />
+          
           {/* Messages */}
           <div className="flex-1 overflow-y-auto p-4 space-y-4">
             <AnimatePresence mode="popLayout">

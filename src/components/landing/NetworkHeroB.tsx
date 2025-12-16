@@ -97,17 +97,17 @@ const profiles = [
   }
 ];
 
-// Simplified Floating Profile Card - only photo, name, title
+// Simplified Floating Profile Card - only photo, name, title - BIGGER
 const FloatingProfileCard = ({ profile }: { profile: typeof profiles[0] }) => (
   <motion.div
-    className="absolute -left-6 sm:-left-10 md:-left-28 -top-4 sm:-top-2 md:top-4 z-30 w-[200px] sm:w-[240px] md:w-[300px]"
+    className="absolute -left-8 sm:-left-14 md:-left-32 -top-6 sm:-top-4 md:top-2 z-30 w-[240px] sm:w-[300px] md:w-[380px]"
     animate={{ y: [0, -6, 0] }}
     transition={{ duration: 4, repeat: Infinity, ease: "easeInOut" }}
   >
     <AnimatePresence mode="wait">
       <motion.div
         key={profile.id}
-        className="bg-white rounded-xl sm:rounded-2xl shadow-xl sm:shadow-2xl border border-gray-100 overflow-hidden"
+        className="bg-white rounded-2xl sm:rounded-3xl shadow-2xl border border-gray-100 overflow-hidden"
         initial={{ opacity: 0, x: -20, scale: 0.95 }}
         animate={{ opacity: 1, x: 0, scale: 1 }}
         exit={{ opacity: 0, x: 20, scale: 0.95 }}
@@ -124,10 +124,10 @@ const FloatingProfileCard = ({ profile }: { profile: typeof profiles[0] }) => (
             className="w-full h-full object-cover object-top"
           />
         </div>
-        {/* Name and title - compact inline */}
-        <div className="px-3 py-2 sm:px-4 sm:py-3 md:px-5 md:py-4 bg-white">
-          <p className="text-sm sm:text-base md:text-lg font-semibold text-gray-900">{profile.name}</p>
-          <p className="text-xs sm:text-sm md:text-base text-gray-500">{profile.title}</p>
+        {/* Name and title - bigger text */}
+        <div className="px-4 py-3 sm:px-5 sm:py-4 md:px-6 md:py-5 bg-white">
+          <p className="text-base sm:text-lg md:text-xl font-semibold text-gray-900">{profile.name}</p>
+          <p className="text-sm sm:text-base md:text-lg text-gray-500">{profile.title}</p>
         </div>
       </motion.div>
     </AnimatePresence>
@@ -319,11 +319,11 @@ export const NetworkHeroB = () => {
               initial={{ opacity: 0, y: 20 }}
               animate={{ opacity: 1, y: 0 }}
               transition={{ duration: 0.8, delay: 0.1 }}
-              className="text-xl sm:text-2xl md:text-3xl lg:text-4xl xl:text-5xl font-medium text-foreground leading-tight mb-6 sm:mb-8 md:mb-10"
+              className="text-xl sm:text-2xl md:text-3xl lg:text-4xl xl:text-5xl font-medium text-foreground leading-tight mb-4 sm:mb-6 md:mb-8"
             >
               <span className="font-semibold">ChekInn knows everyone.</span>
               <br />
-              <span className="font-normal text-muted-foreground">You just talk. We figure out who can help.</span>
+              <span className="font-normal text-muted-foreground">You talk. We connect.</span>
             </motion.h1>
 
             {/* CTA Button */}

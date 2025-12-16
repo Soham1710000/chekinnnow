@@ -8,7 +8,9 @@ type FunnelEvent =
   | "auth_start"
   | "auth_complete"
   | "waitlist_success"
-  | "chat_page_loaded";
+  | "chat_page_loaded"
+  | "ab_variant_assigned"
+  | "ab_variant_view";
 
 // Generate or retrieve session ID for anonymous tracking
 const getSessionId = (): string => {

@@ -74,6 +74,7 @@ const StepCard = ({ step, index }: { step: typeof steps[0]; index: number }) => 
 };
 
 export const HowItWorks = () => {
+  // Force rebuild for cache invalidation
   const ref = useRef(null);
   const isInView = useInView(ref, { once: true, margin: "-100px" });
 

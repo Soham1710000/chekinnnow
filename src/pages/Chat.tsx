@@ -75,10 +75,7 @@ const Chat = () => {
   const [learningComplete, setLearningComplete] = useState(false);
   const [showLoginNudge, setShowLoginNudge] = useState(false);
   const [sessionId] = useState(() => getSessionId());
-  const [showOnboarding, setShowOnboarding] = useState(() => {
-    // Only show onboarding if user hasn't seen it before
-    return !sessionStorage.getItem("chekinn_onboarding_seen");
-  });
+  const [showOnboarding, setShowOnboarding] = useState(false);
   const messagesEndRef = useRef<HTMLDivElement>(null);
   const hasTrackedPageLoad = useRef(false);
   const debriefedIntros = useRef<Set<string>>(new Set()); // Track intros we've already debriefed
@@ -102,13 +99,18 @@ const Chat = () => {
   // Anonymous user: already has message pre-populated, no action needed
   // Authenticated user loading is handled separately
 
-  // Authenticated user: load from DB
+  // Authenticated user: load from DB and show onboarding if first time
   useEffect(() => {
     if (user) {
       loadMessages();
       loadIntroductions();
       subscribeToMessages();
       checkLearningStatus();
+      
+      // Show onboarding for authenticated users who haven't seen it
+      if (!sessionStorage.getItem("chekinn_onboarding_seen")) {
+        setShowOnboarding(true);
+      }
     }
   }, [user]);
 

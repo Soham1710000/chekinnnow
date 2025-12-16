@@ -59,7 +59,7 @@ const Chat = () => {
   const [localMessages, setLocalMessages] = useState<Message[]>(() => [{
     id: `local-${Date.now()}`,
     role: "assistant" as const,
-    content: "Hey! I have a few people in mind who might be perfect for you. What are you looking for?",
+    content: "Hey! A few quick questions and I'll find you the right person. What brings you here?",
     message_type: "text",
     metadata: {},
     created_at: new Date().toISOString(),
@@ -365,8 +365,9 @@ const Chat = () => {
     }
   };
 
-  const handleSend = async () => {
-    if (!input.trim() || sending) return;
+  const handleSend = async (messageOverride?: string) => {
+    const messageToSend = messageOverride || input.trim();
+    if (!messageToSend || sending) return;
 
     // If showing login nudge, don't allow more messages
     if (showLoginNudge && !user) {
@@ -378,8 +379,8 @@ const Chat = () => {
     }
 
     setSending(true);
-    const userMessage = input.trim();
-    setInput("");
+    if (!messageOverride) setInput("");
+    const userMessage = messageToSend;
 
     if (user) {
       // Authenticated: save to DB
@@ -600,7 +601,7 @@ const Chat = () => {
                           </div>
                         </div>
                         <p className="text-xs text-muted-foreground mt-2">
-                          Tell me more to unlock who I have in mind for you...
+                          Answer a few questions to narrow down who's right for you
                         </p>
                       </div>
                       
@@ -616,10 +617,9 @@ const Chat = () => {
                         ].map((template) => (
                           <button
                             key={template}
-                            onClick={() => {
-                              setInput(template);
-                            }}
-                            className="text-xs px-3 py-1.5 rounded-full border border-primary/40 bg-primary/10 hover:bg-primary/20 transition-all text-primary font-medium hover:scale-105 hover:shadow-sm"
+                            onClick={() => handleSend(template)}
+                            disabled={sending}
+                            className="text-xs px-3 py-1.5 rounded-full border border-primary/40 bg-primary/10 hover:bg-primary/20 transition-all text-primary font-medium hover:scale-105 hover:shadow-sm disabled:opacity-50"
                           >
                             {template}
                           </button>
@@ -714,7 +714,7 @@ const Chat = () => {
                 className="flex-1"
                 disabled={sending || (showLoginNudge && !user)}
               />
-              <Button onClick={handleSend} disabled={!input.trim() || sending || (showLoginNudge && !user)} size="icon">
+              <Button onClick={() => handleSend()} disabled={!input.trim() || sending || (showLoginNudge && !user)} size="icon">
                 <Send className="w-4 h-4" />
               </Button>
             </div>

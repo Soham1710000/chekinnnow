@@ -391,21 +391,6 @@ export const NetworkHero = () => {
             transition={{ duration: 0.8, ease: [0.25, 0.46, 0.45, 0.94] }}
             className="text-center lg:text-left order-2 lg:order-1"
           >
-            {/* Social proof hook - above the fold */}
-            <motion.div
-              initial={{ opacity: 0, y: 10 }}
-              animate={{ opacity: 1, y: 0 }}
-              transition={{ duration: 0.6 }}
-              className="mb-4 sm:mb-5 md:mb-6"
-            >
-              <span className="inline-flex items-center gap-2 bg-green-50 text-green-700 px-3 py-1.5 rounded-full text-xs sm:text-sm font-medium border border-green-200">
-                <span className="relative flex h-2 w-2">
-                  <span className="animate-ping absolute inline-flex h-full w-full rounded-full bg-green-400 opacity-75"></span>
-                  <span className="relative inline-flex rounded-full h-2 w-2 bg-green-500"></span>
-                </span>
-                84 intros made this week
-              </span>
-            </motion.div>
             
             <motion.h1
               initial={{ opacity: 0, y: 20 }}

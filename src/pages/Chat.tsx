@@ -101,6 +101,19 @@ const Chat = () => {
     }
   }, [user]);
 
+  // Check in on active intros when user comes back from a user-to-user chat
+  const prevActiveChat = useRef<Introduction | null>(null);
+  useEffect(() => {
+    // If user just closed a user-to-user chat (activeChat went from something to null)
+    if (prevActiveChat.current && !activeChat && user && introductions.length > 0) {
+      // Small delay to let the UI settle
+      setTimeout(() => {
+        checkInOnActiveIntros();
+      }, 500);
+    }
+    prevActiveChat.current = activeChat;
+  }, [activeChat, user, introductions]);
+
   // Check if we should show login nudge for anonymous users
   useEffect(() => {
     if (!user) {
@@ -233,7 +246,7 @@ const Chat = () => {
     setShowLoginNudge(false);
   };
 
-  const loadIntroductions = async (checkForEndedChats = false) => {
+  const loadIntroductions = async () => {
     if (!user) return;
 
     const { data, error } = await supabase
@@ -261,41 +274,32 @@ const Chat = () => {
       })
     );
 
-    // Check for newly ended chats and send debrief message
-    if (checkForEndedChats) {
-      for (const intro of introsWithProfiles) {
-        if (intro.status === "ended" && !debriefedIntros.current.has(intro.id)) {
-          debriefedIntros.current.add(intro.id);
-          const otherName = intro.other_user?.full_name || "them";
-          // Send debrief message after a short delay
-          setTimeout(() => {
-            sendDebriefMessage(otherName);
-          }, 1000);
-        }
-      }
-    } else {
-      // On initial load, just mark all ended intros as already debriefed
-      for (const intro of introsWithProfiles) {
-        if (intro.status === "ended") {
-          debriefedIntros.current.add(intro.id);
-        }
-      }
-    }
-
     setIntroductions(introsWithProfiles as Introduction[]);
   };
 
-  const sendDebriefMessage = async (otherName: string) => {
+  // Check in on active intros when user comes back to ChekInn chat
+  const checkInOnActiveIntros = async () => {
     if (!user) return;
     
-    const debriefMessages = [
-      `Hey! How was the chat with ${otherName}? 👀`,
-      `So... how'd it go with ${otherName}? Tell me everything!`,
-      `Chat wrapped up with ${otherName}! How was it?`,
-    ];
-    const randomMessage = debriefMessages[Math.floor(Math.random() * debriefMessages.length)];
+    // Find active intros we haven't checked in on
+    const activeIntrosToCheckIn = introductions.filter(
+      intro => intro.status === "active" && !debriefedIntros.current.has(intro.id)
+    );
     
-    await sendBotMessage(randomMessage);
+    if (activeIntrosToCheckIn.length > 0) {
+      const intro = activeIntrosToCheckIn[0];
+      debriefedIntros.current.add(intro.id);
+      const otherName = intro.other_user?.full_name || "them";
+      
+      const checkInMessages = [
+        `Hey! How's it going with ${otherName}? 👀`,
+        `So... how's the chat with ${otherName} going?`,
+        `Quick check-in — how's ${otherName}? Getting good vibes?`,
+      ];
+      const randomMessage = checkInMessages[Math.floor(Math.random() * checkInMessages.length)];
+      
+      await sendBotMessage(randomMessage);
+    }
   };
 
   const subscribeToMessages = () => {
@@ -327,7 +331,7 @@ const Chat = () => {
           table: "introductions",
         },
         () => {
-          loadIntroductions(true); // Check for newly ended chats
+          loadIntroductions();
         }
       )
       .subscribe();

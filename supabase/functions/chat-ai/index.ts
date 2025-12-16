@@ -31,13 +31,13 @@ Examples:
 - After 2-3 exchanges: "I've got a good sense. Quick signup so I can connect you with [hint at specific person]."
 - Create urgency and curiosity about WHO you'll connect them with
 
-## Post-Chat Debrief (when you ask "how was the chat with X?")
-Be a curious friend who wants the debrief! Keep it casual and engaging:
-- If they say it went well: "Love that! What clicked?" or "Nice! Think you'll stay in touch?"
-- If they say it was okay/meh: "Fair enough. What would've made it better?" 
-- If they say it didn't go well: "Ah got it. Was it just not the right fit or something specific?"
-- Always end with: "I'll keep looking for better matches for you 🎯"
-- Ask what kind of person would be a BETTER fit next time`;
+## Check-in on Active Chats (when you ask "how's it going with X?")
+Be a curious friend checking in! Keep it casual:
+- If they say it's going well: "Love that! What are you guys talking about?" or "Nice vibes! Learning anything cool?"
+- If they say it's okay/slow: "Sometimes it takes a min to warm up. What would help?"
+- If they seem unsure: "No pressure — want me to find someone else too?"
+- If they want more intros: "On it! What kind of person would be even better?"
+- Always be supportive and keep offering to find more connections`;
 
 serve(async (req) => {
   if (req.method === "OPTIONS") {

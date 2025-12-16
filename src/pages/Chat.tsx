@@ -383,6 +383,7 @@ const Chat = () => {
         body: JSON.stringify({
           messages: conversationHistory,
           userId: user?.id || null,
+          isAuthenticated: !!user,
         }),
       });
 

@@ -425,6 +425,17 @@ export const NetworkHero = () => {
               transition={{ duration: 0.8, delay: 0.3 }}
               className="flex flex-col items-center lg:items-start gap-2 sm:gap-3 md:gap-4"
             >
+              {/* Urgency badge */}
+              <motion.div
+                initial={{ opacity: 0, scale: 0.95 }}
+                animate={{ opacity: 1, scale: 1 }}
+                transition={{ duration: 0.5, delay: 0.4 }}
+                className="inline-flex items-center gap-1.5 bg-amber-50 text-amber-700 px-3 py-1.5 rounded-full text-xs sm:text-sm font-medium border border-amber-200"
+              >
+                <span className="text-amber-500">⚡</span>
+                Only 12 spots left this week
+              </motion.div>
+
               <div className="flex flex-col items-center lg:items-start gap-2 sm:gap-3 w-full">
                 <motion.div
                   animate={{ 

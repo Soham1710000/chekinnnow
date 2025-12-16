@@ -665,8 +665,30 @@ const Chat = () => {
         )}
       </AnimatePresence>
 
+      {/* Login nudge banner for non-authenticated users */}
+      {!user && (
+        <motion.div
+          initial={{ opacity: 0, y: -10 }}
+          animate={{ opacity: 1, y: 0 }}
+          className="bg-primary text-primary-foreground px-4 py-2.5 flex items-center justify-between gap-3"
+        >
+          <div className="flex items-center gap-2 text-sm">
+            <Sparkles className="w-4 h-4" />
+            <span className="font-medium">Sign up to get matched with the right person</span>
+          </div>
+          <Button
+            size="sm"
+            variant="secondary"
+            onClick={() => navigate("/auth")}
+            className="text-xs font-semibold px-4 h-7"
+          >
+            Sign up
+          </Button>
+        </motion.div>
+      )}
+
       {/* Header */}
-      <header className="border-b border-border bg-background/95 backdrop-blur sticky top-0 z-50">
+      <header className="border-b border-border bg-background/95 backdrop-blur sticky top-0 z-40">
         <div className="flex items-center justify-between px-4 py-3">
           <button onClick={() => navigate("/")} className="flex items-center gap-2 text-muted-foreground hover:text-foreground transition-colors">
             <ArrowLeft className="w-5 h-5" />

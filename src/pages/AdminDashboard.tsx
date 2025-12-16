@@ -80,6 +80,7 @@ interface FunnelStats {
   auth_start: number;
   auth_complete: number;
   waitlist_success: number;
+  ab_variant_assigned: number;
   unique_sessions: number;
   sources: Record<string, number>;
 }
@@ -117,6 +118,9 @@ const AdminDashboard = () => {
   const [profiles, setProfiles] = useState<Profile[]>([]);
   const [introductions, setIntroductions] = useState<Introduction[]>([]);
   const [funnelStats, setFunnelStats] = useState<FunnelStats | null>(null);
+  const [funnelStatsA, setFunnelStatsA] = useState<FunnelStats | null>(null);
+  const [funnelStatsB, setFunnelStatsB] = useState<FunnelStats | null>(null);
+  const [abVariantFilter, setAbVariantFilter] = useState<"all" | "A" | "B">("all");
   const [recentEvents, setRecentEvents] = useState<FunnelEvent[]>([]);
   const [leads, setLeads] = useState<Lead[]>([]);
   const [funnelTimeRange, setFunnelTimeRange] = useState(24);
@@ -195,6 +199,8 @@ const AdminDashboard = () => {
       setProfiles(data.profiles || []);
       setIntroductions(data.introductions || []);
       setFunnelStats(data.funnelStats || null);
+      setFunnelStatsA(data.funnelStatsA || null);
+      setFunnelStatsB(data.funnelStatsB || null);
       setRecentEvents(data.recentEvents || []);
       setLeads(data.leads || []);
     } catch (error) {
@@ -675,74 +681,158 @@ const AdminDashboard = () => {
 
           {/* Funnel Tab */}
           <TabsContent value="funnel" className="space-y-4">
-            {/* Time Range Selector */}
-            <div className="flex gap-2 flex-wrap">
-              {[1, 6, 24, 72, 168].map((hours) => (
-                <Button
-                  key={hours}
-                  variant={funnelTimeRange === hours ? "default" : "outline"}
-                  size="sm"
-                  onClick={() => handleTimeRangeChange(hours)}
-                >
-                  {hours === 1 ? "1h" : hours === 6 ? "6h" : hours === 24 ? "24h" : hours === 72 ? "3d" : "7d"}
-                </Button>
-              ))}
+            {/* Time Range & A/B Variant Selectors */}
+            <div className="flex flex-wrap gap-4 items-center justify-between">
+              <div className="flex gap-2 flex-wrap">
+                {[1, 6, 24, 72, 168].map((hours) => (
+                  <Button
+                    key={hours}
+                    variant={funnelTimeRange === hours ? "default" : "outline"}
+                    size="sm"
+                    onClick={() => handleTimeRangeChange(hours)}
+                  >
+                    {hours === 1 ? "1h" : hours === 6 ? "6h" : hours === 24 ? "24h" : hours === 72 ? "3d" : "7d"}
+                  </Button>
+                ))}
+              </div>
+              
+              {/* A/B Variant Filter */}
+              <div className="flex items-center gap-2">
+                <span className="text-sm text-muted-foreground">A/B Test:</span>
+                <div className="flex gap-1">
+                  {(["all", "A", "B"] as const).map((variant) => (
+                    <Button
+                      key={variant}
+                      variant={abVariantFilter === variant ? "default" : "outline"}
+                      size="sm"
+                      onClick={() => setAbVariantFilter(variant)}
+                      className={
+                        variant === "A" && abVariantFilter === "A" ? "bg-blue-600 hover:bg-blue-700" :
+                        variant === "B" && abVariantFilter === "B" ? "bg-purple-600 hover:bg-purple-700" : ""
+                      }
+                    >
+                      {variant === "all" ? "All" : `Variant ${variant}`}
+                    </Button>
+                  ))}
+                </div>
+              </div>
             </div>
 
-            {/* Funnel Stats */}
-            {funnelStats && (
-              <div className="grid grid-cols-2 md:grid-cols-3 lg:grid-cols-6 gap-4">
-                <div className="bg-card border border-border rounded-xl p-4">
-                  <div className="flex items-center gap-2 mb-2">
-                    <Eye className="w-4 h-4 text-blue-500" />
-                    <span className="text-sm text-muted-foreground">Page Views</span>
+            {/* A/B Stats Comparison Card */}
+            {funnelStatsA && funnelStatsB && (funnelStatsA.unique_sessions > 0 || funnelStatsB.unique_sessions > 0) && (
+              <div className="bg-gradient-to-r from-blue-500/10 to-purple-500/10 border border-border rounded-xl p-4">
+                <h3 className="font-semibold mb-3 flex items-center gap-2">
+                  <TrendingUp className="w-4 h-4" />
+                  A/B Test Comparison
+                </h3>
+                <div className="grid grid-cols-2 md:grid-cols-4 gap-4">
+                  <div>
+                    <p className="text-xs text-muted-foreground mb-1">Sessions</p>
+                    <div className="flex items-baseline gap-2">
+                      <span className="text-lg font-bold text-blue-600">A: {funnelStatsA.unique_sessions}</span>
+                      <span className="text-lg font-bold text-purple-600">B: {funnelStatsB.unique_sessions}</span>
+                    </div>
                   </div>
-                  <p className="text-2xl font-bold">{funnelStats.page_view}</p>
-                </div>
-                <div className="bg-card border border-border rounded-xl p-4">
-                  <div className="flex items-center gap-2 mb-2">
-                    <MousePointer className="w-4 h-4 text-green-500" />
-                    <span className="text-sm text-muted-foreground">CTA Clicks</span>
+                  <div>
+                    <p className="text-xs text-muted-foreground mb-1">CTA Click Rate</p>
+                    <div className="flex items-baseline gap-2">
+                      <span className="text-lg font-bold text-blue-600">
+                        A: {funnelStatsA.page_view > 0 ? ((funnelStatsA.cta_click / funnelStatsA.page_view) * 100).toFixed(1) : 0}%
+                      </span>
+                      <span className="text-lg font-bold text-purple-600">
+                        B: {funnelStatsB.page_view > 0 ? ((funnelStatsB.cta_click / funnelStatsB.page_view) * 100).toFixed(1) : 0}%
+                      </span>
+                    </div>
                   </div>
-                  <p className="text-2xl font-bold">{funnelStats.cta_click}</p>
-                </div>
-                <div className="bg-card border border-border rounded-xl p-4">
-                  <div className="flex items-center gap-2 mb-2">
-                    <MessageCircle className="w-4 h-4 text-cyan-500" />
-                    <span className="text-sm text-muted-foreground">Chat Loaded</span>
+                  <div>
+                    <p className="text-xs text-muted-foreground mb-1">Auth Complete Rate</p>
+                    <div className="flex items-baseline gap-2">
+                      <span className="text-lg font-bold text-blue-600">
+                        A: {funnelStatsA.page_view > 0 ? ((funnelStatsA.auth_complete / funnelStatsA.page_view) * 100).toFixed(1) : 0}%
+                      </span>
+                      <span className="text-lg font-bold text-purple-600">
+                        B: {funnelStatsB.page_view > 0 ? ((funnelStatsB.auth_complete / funnelStatsB.page_view) * 100).toFixed(1) : 0}%
+                      </span>
+                    </div>
                   </div>
-                  <p className="text-2xl font-bold">{funnelStats.chat_page_loaded || 0}</p>
-                </div>
-                <div className="bg-card border border-border rounded-xl p-4">
-                  <div className="flex items-center gap-2 mb-2">
-                    <UserPlus className="w-4 h-4 text-yellow-500" />
-                    <span className="text-sm text-muted-foreground">Auth Started</span>
+                  <div>
+                    <p className="text-xs text-muted-foreground mb-1">Winner</p>
+                    {(() => {
+                      const aRate = funnelStatsA.page_view > 0 ? (funnelStatsA.auth_complete / funnelStatsA.page_view) : 0;
+                      const bRate = funnelStatsB.page_view > 0 ? (funnelStatsB.auth_complete / funnelStatsB.page_view) : 0;
+                      if (funnelStatsA.unique_sessions < 10 && funnelStatsB.unique_sessions < 10) {
+                        return <span className="text-lg font-bold text-muted-foreground">Need more data</span>;
+                      }
+                      if (aRate > bRate) {
+                        return <span className="text-lg font-bold text-blue-600">Variant A 🏆</span>;
+                      } else if (bRate > aRate) {
+                        return <span className="text-lg font-bold text-purple-600">Variant B 🏆</span>;
+                      }
+                      return <span className="text-lg font-bold text-muted-foreground">Tie</span>;
+                    })()}
                   </div>
-                  <p className="text-2xl font-bold">{funnelStats.auth_start}</p>
-                </div>
-                <div className="bg-card border border-border rounded-xl p-4">
-                  <div className="flex items-center gap-2 mb-2">
-                    <CheckCircle className="w-4 h-4 text-emerald-500" />
-                    <span className="text-sm text-muted-foreground">Auth Complete</span>
-                  </div>
-                  <p className="text-2xl font-bold">{funnelStats.auth_complete}</p>
-                </div>
-                <div className="bg-card border border-border rounded-xl p-4">
-                  <div className="flex items-center gap-2 mb-2">
-                    <TrendingUp className="w-4 h-4 text-purple-500" />
-                    <span className="text-sm text-muted-foreground">Waitlist Success</span>
-                  </div>
-                  <p className="text-2xl font-bold">{funnelStats.waitlist_success}</p>
-                </div>
-                <div className="bg-card border border-border rounded-xl p-4">
-                  <div className="flex items-center gap-2 mb-2">
-                    <Users className="w-4 h-4 text-gray-500" />
-                    <span className="text-sm text-muted-foreground">Sessions</span>
-                  </div>
-                  <p className="text-2xl font-bold">{funnelStats.unique_sessions}</p>
                 </div>
               </div>
             )}
+
+            {/* Funnel Stats */}
+            {(() => {
+              const stats = abVariantFilter === "A" ? funnelStatsA : abVariantFilter === "B" ? funnelStatsB : funnelStats;
+              if (!stats) return null;
+              return (
+                <div className="grid grid-cols-2 md:grid-cols-3 lg:grid-cols-6 gap-4">
+                  <div className="bg-card border border-border rounded-xl p-4">
+                    <div className="flex items-center gap-2 mb-2">
+                      <Eye className="w-4 h-4 text-blue-500" />
+                      <span className="text-sm text-muted-foreground">Page Views</span>
+                    </div>
+                    <p className="text-2xl font-bold">{stats.page_view}</p>
+                  </div>
+                  <div className="bg-card border border-border rounded-xl p-4">
+                    <div className="flex items-center gap-2 mb-2">
+                      <MousePointer className="w-4 h-4 text-green-500" />
+                      <span className="text-sm text-muted-foreground">CTA Clicks</span>
+                    </div>
+                    <p className="text-2xl font-bold">{stats.cta_click}</p>
+                  </div>
+                  <div className="bg-card border border-border rounded-xl p-4">
+                    <div className="flex items-center gap-2 mb-2">
+                      <MessageCircle className="w-4 h-4 text-cyan-500" />
+                      <span className="text-sm text-muted-foreground">Chat Loaded</span>
+                    </div>
+                    <p className="text-2xl font-bold">{stats.chat_page_loaded || 0}</p>
+                  </div>
+                  <div className="bg-card border border-border rounded-xl p-4">
+                    <div className="flex items-center gap-2 mb-2">
+                      <UserPlus className="w-4 h-4 text-yellow-500" />
+                      <span className="text-sm text-muted-foreground">Auth Started</span>
+                    </div>
+                    <p className="text-2xl font-bold">{stats.auth_start}</p>
+                  </div>
+                  <div className="bg-card border border-border rounded-xl p-4">
+                    <div className="flex items-center gap-2 mb-2">
+                      <CheckCircle className="w-4 h-4 text-emerald-500" />
+                      <span className="text-sm text-muted-foreground">Auth Complete</span>
+                    </div>
+                    <p className="text-2xl font-bold">{stats.auth_complete}</p>
+                  </div>
+                  <div className="bg-card border border-border rounded-xl p-4">
+                    <div className="flex items-center gap-2 mb-2">
+                      <TrendingUp className="w-4 h-4 text-purple-500" />
+                      <span className="text-sm text-muted-foreground">Waitlist Success</span>
+                    </div>
+                    <p className="text-2xl font-bold">{stats.waitlist_success}</p>
+                  </div>
+                  <div className="bg-card border border-border rounded-xl p-4">
+                    <div className="flex items-center gap-2 mb-2">
+                      <Users className="w-4 h-4 text-gray-500" />
+                      <span className="text-sm text-muted-foreground">Sessions</span>
+                    </div>
+                    <p className="text-2xl font-bold">{stats.unique_sessions}</p>
+                  </div>
+                </div>
+              );
+            })()}
 
             {/* Conversion Rates */}
             {funnelStats && funnelStats.page_view > 0 && (

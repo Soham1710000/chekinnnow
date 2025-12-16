@@ -145,21 +145,45 @@ Deno.serve(async (req) => {
 
     // Calculate funnel stats
     const events = funnelEvents || [];
-    const funnelStats = {
-      page_view: events.filter(e => e.event_type === "page_view").length,
-      cta_click: events.filter(e => e.event_type === "cta_click").length,
-      chat_page_loaded: events.filter(e => e.event_type === "chat_page_loaded").length,
-      modal_open: events.filter(e => e.event_type === "modal_open").length,
-      auth_start: events.filter(e => e.event_type === "auth_start").length,
-      auth_complete: events.filter(e => e.event_type === "auth_complete").length,
-      waitlist_success: events.filter(e => e.event_type === "waitlist_success").length,
-      unique_sessions: new Set(events.map(e => e.session_id)).size,
-      sources: events.reduce((acc, e) => {
+    
+    // Helper to calculate stats for a set of events
+    const calcStats = (evts: typeof events) => ({
+      page_view: evts.filter(e => e.event_type === "page_view").length,
+      cta_click: evts.filter(e => e.event_type === "cta_click").length,
+      chat_page_loaded: evts.filter(e => e.event_type === "chat_page_loaded").length,
+      modal_open: evts.filter(e => e.event_type === "modal_open").length,
+      auth_start: evts.filter(e => e.event_type === "auth_start").length,
+      auth_complete: evts.filter(e => e.event_type === "auth_complete").length,
+      waitlist_success: evts.filter(e => e.event_type === "waitlist_success").length,
+      ab_variant_assigned: evts.filter(e => e.event_type === "ab_variant_assigned").length,
+      unique_sessions: new Set(evts.map(e => e.session_id)).size,
+      sources: evts.reduce((acc, e) => {
         const source = e.source || 'direct';
         acc[source] = (acc[source] || 0) + 1;
         return acc;
       }, {} as Record<string, number>),
-    };
+    });
+
+    // Get all sessions that were assigned a variant
+    const variantAssignments = events.filter(e => 
+      e.event_type === "ab_variant_assigned" || e.event_type === "ab_variant_view"
+    );
+    
+    // Build session -> variant map
+    const sessionVariants: Record<string, string> = {};
+    variantAssignments.forEach(e => {
+      if (e.session_id && e.metadata?.variant) {
+        sessionVariants[e.session_id] = e.metadata.variant;
+      }
+    });
+
+    // Filter events by variant
+    const variantAEvents = events.filter(e => sessionVariants[e.session_id] === "A");
+    const variantBEvents = events.filter(e => sessionVariants[e.session_id] === "B");
+
+    const funnelStats = calcStats(events);
+    const funnelStatsA = calcStats(variantAEvents);
+    const funnelStatsB = calcStats(variantBEvents);
 
     // Recent events for detailed view
     const recentEvents = events.slice(0, 50);
@@ -169,6 +193,8 @@ Deno.serve(async (req) => {
         profiles: enrichedProfiles, 
         introductions: introsWithUsers,
         funnelStats,
+        funnelStatsA,
+        funnelStatsB,
         recentEvents,
         leads: leads || [],
       }),

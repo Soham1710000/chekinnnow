@@ -738,12 +738,26 @@ const Chat = () => {
             
             {sending && (
               <motion.div
-                initial={{ opacity: 0 }}
-                animate={{ opacity: 1 }}
+                initial={{ opacity: 0, y: 10 }}
+                animate={{ opacity: 1, y: 0 }}
                 className="flex justify-start"
               >
-                <div className="bg-muted rounded-2xl px-4 py-2.5 text-muted-foreground">
-                  <span className="animate-pulse">Typing...</span>
+                <div className="bg-muted rounded-2xl px-4 py-3 flex items-center gap-1">
+                  <motion.span
+                    className="w-2 h-2 bg-muted-foreground/60 rounded-full"
+                    animate={{ y: [0, -6, 0] }}
+                    transition={{ duration: 0.6, repeat: Infinity, delay: 0 }}
+                  />
+                  <motion.span
+                    className="w-2 h-2 bg-muted-foreground/60 rounded-full"
+                    animate={{ y: [0, -6, 0] }}
+                    transition={{ duration: 0.6, repeat: Infinity, delay: 0.15 }}
+                  />
+                  <motion.span
+                    className="w-2 h-2 bg-muted-foreground/60 rounded-full"
+                    animate={{ y: [0, -6, 0] }}
+                    transition={{ duration: 0.6, repeat: Infinity, delay: 0.3 }}
+                  />
                 </div>
               </motion.div>
             )}

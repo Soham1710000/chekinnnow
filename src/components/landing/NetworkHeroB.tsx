@@ -142,7 +142,7 @@ const ProfileCardsDisplay = ({ currentIndex }: { currentIndex: number }) => {
       </motion.div>
       
       {/* Progress indicators */}
-      <div className="absolute -bottom-8 left-1/2 -translate-x-1/2 flex gap-1.5 sm:gap-2">
+      <div className="absolute -bottom-12 sm:-bottom-14 left-1/2 -translate-x-1/2 flex gap-1.5 sm:gap-2">
         {profiles.map((_, index) => (
           <motion.div
             key={index}
@@ -344,7 +344,7 @@ export const NetworkHeroB = () => {
             initial={{ opacity: 0, y: -20 }}
             animate={{ opacity: 1, y: 0 }}
             transition={{ duration: 0.8, delay: 0.2, ease: [0.25, 0.46, 0.45, 0.94] }}
-            className="order-1 lg:order-2 relative pb-12"
+            className="order-1 lg:order-2 relative pb-16 sm:pb-20"
           >
             <ProfileCardsDisplay currentIndex={currentIndex} />
           </motion.div>

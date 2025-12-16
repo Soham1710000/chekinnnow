@@ -10,6 +10,7 @@ import { AuthProvider } from "@/hooks/useAuth";
 import Index from "./pages/Index";
 
 // Lazy load other routes
+const IndexB = lazy(() => import("./pages/IndexB"));
 const Waitlist = lazy(() => import("./pages/Waitlist"));
 const Admin = lazy(() => import("./pages/Admin"));
 const Chat = lazy(() => import("./pages/Chat"));
@@ -42,6 +43,7 @@ const App = () => (
           <Suspense fallback={<RouteLoader />}>
             <Routes>
               <Route path="/" element={<Index />} />
+              <Route path="/b" element={<IndexB />} />
               <Route path="/waitlist" element={<Waitlist />} />
               <Route path="/admin" element={<Admin />} />
               <Route path="/chat" element={<Chat />} />

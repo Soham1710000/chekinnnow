@@ -659,7 +659,8 @@ const Chat = () => {
                           "Explore a career",
                           "Break into tech",
                           "Get some advice",
-                          "Find co-builder"
+                          "Find co-builder",
+                          "Get me referral in job"
                         ].map((template) => (
                           <button
                             key={template}

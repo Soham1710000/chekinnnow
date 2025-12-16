@@ -21,6 +21,7 @@ import {
   MousePointer,
   UserPlus,
   CheckCircle,
+  Download,
 } from "lucide-react";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import {
@@ -384,6 +385,85 @@ const AdminDashboard = () => {
     }
   };
 
+  const handleExportCSV = () => {
+    // Combine AI chats and user-to-user chats
+    const rows: string[] = [];
+    rows.push("type,user_email,user_name,other_user_email,other_user_name,role,content,created_at");
+
+    // AI chat messages from profiles
+    profiles.forEach((profile) => {
+      if (profile.chat_messages) {
+        profile.chat_messages.forEach((msg: any) => {
+          const row = [
+            "ai_chat",
+            profile.email || "",
+            profile.full_name || "",
+            "",
+            "",
+            msg.role || "",
+            `"${(msg.content || "").replace(/"/g, '""')}"`,
+            msg.created_at || "",
+          ].join(",");
+          rows.push(row);
+        });
+      }
+    });
+
+    // User-to-user chats from introductions
+    introductions.forEach((intro) => {
+      if (intro.chats) {
+        intro.chats.forEach((chat) => {
+          const sender = intro.user_a?.id === chat.sender_id ? intro.user_a : intro.user_b;
+          const receiver = intro.user_a?.id === chat.receiver_id ? intro.user_a : intro.user_b;
+          const row = [
+            "user_chat",
+            sender?.email || "",
+            sender?.full_name || "",
+            receiver?.email || "",
+            receiver?.full_name || "",
+            "user",
+            `"${(chat.content || "").replace(/"/g, '""')}"`,
+            chat.created_at || "",
+          ].join(",");
+          rows.push(row);
+        });
+      }
+    });
+
+    // Anonymous leads
+    leads.forEach((lead) => {
+      if (lead.messages) {
+        lead.messages.forEach((msg) => {
+          const row = [
+            lead.user_id ? "converted_lead" : "anonymous_lead",
+            lead.user_id || "",
+            `session:${lead.session_id}`,
+            "",
+            "",
+            msg.role || "",
+            `"${(msg.content || "").replace(/"/g, '""')}"`,
+            msg.created_at || "",
+          ].join(",");
+          rows.push(row);
+        });
+      }
+    });
+
+    const csvContent = rows.join("\n");
+    const blob = new Blob([csvContent], { type: "text/csv;charset=utf-8;" });
+    const url = URL.createObjectURL(blob);
+    const link = document.createElement("a");
+    link.href = url;
+    link.download = `chekinn-chats-${new Date().toISOString().split("T")[0]}.csv`;
+    link.click();
+    URL.revokeObjectURL(url);
+
+    toast({
+      title: "CSV exported",
+      description: `Exported ${rows.length - 1} messages.`,
+    });
+  };
+
   const filteredProfiles = profiles.filter(
     (p) =>
       p.full_name?.toLowerCase().includes(searchTerm.toLowerCase()) ||
@@ -448,6 +528,10 @@ const AdminDashboard = () => {
             <h1 className="font-bold text-lg">ChekInn Admin</h1>
           </div>
           <div className="flex items-center gap-2">
+            <Button variant="outline" size="sm" onClick={handleExportCSV}>
+              <Download className="w-4 h-4 mr-2" />
+              Export CSV
+            </Button>
             <Button variant="outline" size="sm" onClick={() => loadData()}>
               <RefreshCw className="w-4 h-4 mr-2" />
               Refresh

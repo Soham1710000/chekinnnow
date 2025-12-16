@@ -97,96 +97,61 @@ const profiles = [
   }
 ];
 
-// Simplified Floating Profile Card - only photo, name, title - BIGGER
-const FloatingProfileCard = ({ profile }: { profile: typeof profiles[0] }) => (
-  <motion.div
-    className="absolute -left-8 sm:-left-14 md:-left-32 -top-6 sm:-top-4 md:top-2 z-30 w-[240px] sm:w-[300px] md:w-[380px]"
-    animate={{ y: [0, -6, 0] }}
-    transition={{ duration: 4, repeat: Infinity, ease: "easeInOut" }}
-  >
-    <AnimatePresence mode="wait">
-      <motion.div
-        key={profile.id}
-        className="bg-white rounded-2xl sm:rounded-3xl shadow-2xl border border-gray-100 overflow-hidden"
-        initial={{ opacity: 0, x: -20, scale: 0.95 }}
-        animate={{ opacity: 1, x: 0, scale: 1 }}
-        exit={{ opacity: 0, x: 20, scale: 0.95 }}
-        transition={{ duration: 0.5 }}
-      >
-        {/* Photo - larger */}
-        <div className="aspect-[4/3] relative overflow-hidden bg-gray-100">
-          <img 
-            src={profile.image} 
-            alt={profile.name}
-            loading="eager"
-            decoding="async"
-            fetchPriority="high"
-            className="w-full h-full object-cover object-top"
-          />
-        </div>
-        {/* Name and title - bigger text */}
-        <div className="px-4 py-3 sm:px-5 sm:py-4 md:px-6 md:py-5 bg-white">
-          <p className="text-base sm:text-lg md:text-xl font-semibold text-gray-900">{profile.name}</p>
-          <p className="text-sm sm:text-base md:text-lg text-gray-500">{profile.title}</p>
-        </div>
-      </motion.div>
-    </AnimatePresence>
-  </motion.div>
+// Simple Profile Card - no phone mockup
+const ProfileCard = ({ profile }: { profile: typeof profiles[0] }) => (
+  <AnimatePresence mode="wait">
+    <motion.div
+      key={profile.id}
+      className="bg-white rounded-2xl sm:rounded-3xl shadow-2xl border border-gray-100 overflow-hidden w-[280px] sm:w-[340px] md:w-[400px]"
+      initial={{ opacity: 0, y: 20, scale: 0.95 }}
+      animate={{ opacity: 1, y: 0, scale: 1 }}
+      exit={{ opacity: 0, y: -20, scale: 0.95 }}
+      transition={{ duration: 0.5 }}
+    >
+      {/* Photo */}
+      <div className="aspect-[4/3] relative overflow-hidden bg-gray-100">
+        <img 
+          src={profile.image} 
+          alt={profile.name}
+          loading="eager"
+          decoding="async"
+          fetchPriority="high"
+          className="w-full h-full object-cover object-top"
+        />
+      </div>
+      {/* Name and title */}
+      <div className="px-5 py-4 sm:px-6 sm:py-5 bg-white">
+        <p className="text-lg sm:text-xl md:text-2xl font-semibold text-gray-900">{profile.name}</p>
+        <p className="text-base sm:text-lg md:text-xl text-gray-500">{profile.title}</p>
+      </div>
+    </motion.div>
+  </AnimatePresence>
 );
 
-// Half iPhone Mockup - simplified without reply
-const IPhoneMockup = ({ currentIndex }: { currentIndex: number }) => {
+// Profile Cards Display
+const ProfileCardsDisplay = ({ currentIndex }: { currentIndex: number }) => {
   const currentProfile = profiles[currentIndex];
 
   return (
-    <motion.div
-      initial={{ opacity: 0, y: 30 }}
-      animate={{ opacity: 1, y: 0 }}
-      transition={{ duration: 0.8, delay: 0.3 }}
-      className="relative mx-auto"
-    >
-      {/* Floating profile card */}
-      <FloatingProfileCard profile={currentProfile} />
-
-      {/* Half iPhone frame - cut off at bottom */}
-      <div className="relative w-[220px] sm:w-[280px] md:w-[380px] h-[320px] sm:h-[400px] md:h-[560px] overflow-hidden">
-        {/* Phone frame - extended beyond container so bottom is hidden */}
-        <div className="absolute inset-x-0 top-0 h-[420px] sm:h-[520px] md:h-[700px] bg-white rounded-t-[28px] sm:rounded-t-[36px] md:rounded-t-[50px] border-[6px] sm:border-[7px] md:border-[10px] border-b-0 border-gray-900 shadow-xl sm:shadow-2xl overflow-hidden">
-          {/* Dynamic Island */}
-          <div className="absolute top-1 sm:top-1.5 md:top-2 left-1/2 -translate-x-1/2 w-12 sm:w-16 md:w-24 h-3 sm:h-4 md:h-6 bg-gray-900 rounded-full z-20" />
-          
-          {/* Screen content */}
-          <div className="absolute inset-0 pt-6 sm:pt-8 md:pt-12 bg-gradient-to-b from-gray-50 to-white flex flex-col">
-            {/* ChekInn header */}
-            <div className="px-3 sm:px-4 py-1 sm:py-1.5 md:py-2 border-b border-gray-100">
-              <p className="text-[9px] sm:text-[10px] md:text-xs text-gray-500 text-center">ChekInn</p>
-            </div>
-
-            {/* Empty content area */}
-            <div className="flex-1" />
-          </div>
-        </div>
-      </div>
-
+    <div className="flex justify-center">
+      <motion.div
+        animate={{ y: [0, -8, 0] }}
+        transition={{ duration: 4, repeat: Infinity, ease: "easeInOut" }}
+      >
+        <ProfileCard profile={currentProfile} />
+      </motion.div>
+      
       {/* Progress indicators */}
-      <div className="flex justify-center gap-1 sm:gap-1.5 md:gap-2 mt-2 sm:mt-3 md:mt-4">
+      <div className="absolute -bottom-8 left-1/2 -translate-x-1/2 flex gap-1.5 sm:gap-2">
         {profiles.map((_, index) => (
           <motion.div
             key={index}
-            className={`h-0.5 sm:h-1 md:h-1.5 rounded-full transition-all duration-300 ${
-              index === currentIndex ? "w-3 sm:w-4 md:w-6 bg-gray-900" : "w-0.5 sm:w-1 md:w-1.5 bg-gray-300"
+            className={`h-1 sm:h-1.5 rounded-full transition-all duration-300 ${
+              index === currentIndex ? "w-4 sm:w-6 bg-gray-900" : "w-1.5 sm:w-2 bg-gray-300"
             }`}
           />
         ))}
       </div>
-    </motion.div>
-  );
-};
-
-const NetworkVisualization = ({ currentIndex }: { currentIndex: number }) => {
-  return (
-    <div className="relative w-full flex justify-center pl-4 sm:pl-8 md:pl-16">
-      <IPhoneMockup currentIndex={currentIndex} />
     </div>
   );
 };
@@ -303,18 +268,17 @@ export const NetworkHeroB = () => {
         </div>
       </motion.div>
 
-      {/* Main content - flex grow to fill remaining space */}
-      <div className="flex-1 flex items-end">
-        <div className="container-apple relative z-10 py-6 sm:py-8 md:py-12 pb-8 sm:pb-12 md:pb-16 px-4 md:px-6 w-full">
-          <div className="grid lg:grid-cols-2 gap-4 sm:gap-6 md:gap-8 lg:gap-8 items-end">
+      {/* Main content - centered with better spacing */}
+      <div className="flex-1 flex items-center justify-center">
+        <div className="container-apple relative z-10 py-8 sm:py-12 md:py-16 px-4 md:px-6 w-full">
+          <div className="grid lg:grid-cols-2 gap-8 sm:gap-12 md:gap-16 lg:gap-20 items-center">
           {/* Left column - Header with CTA */}
           <motion.div
             initial={{ opacity: 0, x: -30 }}
             animate={{ opacity: 1, x: 0 }}
             transition={{ duration: 0.8, ease: [0.25, 0.46, 0.45, 0.94] }}
-            className="text-center lg:text-left order-2 lg:order-1"
+            className="text-center lg:text-left order-2 lg:order-1 space-y-6 sm:space-y-8"
           >
-            
             <motion.h1
               initial={{ opacity: 0, y: 20 }}
               animate={{ opacity: 1, y: 0 }}
@@ -375,14 +339,14 @@ export const NetworkHeroB = () => {
             </motion.div>
           </motion.div>
 
-          {/* Right column - Visualization */}
+          {/* Right column - Profile Cards */}
           <motion.div
-            initial={{ opacity: 0, x: 30 }}
-            animate={{ opacity: 1, x: 0 }}
+            initial={{ opacity: 0, y: -20 }}
+            animate={{ opacity: 1, y: 0 }}
             transition={{ duration: 0.8, delay: 0.2, ease: [0.25, 0.46, 0.45, 0.94] }}
-            className="order-1 lg:order-2"
+            className="order-1 lg:order-2 relative pb-12"
           >
-            <NetworkVisualization currentIndex={currentIndex} />
+            <ProfileCardsDisplay currentIndex={currentIndex} />
           </motion.div>
         </div>
       </div>

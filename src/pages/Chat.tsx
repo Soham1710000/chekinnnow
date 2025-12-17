@@ -828,32 +828,9 @@ const Chat = () => {
                     </motion.div>
                   )}
                   
-                  {/* Template buttons and Ayushi profile preview after first AI message */}
+                  {/* Template buttons after first AI message */}
                   {index === 0 && msg.role === "assistant" && activeMessages.length === 1 && (
-                    <div className="mt-3 space-y-3 animate-fade-in">
-                      {/* Ayushi profile preview */}
-                      <div className="relative overflow-hidden rounded-xl border border-primary/20 bg-gradient-to-br from-primary/5 to-primary/10 p-3">
-                        <div className="flex items-center gap-3">
-                          <div className="w-12 h-12 rounded-full bg-gradient-to-br from-amber-200 to-amber-300 flex items-center justify-center text-amber-700 font-bold text-lg">
-                            A
-                          </div>
-                          <div className="flex-1">
-                            <p className="font-semibold text-foreground text-sm">Ayushi</p>
-                            <p className="text-xs text-muted-foreground">
-                              {user?.email === "torimaaki@gmail.com" 
-                                ? "UPSC cleared 2x mains" 
-                                : "ChekInn member"}
-                            </p>
-                          </div>
-                          <div className="text-xs font-medium text-primary bg-primary/10 px-2 py-1 rounded-full">
-                            Potential match
-                          </div>
-                        </div>
-                        <p className="text-xs text-muted-foreground mt-2">
-                          Answer a few questions to narrow down who's right for you
-                        </p>
-                      </div>
-                      
+                    <div className="mt-3 animate-fade-in">
                       {/* Template buttons - different for UPSC */}
                       <div className="flex flex-wrap gap-1.5 max-w-[300px]">
                         {(isUPSC ? UPSC_TEMPLATES : GENERAL_TEMPLATES).map((template) => (

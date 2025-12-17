@@ -52,16 +52,45 @@ const getSessionId = () => {
   return sessionId;
 };
 
+// Get source for UPSC-specific experience
+const getSource = () => sessionStorage.getItem("chekinn_source") || "";
+const isUPSCSource = () => getSource() === "upsc";
+
+// UPSC-specific templates
+const UPSC_TEMPLATES = [
+  "Where do I even start?",
+  "How to pick my optional?",
+  "Stuck with answer writing",
+  "Need mentor guidance",
+  "Prelims anxiety",
+  "Interview prep help",
+];
+
+// General templates
+const GENERAL_TEMPLATES = [
+  "Prep for an interview",
+  "Explore a career",
+  "Break into tech",
+  "Get some advice",
+  "Find co-builder",
+  "Get me referral in job",
+];
+
 const Chat = () => {
   const { user, loading: authLoading } = useAuth();
   const navigate = useNavigate();
   const { toast } = useToast();
   const { trackEvent } = useFunnelTracking();
   const [messages, setMessages] = useState<Message[]>([]);
+  const [source] = useState(() => getSource());
+  const isUPSC = source === "upsc";
+  
   const [localMessages, setLocalMessages] = useState<Message[]>(() => [{
     id: `local-${Date.now()}`,
     role: "assistant" as const,
-    content: "Hey! A few quick questions and I'll find you the right person. What brings you here?",
+    content: isUPSCSource() 
+      ? "Hey! I know the UPSC journey can feel overwhelming. Tell me what you're struggling with — I'll connect you with someone who's been through it."
+      : "Hey! A few quick questions and I'll find you the right person. What brings you here?",
     message_type: "text",
     metadata: {},
     created_at: new Date().toISOString(),
@@ -795,17 +824,9 @@ const Chat = () => {
                         </p>
                       </div>
                       
-                      {/* Template buttons */}
+                      {/* Template buttons - different for UPSC */}
                       <div className="flex flex-wrap gap-1.5 max-w-[300px]">
-                        {[
-                          "Prep for an interview",
-                          "Questions about UPSC",
-                          "Explore a career",
-                          "Break into tech",
-                          "Get some advice",
-                          "Find co-builder",
-                          "Get me referral in job"
-                        ].map((template) => (
+                        {(isUPSC ? UPSC_TEMPLATES : GENERAL_TEMPLATES).map((template) => (
                           <button
                             key={template}
                             onClick={() => handleSend(template)}

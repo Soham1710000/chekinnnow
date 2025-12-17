@@ -2,15 +2,31 @@ import { useEffect } from "react";
 import { useNavigate } from "react-router-dom";
 import { useFunnelTracking } from "@/hooks/useFunnelTracking";
 import { motion } from "framer-motion";
-import { MessageCircle, Users, ArrowRight } from "lucide-react";
+import { ArrowRight } from "lucide-react";
 
 const templates = [
-  "Where do I even start?",
-  "How to pick my optional?",
-  "Struggling with answer writing",
-  "Interview prep help",
-  "Feeling stuck & demotivated",
+  "Where do I start?",
+  "How to pick optional?",
+  "Answer writing tips",
+  "Interview prep",
+  "Feeling stuck",
 ];
+
+// UPSC-relevant social proof marquee
+const logoItems = (
+  <>
+    <span className="text-xs font-semibold text-gray-700 tracking-tight">IAS Officers</span>
+    <span className="text-xs font-semibold text-gray-700 tracking-tight">LBSNAA Alumni</span>
+    <span className="text-xs font-bold text-gray-800 tracking-tight">IIT Delhi</span>
+    <span className="text-xs font-semibold text-gray-700 tracking-tight">Delhi University</span>
+    <span className="text-xs font-semibold text-gray-700 tracking-tight">JNU</span>
+    <span className="text-xs font-bold text-gray-800 tracking-tight">SRCC</span>
+    <span className="text-xs font-semibold text-gray-700 tracking-tight">St. Stephen's</span>
+    <span className="text-xs font-semibold text-gray-700 tracking-tight">IIM Alumni</span>
+    <span className="text-xs font-bold text-gray-800 tracking-tight">Top Rankers</span>
+    <span className="text-xs font-semibold text-gray-700 tracking-tight">Interview Boards</span>
+  </>
+);
 
 const UPSC = () => {
   const { trackPageView, trackEvent } = useFunnelTracking();
@@ -34,61 +50,68 @@ const UPSC = () => {
   };
 
   return (
-    <main className="min-h-[100svh] bg-background flex flex-col">
-      {/* Header */}
-      <motion.header
-        initial={{ opacity: 0, y: -10 }}
-        animate={{ opacity: 1, y: 0 }}
-        className="w-full py-4 px-5 border-b border-border/30"
+    <main className="min-h-[100svh] bg-white flex flex-col">
+      {/* Top scrolling logo marquee - matching A/B */}
+      <motion.div
+        initial={{ opacity: 0 }}
+        animate={{ opacity: 1 }}
+        transition={{ delay: 0.2 }}
+        className="w-full py-2.5 bg-gray-50/80 border-b border-gray-100 overflow-hidden"
       >
-        <div className="max-w-md mx-auto flex items-center justify-between">
-          <span className="text-sm font-semibold text-foreground tracking-tight">ChekInn</span>
-          <span className="text-[10px] text-muted-foreground/60 uppercase tracking-wider">for UPSC aspirants</span>
+        <div className="relative flex overflow-hidden">
+          <div className="flex shrink-0 animate-marquee items-center gap-6 px-4">
+            <span className="text-[10px] text-gray-500 uppercase tracking-wider font-medium whitespace-nowrap">Members are from</span>
+            <span className="text-gray-300">•</span>
+            {logoItems}
+          </div>
+          <div className="flex shrink-0 animate-marquee items-center gap-6 px-4">
+            <span className="text-[10px] text-gray-500 uppercase tracking-wider font-medium whitespace-nowrap">Members are from</span>
+            <span className="text-gray-300">•</span>
+            {logoItems}
+          </div>
         </div>
-      </motion.header>
+      </motion.div>
 
       {/* Main content */}
-      <div className="flex-1 flex items-center justify-center px-5 py-8 sm:py-12">
-        <div className="max-w-md w-full space-y-8">
+      <div className="flex-1 flex items-center justify-center px-5 py-10 sm:py-16">
+        <div className="max-w-lg w-full space-y-10">
           
-          {/* Headline */}
+          {/* Social proof badge */}
           <motion.div
-            initial={{ opacity: 0, y: 16 }}
+            initial={{ opacity: 0, y: -10 }}
             animate={{ opacity: 1, y: 0 }}
-            transition={{ duration: 0.5, delay: 0.1 }}
-            className="text-center space-y-3"
+            transition={{ duration: 0.5 }}
+            className="flex justify-center"
           >
-            <h1 className="text-xl sm:text-2xl text-foreground leading-relaxed">
-              <span className="font-normal text-muted-foreground">UPSC journey feeling heavy?</span>
-              <br />
-              <span className="font-medium">Talk it out. We'll help.</span>
-            </h1>
+            <div className="inline-flex items-center gap-2 px-3 py-1.5 rounded-full bg-gray-100 border border-gray-200">
+              <span className="relative flex h-2 w-2">
+                <span className="animate-ping absolute inline-flex h-full w-full rounded-full bg-green-400 opacity-75"></span>
+                <span className="relative inline-flex rounded-full h-2 w-2 bg-green-500"></span>
+              </span>
+              <span className="text-xs text-gray-600 font-medium">50+ aspirants connected this week</span>
+            </div>
           </motion.div>
 
-          {/* How it works */}
+          {/* Headline - Apple style */}
           <motion.div
-            initial={{ opacity: 0, y: 16 }}
+            initial={{ opacity: 0, y: 20 }}
+            animate={{ opacity: 1, y: 0 }}
+            transition={{ duration: 0.6, delay: 0.1 }}
+            className="text-center space-y-4"
+          >
+            <h1 className="text-2xl sm:text-3xl md:text-4xl font-semibold text-gray-900 leading-tight tracking-tight">
+              UPSC journey feeling heavy?
+            </h1>
+            <p className="text-lg sm:text-xl text-gray-500 font-normal leading-relaxed">
+              Talk it out. We'll connect you<br className="hidden sm:block" /> to someone who's been there.
+            </p>
+          </motion.div>
+
+          {/* Templates - compact pills */}
+          <motion.div
+            initial={{ opacity: 0, y: 20 }}
             animate={{ opacity: 1, y: 0 }}
             transition={{ duration: 0.5, delay: 0.2 }}
-            className="flex flex-col sm:flex-row items-center justify-center gap-2 sm:gap-3 text-xs text-muted-foreground"
-          >
-            <div className="flex items-center gap-1.5">
-              <MessageCircle className="w-3.5 h-3.5" />
-              <span>Share what's on your mind</span>
-            </div>
-            <ArrowRight className="w-3 h-3 text-muted-foreground/40 hidden sm:block" />
-            <span className="text-muted-foreground/40 sm:hidden">↓</span>
-            <div className="flex items-center gap-1.5">
-              <Users className="w-3.5 h-3.5" />
-              <span>We connect you to the right person</span>
-            </div>
-          </motion.div>
-
-          {/* Templates */}
-          <motion.div
-            initial={{ opacity: 0, y: 16 }}
-            animate={{ opacity: 1, y: 0 }}
-            transition={{ duration: 0.5, delay: 0.3 }}
             className="flex flex-wrap justify-center gap-2"
           >
             {templates.map((template, index) => (
@@ -96,9 +119,11 @@ const UPSC = () => {
                 key={index}
                 initial={{ opacity: 0, scale: 0.95 }}
                 animate={{ opacity: 1, scale: 1 }}
-                transition={{ duration: 0.3, delay: 0.35 + index * 0.05 }}
+                transition={{ duration: 0.3, delay: 0.25 + index * 0.04 }}
                 onClick={() => handleTemplateClick(template)}
-                className="px-3 py-1.5 rounded-full border border-border/60 bg-background hover:bg-muted/50 hover:border-primary/30 transition-all duration-200 text-xs text-muted-foreground hover:text-foreground"
+                whileHover={{ scale: 1.03 }}
+                whileTap={{ scale: 0.97 }}
+                className="px-4 py-2 rounded-full bg-gray-100 hover:bg-gray-200 border border-gray-200 hover:border-gray-300 transition-all duration-200 text-sm text-gray-700 hover:text-gray-900 font-medium"
               >
                 {template}
               </motion.button>
@@ -109,46 +134,58 @@ const UPSC = () => {
           <motion.div
             initial={{ opacity: 0 }}
             animate={{ opacity: 1 }}
-            transition={{ duration: 0.4, delay: 0.5 }}
-            className="flex items-center gap-3 px-12"
+            transition={{ duration: 0.4, delay: 0.4 }}
+            className="flex items-center gap-4 px-8"
           >
-            <div className="flex-1 h-px bg-border/40" />
-            <span className="text-[10px] text-muted-foreground/40 uppercase tracking-wide">or</span>
-            <div className="flex-1 h-px bg-border/40" />
+            <div className="flex-1 h-px bg-gray-200" />
+            <span className="text-xs text-gray-400 uppercase tracking-wide">or</span>
+            <div className="flex-1 h-px bg-gray-200" />
           </motion.div>
 
-          {/* CTA */}
+          {/* CTA - Apple style with pulse */}
           <motion.div
-            initial={{ opacity: 0, y: 16 }}
+            initial={{ opacity: 0, y: 20 }}
             animate={{ opacity: 1, y: 0 }}
-            transition={{ duration: 0.5, delay: 0.55 }}
-            className="text-center"
+            transition={{ duration: 0.5, delay: 0.5 }}
+            className="text-center space-y-4"
           >
             <motion.button
               onClick={handleJustTalk}
               whileHover={{ scale: 1.02 }}
               whileTap={{ scale: 0.98 }}
-              className="inline-flex items-center gap-2 px-6 py-3 rounded-full bg-primary text-primary-foreground font-medium text-sm shadow-md hover:shadow-lg transition-all duration-200"
+              animate={{ 
+                boxShadow: [
+                  "0 0 0 0 rgba(0, 0, 0, 0.3)",
+                  "0 0 0 10px rgba(0, 0, 0, 0)",
+                  "0 0 0 0 rgba(0, 0, 0, 0)"
+                ]
+              }}
+              transition={{ 
+                boxShadow: { duration: 2, repeat: Infinity, ease: "easeOut" }
+              }}
+              className="inline-flex items-center gap-2.5 px-8 py-4 rounded-full bg-gray-900 text-white font-semibold text-base shadow-lg hover:bg-gray-800 transition-colors duration-200"
             >
               Just talk to me
-              <ArrowRight className="w-4 h-4" />
+              <ArrowRight className="w-5 h-5" />
             </motion.button>
-            <p className="mt-3 text-[11px] text-muted-foreground/50">
-              No login needed • Start with one sentence
+            <p className="text-sm text-gray-400">
+              No login required • Start with one sentence
             </p>
           </motion.div>
-
-          {/* Social proof */}
-          <motion.p
-            initial={{ opacity: 0 }}
-            animate={{ opacity: 1 }}
-            transition={{ duration: 0.5, delay: 0.7 }}
-            className="text-center text-[10px] text-muted-foreground/40"
-          >
-            Talked to 50+ UPSC aspirants this week
-          </motion.p>
         </div>
       </div>
+
+      {/* Footer tagline */}
+      <motion.footer
+        initial={{ opacity: 0 }}
+        animate={{ opacity: 1 }}
+        transition={{ duration: 0.5, delay: 0.7 }}
+        className="py-6 text-center"
+      >
+        <p className="text-xs text-gray-400">
+          ChekInn — where aspirants find their people
+        </p>
+      </motion.footer>
     </main>
   );
 };

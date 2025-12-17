@@ -54,9 +54,10 @@ const getSessionId = () => {
   return sessionId;
 };
 
-// Get source for UPSC-specific experience
+// Get source for cohort-specific experience
 const getSource = () => sessionStorage.getItem("chekinn_source") || "";
 const isUPSCSource = () => getSource() === "upsc";
+const isCATSource = () => getSource() === "cat";
 
 // UPSC-specific templates
 const UPSC_TEMPLATES = [
@@ -66,6 +67,16 @@ const UPSC_TEMPLATES = [
   "Need mentor guidance",
   "Prelims anxiety",
   "Interview prep help",
+];
+
+// CAT/MBA-specific templates
+const CAT_TEMPLATES = [
+  "CAT didn't go well",
+  "Gap year concerns",
+  "Which IIMs to target?",
+  "Need mock interview",
+  "Profile evaluation",
+  "Career track anxiety",
 ];
 
 // General templates
@@ -86,12 +97,15 @@ const Chat = () => {
   const [messages, setMessages] = useState<Message[]>([]);
   const [source] = useState(() => getSource());
   const isUPSC = source === "upsc";
+  const isCAT = source === "cat";
   
   const [localMessages, setLocalMessages] = useState<Message[]>(() => [{
     id: `local-${Date.now()}`,
     role: "assistant" as const,
     content: isUPSCSource() 
       ? "Hey! I know the UPSC journey can feel overwhelming. Tell me what you're struggling with — I'll connect you with someone who's been through it."
+      : isCATSource()
+      ? "Hey! CAT prep can be intense. Tell me what's on your mind — I'll connect you with someone who's been through it."
       : "Hey! A few quick questions and I'll find you the right person. What brings you here?",
     message_type: "text",
     metadata: {},
@@ -831,9 +845,9 @@ const Chat = () => {
                   {/* Template buttons after first AI message */}
                   {index === 0 && msg.role === "assistant" && activeMessages.length === 1 && (
                     <div className="mt-3 animate-fade-in">
-                      {/* Template buttons - different for UPSC */}
+                      {/* Template buttons - different for UPSC/CAT */}
                       <div className="flex flex-wrap gap-1.5 max-w-[300px]">
-                        {(isUPSC ? UPSC_TEMPLATES : GENERAL_TEMPLATES).map((template) => (
+                        {(isUPSC ? UPSC_TEMPLATES : isCAT ? CAT_TEMPLATES : GENERAL_TEMPLATES).map((template) => (
                           <button
                             key={template}
                             onClick={() => handleSend(template)}

@@ -46,9 +46,7 @@ serve(async (req) => {
       });
     }
 
-    console.log("send-temp-password request", {
-      email_domain: email.includes("@"),
-    });
+    console.log("send-temp-password request for:", email);
 
     const supabaseAdmin = createClient(supabaseUrl, supabaseServiceKey, {
       auth: { autoRefreshToken: false, persistSession: false },
@@ -84,6 +82,7 @@ serve(async (req) => {
     }
 
     const tempPassword = generateTempPassword();
+    console.log("Generated temp password for user:", user.id);
 
     const { error: updateError } = await supabaseAdmin.auth.admin.updateUserById(
       user.id,
@@ -98,7 +97,9 @@ serve(async (req) => {
       });
     }
 
-    const { error: emailError } = await resend.emails.send({
+    console.log("Password updated, sending email via Resend to:", email);
+
+    const emailResult = await resend.emails.send({
       from: "ChekInn <onboarding@resend.dev>",
       to: [email],
       subject: "Your temporary password",
@@ -114,13 +115,17 @@ serve(async (req) => {
       `,
     });
 
-    if (emailError) {
-      console.error("resend error", emailError);
-      return new Response(JSON.stringify({ error: "Failed to send email" }), {
+    console.log("Resend response:", JSON.stringify(emailResult));
+
+    if (emailResult.error) {
+      console.error("Resend error:", emailResult.error);
+      return new Response(JSON.stringify({ error: "Failed to send email: " + emailResult.error.message }), {
         status: 500,
         headers: { ...corsHeaders, "Content-Type": "application/json" },
       });
     }
+
+    console.log("Email sent successfully, id:", emailResult.data?.id);
 
     return new Response(
       JSON.stringify({

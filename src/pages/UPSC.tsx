@@ -4,14 +4,12 @@ import { useFunnelTracking } from "@/hooks/useFunnelTracking";
 import { motion } from "framer-motion";
 import { ArrowRight } from "lucide-react";
 
-// Relatable pain points UPSC aspirants face
+// Relatable pain points - reduced for mobile
 const painPoints = [
-  "Don't know where to start?",
-  "Confused about optional?",
-  "Stuck in answer writing?",
-  "Prelims anxiety?",
-  "Need a study buddy?",
-  "Want mentor guidance?",
+  "Where do I even start?",
+  "Stuck in answer writing",
+  "Need mentor guidance",
+  "Prelims giving anxiety",
 ];
 
 // Social proof marquee
@@ -108,27 +106,27 @@ const UPSC = () => {
             </p>
           </motion.div>
 
-          {/* Relatable pain points */}
+          {/* Relatable pain points - highlighted */}
           <motion.div
             initial={{ opacity: 0, y: 15 }}
             animate={{ opacity: 1, y: 0 }}
             transition={{ duration: 0.5, delay: 0.2 }}
-            className="space-y-3"
+            className="space-y-4"
           >
-            <p className="text-center text-xs text-muted-foreground/60 uppercase tracking-wider font-medium">
+            <p className="text-center text-xs text-muted-foreground/70 font-medium">
               Sound familiar?
             </p>
-            <div className="flex flex-wrap justify-center gap-2">
+            <div className="grid grid-cols-2 gap-2.5 max-w-sm mx-auto">
               {painPoints.map((point, index) => (
                 <motion.button
                   key={index}
-                  initial={{ opacity: 0, scale: 0.95 }}
-                  animate={{ opacity: 1, scale: 1 }}
-                  transition={{ duration: 0.25, delay: 0.25 + index * 0.04 }}
+                  initial={{ opacity: 0, y: 8 }}
+                  animate={{ opacity: 1, y: 0 }}
+                  transition={{ duration: 0.25, delay: 0.25 + index * 0.05 }}
                   onClick={() => handlePainPointClick(point)}
-                  whileHover={{ scale: 1.03 }}
+                  whileHover={{ scale: 1.02 }}
                   whileTap={{ scale: 0.97 }}
-                  className="px-3.5 py-2 rounded-full bg-muted/40 hover:bg-muted/70 border border-border/50 hover:border-border/80 transition-all duration-200 text-sm text-foreground/75 hover:text-foreground"
+                  className="px-4 py-3 rounded-xl bg-primary/10 hover:bg-primary/20 border border-primary/20 hover:border-primary/40 transition-all duration-200 text-sm font-medium text-foreground"
                 >
                   {point}
                 </motion.button>

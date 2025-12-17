@@ -1,7 +1,7 @@
-import { useEffect } from "react";
+import { useEffect, useCallback } from "react";
 import { useNavigate } from "react-router-dom";
 import { useFunnelTracking } from "@/hooks/useFunnelTracking";
-import { ArrowRight, Users, MessageCircle, Sparkles, Phone } from "lucide-react";
+import { ArrowRight, Users, MessageCircle, Sparkles } from "lucide-react";
 
 // Compact pain points
 const painPoints = [
@@ -23,85 +23,59 @@ const UPSC = () => {
   const { trackPageView, trackEvent } = useFunnelTracking();
   const navigate = useNavigate();
 
+  // Defer tracking to not block render
   useEffect(() => {
-    trackPageView();
+    requestIdleCallback ? requestIdleCallback(() => trackPageView()) : setTimeout(trackPageView, 0);
   }, [trackPageView]);
 
-  const handlePainPointClick = (painPoint: string) => {
-    trackEvent("cta_click", { variant: "UPSC", template: painPoint });
+  const handlePainPointClick = useCallback((painPoint: string) => {
     sessionStorage.setItem("chekinn_initial_message", painPoint);
     sessionStorage.setItem("chekinn_source", "upsc");
+    // Track async to not block navigation
+    trackEvent("cta_click", { variant: "UPSC", template: painPoint });
     navigate("/chat");
-  };
+  }, [navigate, trackEvent]);
 
-  const handleMainCTA = () => {
-    trackEvent("cta_click", { variant: "UPSC", template: "main_cta" });
+  const handleMainCTA = useCallback(() => {
     sessionStorage.setItem("chekinn_source", "upsc");
+    trackEvent("cta_click", { variant: "UPSC", template: "main_cta" });
     navigate("/chat");
-  };
-
-  const handleWhatsApp = () => {
-    window.open("https://wa.me/917600504810?text=Hi! I need help with UPSC preparation", "_blank");
-  };
+  }, [navigate, trackEvent]);
 
   return (
-    <main 
-      className="min-h-screen"
-      style={{ 
-        backgroundColor: 'hsl(50 20% 98%)',
-        color: 'hsl(0 0% 11%)'
-      }}
-    >
+    <main className="min-h-screen bg-[hsl(50_20%_98%)] text-[hsl(0_0%_11%)]">
       {/* Hero Section - One Fold */}
       <section className="min-h-[100svh] flex flex-col justify-center px-6 py-10">
         <div className="max-w-[520px] w-full mx-auto space-y-8">
           
-          {/* Small trust indicator */}
-          <div className="flex justify-center animate-fade-in">
-            <div 
-              className="inline-flex items-center gap-2 px-3 py-1.5 rounded-full text-xs"
-              style={{ 
-                backgroundColor: 'hsl(50 10% 93%)',
-                color: 'hsl(0 0% 45%)'
-              }}
-            >
+          {/* Small trust indicator - no animation delay */}
+          <div className="flex justify-center">
+            <div className="inline-flex items-center gap-2 px-3 py-1.5 rounded-full text-xs bg-[hsl(50_10%_93%)] text-[hsl(0_0%_45%)]">
               <span className="relative flex h-1.5 w-1.5">
-                <span className="animate-ping absolute inline-flex h-full w-full rounded-full opacity-75" style={{ backgroundColor: 'hsl(140 50% 45%)' }}></span>
-                <span className="relative inline-flex rounded-full h-1.5 w-1.5" style={{ backgroundColor: 'hsl(140 50% 40%)' }}></span>
+                <span className="animate-ping absolute inline-flex h-full w-full rounded-full opacity-75 bg-[hsl(140_50%_45%)]"></span>
+                <span className="relative inline-flex rounded-full h-1.5 w-1.5 bg-[hsl(140_50%_40%)]"></span>
               </span>
               <span>50+ aspirants connected</span>
             </div>
           </div>
 
-          {/* Headline */}
-          <div className="text-center space-y-3 animate-fade-in" style={{ animationDelay: '50ms' }}>
-            <h1 
-              className="text-3xl sm:text-4xl font-semibold leading-tight tracking-tight"
-              style={{ color: 'hsl(0 0% 11%)' }}
-            >
+          {/* Headline - no animation delay */}
+          <div className="text-center space-y-3">
+            <h1 className="text-3xl sm:text-4xl font-semibold leading-tight tracking-tight text-[hsl(0_0%_11%)]">
               UPSC is lonely.
               <br />
-              <span 
-                className="font-normal"
-                style={{ color: 'hsl(0 0% 45%)' }}
-              >
+              <span className="font-normal text-[hsl(0_0%_45%)]">
                 It doesn't have to be.
               </span>
             </h1>
-            <p 
-              className="text-base sm:text-lg"
-              style={{ color: 'hsl(0 0% 50%)' }}
-            >
+            <p className="text-base sm:text-lg text-[hsl(0_0%_50%)]">
               We'll connect you with someone who's been there.
             </p>
           </div>
 
-          {/* Pain points - compact inline pills */}
-          <div className="space-y-3 animate-fade-in" style={{ animationDelay: '100ms' }}>
-            <p 
-              className="text-center text-xs font-medium tracking-wide uppercase"
-              style={{ color: 'hsl(0 0% 55%)' }}
-            >
+          {/* Pain points - CSS hover instead of JS */}
+          <div className="space-y-3">
+            <p className="text-center text-xs font-medium tracking-wide uppercase text-[hsl(0_0%_55%)]">
               Sound familiar?
             </p>
             <div className="flex flex-wrap justify-center gap-2">
@@ -109,22 +83,10 @@ const UPSC = () => {
                 <button
                   key={index}
                   onClick={() => handlePainPointClick(point)}
-                  className="px-4 py-2 rounded-full text-sm font-medium transition-all duration-200 hover:scale-[1.03] active:scale-[0.97]"
-                  style={{ 
-                    backgroundColor: 'hsl(50 15% 94%)',
-                    border: '1px solid hsl(50 10% 86%)',
-                    color: 'hsl(0 0% 25%)'
-                  }}
-                  onMouseEnter={(e) => {
-                    e.currentTarget.style.backgroundColor = 'hsl(220 38% 20%)';
-                    e.currentTarget.style.borderColor = 'hsl(220 38% 20%)';
-                    e.currentTarget.style.color = 'hsl(0 0% 98%)';
-                  }}
-                  onMouseLeave={(e) => {
-                    e.currentTarget.style.backgroundColor = 'hsl(50 15% 94%)';
-                    e.currentTarget.style.borderColor = 'hsl(50 10% 86%)';
-                    e.currentTarget.style.color = 'hsl(0 0% 25%)';
-                  }}
+                  className="px-4 py-2 rounded-full text-sm font-medium transition-all duration-150 
+                    bg-[hsl(50_15%_94%)] border border-[hsl(50_10%_86%)] text-[hsl(0_0%_25%)]
+                    hover:bg-[hsl(220_38%_20%)] hover:border-[hsl(220_38%_20%)] hover:text-white
+                    active:scale-[0.97]"
                 >
                   {point}
                 </button>
@@ -132,30 +94,19 @@ const UPSC = () => {
             </div>
           </div>
 
-          {/* Main CTA */}
-          <div className="text-center space-y-3 animate-fade-in" style={{ animationDelay: '150ms' }}>
+          {/* Main CTA - CSS hover instead of JS */}
+          <div className="text-center space-y-3">
             <button
               onClick={handleMainCTA}
-              className="inline-flex items-center gap-2.5 px-7 py-3.5 rounded-full font-semibold text-[15px] transition-all duration-200 hover:scale-[1.02] active:scale-[0.98]"
-              style={{ 
-                backgroundColor: 'hsl(220 38% 20%)',
-                color: 'hsl(0 0% 98%)',
-                boxShadow: '0 4px 20px -4px hsl(220 38% 20% / 0.35)'
-              }}
-              onMouseEnter={(e) => {
-                e.currentTarget.style.boxShadow = '0 8px 30px -4px hsl(220 38% 20% / 0.5)';
-              }}
-              onMouseLeave={(e) => {
-                e.currentTarget.style.boxShadow = '0 4px 20px -4px hsl(220 38% 20% / 0.35)';
-              }}
+              className="inline-flex items-center gap-2.5 px-7 py-3.5 rounded-full font-semibold text-[15px] 
+                bg-[hsl(220_38%_20%)] text-white shadow-[0_4px_20px_-4px_hsl(220_38%_20%/0.35)]
+                transition-all duration-150 hover:shadow-[0_8px_30px_-4px_hsl(220_38%_20%/0.5)] 
+                hover:scale-[1.02] active:scale-[0.98]"
             >
               Talk to us
               <ArrowRight className="w-4 h-4" />
             </button>
-            <p 
-              className="text-xs"
-              style={{ color: 'hsl(0 0% 55%)' }}
-            >
+            <p className="text-xs text-[hsl(0_0%_55%)]">
               No signup needed
             </p>
           </div>
@@ -163,15 +114,9 @@ const UPSC = () => {
       </section>
 
       {/* How it Works Section */}
-      <section 
-        className="py-20 px-6"
-        style={{ backgroundColor: 'hsl(50 15% 96%)' }}
-      >
+      <section className="py-20 px-6 bg-[hsl(50_15%_96%)]">
         <div className="max-w-[640px] mx-auto">
-          <h2 
-            className="text-2xl sm:text-3xl font-semibold text-center mb-12"
-            style={{ color: 'hsl(0 0% 11%)' }}
-          >
+          <h2 className="text-2xl sm:text-3xl font-semibold text-center mb-12 text-[hsl(0_0%_11%)]">
             How it works
           </h2>
           
@@ -194,23 +139,14 @@ const UPSC = () => {
               }
             ].map((step, i) => (
               <div key={i} className="flex gap-4 items-start">
-                <div 
-                  className="flex-shrink-0 w-10 h-10 rounded-full flex items-center justify-center"
-                  style={{ backgroundColor: 'hsl(220 38% 20% / 0.1)' }}
-                >
-                  <step.icon className="w-5 h-5" style={{ color: 'hsl(220 38% 20%)' }} />
+                <div className="flex-shrink-0 w-10 h-10 rounded-full flex items-center justify-center bg-[hsl(220_38%_20%/0.1)]">
+                  <step.icon className="w-5 h-5 text-[hsl(220_38%_20%)]" />
                 </div>
                 <div>
-                  <h3 
-                    className="font-medium text-lg mb-1"
-                    style={{ color: 'hsl(0 0% 11%)' }}
-                  >
+                  <h3 className="font-medium text-lg mb-1 text-[hsl(0_0%_11%)]">
                     {step.title}
                   </h3>
-                  <p 
-                    className="text-base"
-                    style={{ color: 'hsl(0 0% 50%)' }}
-                  >
+                  <p className="text-base text-[hsl(0_0%_50%)]">
                     {step.desc}
                   </p>
                 </div>
@@ -223,16 +159,10 @@ const UPSC = () => {
       {/* Social Proof Section */}
       <section className="py-20 px-6">
         <div className="max-w-[640px] mx-auto">
-          <h2 
-            className="text-2xl sm:text-3xl font-semibold text-center mb-4"
-            style={{ color: 'hsl(0 0% 11%)' }}
-          >
+          <h2 className="text-2xl sm:text-3xl font-semibold text-center mb-4 text-[hsl(0_0%_11%)]">
             Who you'll meet
           </h2>
-          <p 
-            className="text-center mb-12"
-            style={{ color: 'hsl(0 0% 50%)' }}
-          >
+          <p className="text-center mb-12 text-[hsl(0_0%_50%)]">
             People who've walked the path you're on
           </p>
           
@@ -240,22 +170,12 @@ const UPSC = () => {
             {socialProof.map((item, i) => (
               <div 
                 key={i}
-                className="p-5 rounded-xl"
-                style={{ 
-                  backgroundColor: 'hsl(50 15% 95%)',
-                  border: '1px solid hsl(50 10% 88%)'
-                }}
+                className="p-5 rounded-xl bg-[hsl(50_15%_95%)] border border-[hsl(50_10%_88%)]"
               >
-                <h3 
-                  className="font-medium text-base mb-1"
-                  style={{ color: 'hsl(0 0% 15%)' }}
-                >
+                <h3 className="font-medium text-base mb-1 text-[hsl(0_0%_15%)]">
                   {item.name}
                 </h3>
-                <p 
-                  className="text-sm"
-                  style={{ color: 'hsl(0 0% 50%)' }}
-                >
+                <p className="text-sm text-[hsl(0_0%_50%)]">
                   {item.desc}
                 </p>
               </div>
@@ -265,31 +185,20 @@ const UPSC = () => {
       </section>
 
       {/* Final CTA Section */}
-      <section 
-        className="py-20 px-6"
-        style={{ backgroundColor: 'hsl(50 15% 96%)' }}
-      >
+      <section className="py-20 px-6 bg-[hsl(50_15%_96%)]">
         <div className="max-w-[480px] mx-auto text-center">
-          <h2 
-            className="text-2xl sm:text-3xl font-semibold mb-4"
-            style={{ color: 'hsl(0 0% 11%)' }}
-          >
+          <h2 className="text-2xl sm:text-3xl font-semibold mb-4 text-[hsl(0_0%_11%)]">
             Ready to talk?
           </h2>
-          <p 
-            className="mb-8"
-            style={{ color: 'hsl(0 0% 50%)' }}
-          >
+          <p className="mb-8 text-[hsl(0_0%_50%)]">
             Start a conversation. We'll take it from there.
           </p>
           <button
             onClick={handleMainCTA}
-            className="inline-flex items-center gap-2.5 px-8 py-4 rounded-full font-semibold text-base transition-all duration-200 hover:scale-[1.02] active:scale-[0.98]"
-            style={{ 
-              backgroundColor: 'hsl(220 38% 20%)',
-              color: 'hsl(0 0% 98%)',
-              boxShadow: '0 4px 20px -4px hsl(220 38% 20% / 0.35)'
-            }}
+            className="inline-flex items-center gap-2.5 px-8 py-4 rounded-full font-semibold text-base 
+              bg-[hsl(220_38%_20%)] text-white shadow-[0_4px_20px_-4px_hsl(220_38%_20%/0.35)]
+              transition-all duration-150 hover:shadow-[0_8px_30px_-4px_hsl(220_38%_20%/0.5)]
+              hover:scale-[1.02] active:scale-[0.98]"
           >
             Talk to us
             <ArrowRight className="w-4 h-4" />
@@ -299,14 +208,10 @@ const UPSC = () => {
 
       {/* Footer */}
       <footer className="py-8 text-center">
-        <p 
-          className="text-xs"
-          style={{ color: 'hsl(0 0% 60%)' }}
-        >
+        <p className="text-xs text-[hsl(0_0%_60%)]">
           ChekInn — where aspirants find their people
         </p>
       </footer>
-
     </main>
   );
 };

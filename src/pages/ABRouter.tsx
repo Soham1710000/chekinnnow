@@ -1,32 +1,16 @@
-import { useEffect, useState } from "react";
+import { useEffect } from "react";
 import Index from "./Index";
-import IndexB from "./IndexB";
 import { useFunnelTracking } from "@/hooks/useFunnelTracking";
 
 const ABRouter = () => {
-  const [variant, setVariant] = useState<"A" | "B" | null>(null);
   const { trackEvent } = useFunnelTracking();
 
   useEffect(() => {
-    const existingVariant = sessionStorage.getItem("ab_variant");
-    
-    if (existingVariant === "A" || existingVariant === "B") {
-      setVariant(existingVariant);
-      trackEvent("ab_variant_view", { variant: existingVariant, isNew: false });
-    } else {
-      // 50/50 split
-      const newVariant = Math.random() < 0.5 ? "A" : "B";
-      sessionStorage.setItem("ab_variant", newVariant);
-      setVariant(newVariant);
-      trackEvent("ab_variant_assigned", { variant: newVariant, isNew: true });
-    }
+    trackEvent("ab_variant_view", { variant: "A", isNew: false });
   }, []);
 
-  if (variant === null) {
-    return <div className="min-h-screen bg-white" />;
-  }
-
-  return variant === "A" ? <Index /> : <IndexB />;
+  // Only variant A now - B is killed
+  return <Index />;
 };
 
 export default ABRouter;

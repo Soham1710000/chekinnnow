@@ -153,10 +153,18 @@ Deno.serve(async (req) => {
       e.page_url?.includes("/upsc")
     );
     
-    // Main/Other events (not UPSC)
+    // CAT-specific events (variant = "CAT" in metadata OR page_url contains /cat)
+    const catEvents = events.filter(e => 
+      e.metadata?.variant === "CAT" || 
+      e.page_url?.includes("/cat")
+    );
+    
+    // Main/Other events (not UPSC or CAT)
     const mainEvents = events.filter(e => 
       e.metadata?.variant !== "UPSC" && 
-      !e.page_url?.includes("/upsc")
+      e.metadata?.variant !== "CAT" &&
+      !e.page_url?.includes("/upsc") &&
+      !e.page_url?.includes("/cat")
     );
 
     // General funnel stats
@@ -170,6 +178,7 @@ Deno.serve(async (req) => {
       waitlist_success: events.filter(e => e.event_type === "waitlist_success").length,
       unique_sessions: new Set(events.map(e => e.session_id)).size,
       upsc_cta_clicks: upscEvents.filter(e => e.event_type === "cta_click").length,
+      cat_cta_clicks: catEvents.filter(e => e.event_type === "cta_click").length,
       sources: events.reduce((acc, e) => {
         const source = e.source || 'direct';
         acc[source] = (acc[source] || 0) + 1;
@@ -197,6 +206,26 @@ Deno.serve(async (req) => {
       recentEvents: upscEvents.slice(0, 20),
     };
 
+    // CAT-specific detailed stats
+    const catStats = {
+      page_view: catEvents.filter(e => e.event_type === "page_view").length,
+      cta_click: catEvents.filter(e => e.event_type === "cta_click").length,
+      chat_page_loaded: catEvents.filter(e => e.event_type === "chat_page_loaded").length,
+      auth_start: catEvents.filter(e => e.event_type === "auth_start").length,
+      auth_complete: catEvents.filter(e => e.event_type === "auth_complete").length,
+      unique_sessions: new Set(catEvents.map(e => e.session_id)).size,
+      // CTA template breakdown
+      templates: catEvents
+        .filter(e => e.event_type === "cta_click" && e.metadata?.template)
+        .reduce((acc, e) => {
+          const template = e.metadata?.template || "main_cta";
+          acc[template] = (acc[template] || 0) + 1;
+          return acc;
+        }, {} as Record<string, number>),
+      // Recent CAT events
+      recentEvents: catEvents.slice(0, 20),
+    };
+
     // Main page stats for comparison
     const mainStats = {
       page_view: mainEvents.filter(e => e.event_type === "page_view").length,
@@ -216,6 +245,7 @@ Deno.serve(async (req) => {
         introductions: introsWithUsers,
         funnelStats,
         upscStats,
+        catStats,
         mainStats,
         recentEvents,
         leads: leads || [],

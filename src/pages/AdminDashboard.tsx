@@ -96,6 +96,17 @@ interface UPSCStats {
   recentEvents: FunnelEvent[];
 }
 
+interface CATStats {
+  page_view: number;
+  cta_click: number;
+  chat_page_loaded: number;
+  auth_start: number;
+  auth_complete: number;
+  unique_sessions: number;
+  templates: Record<string, number>;
+  recentEvents: FunnelEvent[];
+}
+
 interface MainStats {
   page_view: number;
   cta_click: number;
@@ -139,8 +150,9 @@ const AdminDashboard = () => {
   const [introductions, setIntroductions] = useState<Introduction[]>([]);
   const [funnelStats, setFunnelStats] = useState<FunnelStats | null>(null);
   const [upscStats, setUpscStats] = useState<UPSCStats | null>(null);
+  const [catStats, setCatStats] = useState<CATStats | null>(null);
   const [mainStats, setMainStats] = useState<MainStats | null>(null);
-  const [sourceFilter, setSourceFilter] = useState<"all" | "upsc" | "main">("all");
+  const [sourceFilter, setSourceFilter] = useState<"all" | "upsc" | "cat" | "main">("all");
   const [recentEvents, setRecentEvents] = useState<FunnelEvent[]>([]);
   const [leads, setLeads] = useState<Lead[]>([]);
   const [funnelTimeRange, setFunnelTimeRange] = useState(24);
@@ -197,6 +209,7 @@ const AdminDashboard = () => {
       setIntroductions(data.introductions || []);
       setFunnelStats(data.funnelStats || null);
       setUpscStats(data.upscStats || null);
+      setCatStats(data.catStats || null);
       setMainStats(data.mainStats || null);
       setRecentEvents(data.recentEvents || []);
       setLeads(data.leads || []);
@@ -242,6 +255,7 @@ const AdminDashboard = () => {
       setIntroductions(data.introductions || []);
       setFunnelStats(data.funnelStats || null);
       setUpscStats(data.upscStats || null);
+      setCatStats(data.catStats || null);
       setMainStats(data.mainStats || null);
       setRecentEvents(data.recentEvents || []);
       setLeads(data.leads || []);
@@ -701,6 +715,14 @@ const AdminDashboard = () => {
                   </span>
                 )}
               </TabsTrigger>
+              <TabsTrigger value="cat" className="text-blue-600 data-[state=active]:bg-blue-500/10">
+                CAT
+                {catStats && catStats.page_view > 0 && (
+                  <span className="ml-1.5 bg-blue-500 text-white text-xs px-1.5 py-0.5 rounded-full">
+                    {catStats.page_view}
+                  </span>
+                )}
+              </TabsTrigger>
               <TabsTrigger value="leads">
                 Leads
                 {leads.filter(l => !l.converted_at).length > 0 && (
@@ -750,17 +772,18 @@ const AdminDashboard = () => {
               <div className="flex items-center gap-2">
                 <span className="text-sm text-muted-foreground">Source:</span>
                 <div className="flex gap-1">
-                  {(["all", "upsc", "main"] as const).map((src) => (
+                  {(["all", "upsc", "cat", "main"] as const).map((src) => (
                     <Button
                       key={src}
                       variant={sourceFilter === src ? "default" : "outline"}
                       size="sm"
                       onClick={() => setSourceFilter(src)}
                       className={
-                        src === "upsc" && sourceFilter === "upsc" ? "bg-orange-600 hover:bg-orange-700" : ""
+                        src === "upsc" && sourceFilter === "upsc" ? "bg-orange-600 hover:bg-orange-700" : 
+                        src === "cat" && sourceFilter === "cat" ? "bg-blue-600 hover:bg-blue-700" : ""
                       }
                     >
-                      {src === "all" ? "All" : src === "upsc" ? "UPSC" : "Main"}
+                      {src === "all" ? "All" : src === "upsc" ? "UPSC" : src === "cat" ? "CAT" : "Main"}
                     </Button>
                   ))}
                 </div>
@@ -1147,6 +1170,210 @@ const AdminDashboard = () => {
                 </div>
               ) : (
                 <p className="text-muted-foreground text-center py-8">No UPSC analytics data yet. Data will appear once users visit the /upsc page.</p>
+              )}
+            </div>
+          </TabsContent>
+
+          {/* CAT Analytics Tab */}
+          <TabsContent value="cat" className="space-y-4">
+            <div className="bg-gradient-to-r from-blue-500/10 to-cyan-500/10 border border-blue-500/20 rounded-xl p-4">
+              <h2 className="text-lg font-semibold mb-4 flex items-center gap-2">
+                <TrendingUp className="w-5 h-5 text-blue-500" />
+                CAT/MBA Landing Page Analytics
+              </h2>
+              
+              {catStats ? (
+                <div className="space-y-6">
+                  {/* Key Metrics */}
+                  <div className="grid grid-cols-2 md:grid-cols-3 lg:grid-cols-6 gap-4">
+                    <div className="bg-card border border-border rounded-xl p-4">
+                      <div className="flex items-center gap-2 mb-2">
+                        <Eye className="w-4 h-4 text-blue-500" />
+                        <span className="text-sm text-muted-foreground">Page Views</span>
+                      </div>
+                      <p className="text-2xl font-bold text-blue-600">{catStats.page_view}</p>
+                    </div>
+                    <div className="bg-card border border-border rounded-xl p-4">
+                      <div className="flex items-center gap-2 mb-2">
+                        <MousePointer className="w-4 h-4 text-green-500" />
+                        <span className="text-sm text-muted-foreground">CTA Clicks</span>
+                      </div>
+                      <p className="text-2xl font-bold text-blue-600">{catStats.cta_click}</p>
+                    </div>
+                    <div className="bg-card border border-border rounded-xl p-4">
+                      <div className="flex items-center gap-2 mb-2">
+                        <MessageCircle className="w-4 h-4 text-cyan-500" />
+                        <span className="text-sm text-muted-foreground">Chat Loaded</span>
+                      </div>
+                      <p className="text-2xl font-bold text-blue-600">{catStats.chat_page_loaded}</p>
+                    </div>
+                    <div className="bg-card border border-border rounded-xl p-4">
+                      <div className="flex items-center gap-2 mb-2">
+                        <UserPlus className="w-4 h-4 text-yellow-500" />
+                        <span className="text-sm text-muted-foreground">Auth Started</span>
+                      </div>
+                      <p className="text-2xl font-bold text-blue-600">{catStats.auth_start}</p>
+                    </div>
+                    <div className="bg-card border border-border rounded-xl p-4">
+                      <div className="flex items-center gap-2 mb-2">
+                        <CheckCircle className="w-4 h-4 text-emerald-500" />
+                        <span className="text-sm text-muted-foreground">Auth Complete</span>
+                      </div>
+                      <p className="text-2xl font-bold text-blue-600">{catStats.auth_complete}</p>
+                    </div>
+                    <div className="bg-card border border-border rounded-xl p-4">
+                      <div className="flex items-center gap-2 mb-2">
+                        <Users className="w-4 h-4 text-gray-500" />
+                        <span className="text-sm text-muted-foreground">Sessions</span>
+                      </div>
+                      <p className="text-2xl font-bold text-blue-600">{catStats.unique_sessions}</p>
+                    </div>
+                  </div>
+
+                  {/* CAT Conversion Rates */}
+                  {catStats.page_view > 0 && (
+                    <div className="bg-card border border-border rounded-xl p-4">
+                      <h3 className="font-semibold mb-3">CAT Conversion Funnel</h3>
+                      <div className="grid grid-cols-2 md:grid-cols-5 gap-4">
+                        <div>
+                          <p className="text-sm text-muted-foreground">View → Click</p>
+                          <p className="text-xl font-bold text-blue-600">
+                            {((catStats.cta_click / catStats.page_view) * 100).toFixed(1)}%
+                          </p>
+                        </div>
+                        <div>
+                          <p className="text-sm text-muted-foreground">Click → Chat</p>
+                          <p className="text-xl font-bold text-blue-600">
+                            {catStats.cta_click > 0 
+                              ? ((catStats.chat_page_loaded / catStats.cta_click) * 100).toFixed(1) 
+                              : 0}%
+                          </p>
+                        </div>
+                        <div>
+                          <p className="text-sm text-muted-foreground">Chat → Auth Start</p>
+                          <p className="text-xl font-bold text-blue-600">
+                            {catStats.chat_page_loaded > 0 
+                              ? ((catStats.auth_start / catStats.chat_page_loaded) * 100).toFixed(1) 
+                              : 0}%
+                          </p>
+                        </div>
+                        <div>
+                          <p className="text-sm text-muted-foreground">Auth → Complete</p>
+                          <p className="text-xl font-bold text-blue-600">
+                            {catStats.auth_start > 0 
+                              ? ((catStats.auth_complete / catStats.auth_start) * 100).toFixed(1) 
+                              : 0}%
+                          </p>
+                        </div>
+                        <div>
+                          <p className="text-sm text-muted-foreground">Overall</p>
+                          <p className="text-xl font-bold text-blue-500">
+                            {((catStats.auth_complete / catStats.page_view) * 100).toFixed(1)}%
+                          </p>
+                        </div>
+                      </div>
+                    </div>
+                  )}
+
+                  {/* CTA Template Breakdown */}
+                  {Object.keys(catStats.templates || {}).length > 0 && (
+                    <div className="bg-card border border-border rounded-xl p-4">
+                      <h3 className="font-semibold mb-3">Pain Point Clicks</h3>
+                      <div className="space-y-2">
+                        {Object.entries(catStats.templates)
+                          .sort(([, a], [, b]) => b - a)
+                          .map(([template, count]) => (
+                            <div key={template} className="flex justify-between items-center">
+                              <span className="text-sm">{template}</span>
+                              <span className="font-medium text-blue-600">{count}</span>
+                            </div>
+                          ))}
+                      </div>
+                    </div>
+                  )}
+
+                  {/* CAT vs Main Comparison */}
+                  {mainStats && (
+                    <div className="bg-card border border-border rounded-xl p-4">
+                      <h3 className="font-semibold mb-3">CAT vs Main Page Comparison</h3>
+                      <div className="grid grid-cols-2 md:grid-cols-4 gap-4">
+                        <div>
+                          <p className="text-sm text-muted-foreground">Page Views</p>
+                          <div className="flex items-baseline gap-2">
+                            <span className="text-lg font-bold text-blue-600">{catStats.page_view}</span>
+                            <span className="text-muted-foreground">vs</span>
+                            <span className="text-lg font-bold">{mainStats.page_view}</span>
+                          </div>
+                        </div>
+                        <div>
+                          <p className="text-sm text-muted-foreground">Click Rate</p>
+                          <div className="flex items-baseline gap-2">
+                            <span className="text-lg font-bold text-blue-600">
+                              {catStats.page_view > 0 ? ((catStats.cta_click / catStats.page_view) * 100).toFixed(1) : 0}%
+                            </span>
+                            <span className="text-muted-foreground">vs</span>
+                            <span className="text-lg font-bold">
+                              {mainStats.page_view > 0 ? ((mainStats.cta_click / mainStats.page_view) * 100).toFixed(1) : 0}%
+                            </span>
+                          </div>
+                        </div>
+                        <div>
+                          <p className="text-sm text-muted-foreground">Signups</p>
+                          <div className="flex items-baseline gap-2">
+                            <span className="text-lg font-bold text-blue-600">{catStats.auth_complete}</span>
+                            <span className="text-muted-foreground">vs</span>
+                            <span className="text-lg font-bold">{mainStats.auth_complete}</span>
+                          </div>
+                        </div>
+                        <div>
+                          <p className="text-sm text-muted-foreground">Overall Conversion</p>
+                          <div className="flex items-baseline gap-2">
+                            <span className="text-lg font-bold text-blue-600">
+                              {catStats.page_view > 0 ? ((catStats.auth_complete / catStats.page_view) * 100).toFixed(1) : 0}%
+                            </span>
+                            <span className="text-muted-foreground">vs</span>
+                            <span className="text-lg font-bold">
+                              {mainStats.page_view > 0 ? ((mainStats.auth_complete / mainStats.page_view) * 100).toFixed(1) : 0}%
+                            </span>
+                          </div>
+                        </div>
+                      </div>
+                    </div>
+                  )}
+
+                  {/* Recent CAT Events */}
+                  {(catStats.recentEvents?.length ?? 0) > 0 && (
+                    <div className="bg-card border border-border rounded-xl p-4">
+                      <h3 className="font-semibold mb-3">Recent CAT Activity</h3>
+                      <div className="space-y-2 max-h-[300px] overflow-y-auto">
+                        {catStats.recentEvents.map((event) => (
+                          <div key={event.id} className="flex items-center justify-between py-2 border-b border-border last:border-0">
+                            <div className="flex items-center gap-3">
+                              <span className={`px-2 py-1 rounded text-xs font-medium ${
+                                event.event_type === 'page_view' ? 'bg-blue-100 text-blue-700' :
+                                event.event_type === 'cta_click' ? 'bg-green-100 text-green-700' :
+                                event.event_type === 'chat_page_loaded' ? 'bg-cyan-100 text-cyan-700' :
+                                event.event_type === 'auth_start' ? 'bg-yellow-100 text-yellow-700' :
+                                event.event_type === 'auth_complete' ? 'bg-emerald-100 text-emerald-700' :
+                                'bg-gray-100 text-gray-700'
+                              }`}>
+                                {event.event_type}
+                              </span>
+                              <span className="text-sm text-muted-foreground truncate max-w-[150px]">
+                                {(event as any).metadata?.template || event.page_url}
+                              </span>
+                            </div>
+                            <span className="text-xs text-muted-foreground">
+                              {new Date(event.created_at).toLocaleTimeString()}
+                            </span>
+                          </div>
+                        ))}
+                      </div>
+                    </div>
+                  )}
+                </div>
+              ) : (
+                <p className="text-muted-foreground text-center py-8">No CAT analytics data yet. Data will appear once users visit the /cat page.</p>
               )}
             </div>
           </TabsContent>

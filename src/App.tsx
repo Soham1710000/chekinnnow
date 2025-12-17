@@ -12,6 +12,7 @@ import ABRouter from "./pages/ABRouter";
 // Lazy load other routes
 const Index = lazy(() => import("./pages/Index"));
 const IndexB = lazy(() => import("./pages/IndexB"));
+const CAT = lazy(() => import("./pages/CAT"));
 const UPSC = lazy(() => import("./pages/UPSC"));
 const Waitlist = lazy(() => import("./pages/Waitlist"));
 const Admin = lazy(() => import("./pages/Admin"));
@@ -48,6 +49,7 @@ const App = () => (
               <Route path="/a" element={<Index />} />
               <Route path="/b" element={<IndexB />} />
               <Route path="/upsc" element={<UPSC />} />
+              <Route path="/cat" element={<CAT />} />
               <Route path="/waitlist" element={<Waitlist />} />
               <Route path="/admin" element={<Admin />} />
               <Route path="/chat" element={<Chat />} />

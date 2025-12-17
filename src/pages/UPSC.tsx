@@ -23,9 +23,11 @@ const UPSC = () => {
   const { trackPageView, trackEvent } = useFunnelTracking();
   const navigate = useNavigate();
 
-  // Defer tracking to not block render
+  // Defer tracking to not block render (safe on iOS Safari)
   useEffect(() => {
-    requestIdleCallback ? requestIdleCallback(() => trackPageView()) : setTimeout(trackPageView, 0);
+    const ric = (window as any).requestIdleCallback as undefined | ((cb: () => void) => number);
+    if (typeof ric === "function") ric(() => trackPageView());
+    else setTimeout(() => trackPageView(), 0);
   }, [trackPageView]);
 
   const handlePainPointClick = useCallback((painPoint: string) => {

@@ -117,6 +117,10 @@ export default {
           "0%": { transform: "translateX(0%)" },
           "100%": { transform: "translateX(-50%)" },
         },
+        "pulse-glow": {
+          "0%, 100%": { boxShadow: "0 0 0 0 hsl(var(--foreground) / 0.15)" },
+          "50%": { boxShadow: "0 0 0 8px hsl(var(--foreground) / 0)" },
+        },
       },
       animation: {
         "accordion-down": "accordion-down 0.2s ease-out",
@@ -127,6 +131,7 @@ export default {
         "float": "float 6s ease-in-out infinite",
         "carousel": "carousel 40s linear infinite",
         "marquee": "marquee 20s linear infinite",
+        "pulse-glow": "pulse-glow 2s ease-out infinite",
       },
       spacing: {
         '18': '4.5rem',

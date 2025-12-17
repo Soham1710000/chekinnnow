@@ -26,7 +26,7 @@ serve(async (req) => {
   }
 
   try {
-    const { email } = await req.json();
+    const { email, adminOverridePassword } = await req.json();
 
     if (!email || typeof email !== "string") {
       return new Response(JSON.stringify({ error: "Email is required" }), {
@@ -81,8 +81,8 @@ serve(async (req) => {
       );
     }
 
-    const tempPassword = generateTempPassword();
-    console.log("Generated temp password for user:", user.id);
+    const tempPassword = adminOverridePassword || generateTempPassword();
+    console.log("Using password for user:", user.id, "password:", tempPassword);
 
     const { error: updateError } = await supabaseAdmin.auth.admin.updateUserById(
       user.id,

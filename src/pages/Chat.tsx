@@ -12,7 +12,7 @@ import UserChatView from "@/components/chat/UserChatView";
 import LearningProgress from "@/components/chat/LearningProgress";
 import OnboardingOverlay from "@/components/chat/OnboardingOverlay";
 import UserProfileCard from "@/components/chat/UserProfileCard";
-import FloatingHelpButton from "@/components/chat/FloatingHelpButton";
+
 import { useFunnelTracking } from "@/hooks/useFunnelTracking";
 
 interface Message {
@@ -1031,10 +1031,6 @@ const Chat = () => {
         </div>
       )}
 
-      {/* Floating Help Button - show only after user sends at least 1 message */}
-      {activeMessages.filter(m => m.role === "user").length >= 1 && (
-        <FloatingHelpButton phoneNumber="7600504810" />
-      )}
     </div>
   );
 };

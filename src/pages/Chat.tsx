@@ -1031,8 +1031,10 @@ const Chat = () => {
         </div>
       )}
 
-      {/* Floating Help Button */}
-      <FloatingHelpButton phoneNumber="7600504810" />
+      {/* Floating Help Button - show only after user sends at least 1 message */}
+      {activeMessages.filter(m => m.role === "user").length >= 1 && (
+        <FloatingHelpButton phoneNumber="7600504810" />
+      )}
     </div>
   );
 };

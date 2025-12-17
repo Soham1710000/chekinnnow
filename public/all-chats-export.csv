@@ -1,0 +1,83 @@
+type,session_or_user_id,email,name,role,timestamp,content
+lead,session_1765800229451_invmbj0s7,anonymous,anonymous,user,2025-12-15 12:14:14,Hey
+lead,session_1765802299334_q00di4t5f,anonymous,anonymous,user,2025-12-15 12:38:34,Find me a mentor
+lead,session_1765802994173_5ywbhtwcc,anonymous,anonymous,user,2025-12-15 12:50:01,Find me a mentor
+lead,session_1765804506943_n0cq6bdbs,anonymous,anonymous,user,2025-12-15 13:15:26,Break into tech
+lead,session_1765809211284_nmi48muby,anonymous,anonymous,user,2025-12-15 14:51:05,Explore a career
+lead,session_1765820875167_6pdjaqind,anonymous,anonymous,user,2025-12-15 17:48:26,Explore a career
+lead,session_1765821035568_hsgv4oa8o,anonymous,anonymous,user,2025-12-15 17:50:57,Questions about UPSC
+lead,session_1765821145325_3hx18a3g5,anonymous,anonymous,user,2025-12-15 17:52:33,Questions about UPSC
+lead,session_1765821305271_p73o2x6c5,anonymous,anonymous,user,2025-12-15 17:55:30,Explore a career
+lead,session_1765822096193_x8l3tffoe,anonymous,anonymous,user,2025-12-15 18:08:38,Questions about UPSC
+lead,session_1765822256760_nxo9mw35g,anonymous,anonymous,user,2025-12-15 18:11:16,Questions about UPSC
+lead,session_1765822261018_latetf06o,anonymous,anonymous,user,2025-12-15 18:11:27,A fellow traveler
+lead,session_1765822604339_u0ozjf233,anonymous,anonymous,user,2025-12-15 18:16:52,Questions about UPSC
+lead,session_1765825164457_zedodf63h,anonymous,anonymous,user,2025-12-15 18:59:46,Get some advice
+lead,session_1765825781683_95mi992yh,anonymous,anonymous,user,2025-12-15 19:09:59,Questions about UPSC
+lead,session_1765825834353_dd2tun2j9,anonymous,anonymous,user,2025-12-15 19:11:07,Explore a career
+lead,session_1765826355524_qnvrairxs,anonymous,anonymous,user,2025-12-15 19:19:47,Questions about UPSC
+lead,session_1765826767892_x1q7qw65j,anonymous,anonymous,user,2025-12-15 19:26:28,Find co-builder for project
+lead,session_1765827443032_m0jl3wbdq,anonymous,anonymous,user,2025-12-15 19:37:42,Questions about UPSC
+lead,session_1765828161286_uch6cnh0m,anonymous,anonymous,user,2025-12-15 19:49:38,Break into tech
+lead,session_1765828319932_e3f5uyzg4,anonymous,anonymous,user,2025-12-15 19:52:33,Questions about UPSC
+lead,session_1765829009984_d3coul6mt,anonymous,anonymous,user,2025-12-15 20:03:44,Questions about UPSC
+lead,session_1765830603765_xngvv7xh3,anonymous,anonymous,user,2025-12-15 20:30:27,Questions about UPSC
+lead,session_1765833866403_yz8gkzpx0,anonymous,anonymous,user,2025-12-15 21:24:36,Questions about UPSC
+lead,session_1765835038483_bzqmug6rc,anonymous,anonymous,user,2025-12-15 21:44:09,Questions about UPSC
+lead,session_1765835814979_ns6whiczo,anonymous,anonymous,user,2025-12-15 21:57:31,Questions about UPSC
+lead,session_1765837656831_3hddc9p51,anonymous,anonymous,user,2025-12-15 22:27:44,Questions about UPSC
+lead,session_1765837751185_lz8aap7e3,anonymous,anonymous,user,2025-12-15 22:29:28,Questions about UPSC
+authenticated,067e511b-4dbb-447c-a741-742358aefb7f,vedikabehera@gmail.com,Vedika,user,2025-12-16 06:00:45,"Sure connect me with someone coming for MBA advice"
+authenticated,067e511b-4dbb-447c-a741-742358aefb7f,vedikabehera@gmail.com,Vedika,user,2025-12-16 06:01:20,"I'm an MBA grad. Is there someone that requires guidance?"
+authenticated,067e511b-4dbb-447c-a741-742358aefb7f,vedikabehera@gmail.com,Vedika,user,2025-12-16 06:01:33,"Could be anything from pre post or during MBA"
+authenticated,067e511b-4dbb-447c-a741-742358aefb7f,vedikabehera@gmail.com,Vedika,user,2025-12-16 06:02:04,"Maybe gaining a little overall business exposure instead of just sticking to the theories in class?"
+authenticated,067e511b-4dbb-447c-a741-742358aefb7f,vedikabehera@gmail.com,Vedika,user,2025-12-16 06:02:16,"I've already signed up"
+authenticated,067e511b-4dbb-447c-a741-742358aefb7f,vedikabehera@gmail.com,Vedika,user,2025-12-16 06:02:29,"Didn't get you"
+authenticated,067e511b-4dbb-447c-a741-742358aefb7f,vedikabehera@gmail.com,Vedika,user,2025-12-16 06:02:38,"Sure"
+authenticated,067e511b-4dbb-447c-a741-742358aefb7f,vedikabehera@gmail.com,Vedika,user,2025-12-16 06:02:46,"Okay thanks"
+authenticated,067e511b-4dbb-447c-a741-742358aefb7f,vedikabehera@gmail.com,Vedika,user,2025-12-16 06:27:30,"Hey I'm from IIM Trichy not Kozhikode"
+authenticated,067e511b-4dbb-447c-a741-742358aefb7f,vedikabehera@gmail.com,Vedika,user,2025-12-16 06:27:41,"Sure"
+authenticated,067e511b-4dbb-447c-a741-742358aefb7f,vedikabehera@gmail.com,Vedika,user,2025-12-16 16:45:07,"It's good"
+authenticated,135cb526-6351-46aa-9929-db1122557be4,sid.arora082001@gmail.com,unknown,user,2025-12-15 21:47:25,"Questions about UPSC"
+authenticated,135cb526-6351-46aa-9929-db1122557be4,sid.arora082001@gmail.com,unknown,user,2025-12-15 21:47:48,"Umm we just spoke. You have my conversation right or do i have to start over again?"
+authenticated,135cb526-6351-46aa-9929-db1122557be4,sid.arora082001@gmail.com,unknown,user,2025-12-15 21:48:19,"What did i ask for just few mins back"
+authenticated,135cb526-6351-46aa-9929-db1122557be4,sid.arora082001@gmail.com,unknown,user,2025-12-15 21:49:41,"No worries. Its fine. Anyways I was asking for some kind of mentorship. More like general. Someone who have cleared the exam and in service. Would be great to get some guidance gotta filter out the noise in the market and social media. Would prefer if he/she had taken Economics as their optional. Lots of alignment honestly helps here"
+authenticated,135cb526-6351-46aa-9929-db1122557be4,sid.arora082001@gmail.com,unknown,user,2025-12-15 21:50:36,"I mean idk what to say. I would say yes! I'm into my Mains prep. Already kinda covered everything. Just doing a re-run making my notes and all etc etc with pyq wherever."
+authenticated,135cb526-6351-46aa-9929-db1122557be4,sid.arora082001@gmail.com,unknown,user,2025-12-15 21:51:14,"I mean in general like a Mentor to say what's the timeline I should focus on. What mistakes I should avoid. Just to know the structure"
+authenticated,135cb526-6351-46aa-9929-db1122557be4,sid.arora082001@gmail.com,unknown,user,2025-12-15 21:51:52,"Yeah I mean not daily schedule. More like in general. Targets etc"
+authenticated,135cb526-6351-46aa-9929-db1122557be4,sid.arora082001@gmail.com,unknown,user,2025-12-15 21:52:19,"OK how do i check back?"
+authenticated,135cb526-6351-46aa-9929-db1122557be4,sid.arora082001@gmail.com,unknown,user,2025-12-15 21:52:39,"How much time tho? Will you ping me on my email?"
+authenticated,135cb526-6351-46aa-9929-db1122557be4,sid.arora082001@gmail.com,unknown,user,2025-12-15 21:52:57,"Alright so I'll just log in then?"
+authenticated,16e0b0c7-0a37-4e27-86ad-086d080ea280,cookhussey@gmail.com,Hussey,user,2025-12-15 22:31:22,"Sign in"
+authenticated,16e0b0c7-0a37-4e27-86ad-086d080ea280,cookhussey@gmail.com,Hussey,user,2025-12-15 22:31:36,"Sign iny account"
+authenticated,16e0b0c7-0a37-4e27-86ad-086d080ea280,cookhussey@gmail.com,Hussey,user,2025-12-15 22:31:47,"Upsc mains"
+authenticated,16e0b0c7-0a37-4e27-86ad-086d080ea280,cookhussey@gmail.com,Hussey,user,2025-12-15 22:32:44,"Hi"
+authenticated,16e0b0c7-0a37-4e27-86ad-086d080ea280,cookhussey@gmail.com,Hussey,user,2025-12-15 22:32:53,"Connect"
+authenticated,16e0b0c7-0a37-4e27-86ad-086d080ea280,cookhussey@gmail.com,Hussey,user,2025-12-15 22:33:04,"Just connect"
+authenticated,16e0b0c7-0a37-4e27-86ad-086d080ea280,cookhussey@gmail.com,Hussey,user,2025-12-15 22:33:17,"Who already qualified"
+authenticated,16e0b0c7-0a37-4e27-86ad-086d080ea280,cookhussey@gmail.com,Hussey,user,2025-12-15 22:33:33,"Just connect"
+authenticated,16e0b0c7-0a37-4e27-86ad-086d080ea280,cookhussey@gmail.com,Hussey,user,2025-12-15 22:33:47,"Just connect"
+authenticated,16e0b0c7-0a37-4e27-86ad-086d080ea280,cookhussey@gmail.com,Hussey,user,2025-12-15 22:34:06,"Ok"
+authenticated,16e0b0c7-0a37-4e27-86ad-086d080ea280,cookhussey@gmail.com,Hussey,user,2025-12-15 22:34:23,"Ok"
+authenticated,16e0b0c7-0a37-4e27-86ad-086d080ea280,cookhussey@gmail.com,Hussey,user,2025-12-15 22:34:33,"Ok"
+authenticated,16e0b0c7-0a37-4e27-86ad-086d080ea280,cookhussey@gmail.com,Hussey,user,2025-12-15 22:34:43,"Ok"
+authenticated,16e0b0c7-0a37-4e27-86ad-086d080ea280,cookhussey@gmail.com,Hussey,user,2025-12-15 22:34:57,"Ok"
+authenticated,16e0b0c7-0a37-4e27-86ad-086d080ea280,cookhussey@gmail.com,Hussey,user,2025-12-15 22:35:03,"Ok"
+authenticated,16e0b0c7-0a37-4e27-86ad-086d080ea280,cookhussey@gmail.com,Hussey,user,2025-12-15 22:35:16,"Ok"
+authenticated,16e0b0c7-0a37-4e27-86ad-086d080ea280,cookhussey@gmail.com,Hussey,user,2025-12-15 22:35:23,"K"
+authenticated,16e0b0c7-0a37-4e27-86ad-086d080ea280,cookhussey@gmail.com,Hussey,user,2025-12-15 22:35:31,"Ok"
+authenticated,16e0b0c7-0a37-4e27-86ad-086d080ea280,cookhussey@gmail.com,Hussey,user,2025-12-15 22:35:38,"Ok"
+authenticated,16e0b0c7-0a37-4e27-86ad-086d080ea280,cookhussey@gmail.com,Hussey,user,2025-12-15 22:35:51,"Ok"
+authenticated,16e0b0c7-0a37-4e27-86ad-086d080ea280,cookhussey@gmail.com,Hussey,user,2025-12-15 22:35:59,"K"
+authenticated,16e0b0c7-0a37-4e27-86ad-086d080ea280,cookhussey@gmail.com,Hussey,user,2025-12-15 22:36:07,"Ok"
+authenticated,16e0b0c7-0a37-4e27-86ad-086d080ea280,cookhussey@gmail.com,Hussey,user,2025-12-15 22:36:17,"K"
+authenticated,16e0b0c7-0a37-4e27-86ad-086d080ea280,cookhussey@gmail.com,Hussey,user,2025-12-15 22:36:25,"K"
+authenticated,16e0b0c7-0a37-4e27-86ad-086d080ea280,cookhussey@gmail.com,Hussey,user,2025-12-15 22:36:37,"K"
+authenticated,16e0b0c7-0a37-4e27-86ad-086d080ea280,cookhussey@gmail.com,Hussey,user,2025-12-15 22:36:44,"Ok"
+authenticated,16e0b0c7-0a37-4e27-86ad-086d080ea280,cookhussey@gmail.com,Hussey,user,2025-12-15 22:37:05,"K"
+authenticated,16e0b0c7-0a37-4e27-86ad-086d080ea280,cookhussey@gmail.com,Hussey,user,2025-12-15 22:37:26,"Ok"
+authenticated,16e0b0c7-0a37-4e27-86ad-086d080ea280,cookhussey@gmail.com,Hussey,user,2025-12-16 09:36:22,"Ok"
+authenticated,16e0b0c7-0a37-4e27-86ad-086d080ea280,cookhussey@gmail.com,Hussey,user,2025-12-17 18:06:25,"Ok"
+authenticated,16e0b0c7-0a37-4e27-86ad-086d080ea280,cookhussey@gmail.com,Hussey,user,2025-12-17 18:06:36,"Ok"
+authenticated,16e0b0c7-0a37-4e27-86ad-086d080ea280,cookhussey@gmail.com,Hussey,user,2025-12-17 18:06:50,"Ok"
+authenticated,16e0b0c7-0a37-4e27-86ad-086d080ea280,cookhussey@gmail.com,Hussey,user,2025-12-17 18:07:00,"Ok"

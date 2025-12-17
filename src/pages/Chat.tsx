@@ -78,6 +78,7 @@ const Chat = () => {
   const [showOnboarding, setShowOnboarding] = useState(false);
   const messagesEndRef = useRef<HTMLDivElement>(null);
   const hasTrackedPageLoad = useRef(false);
+  const hasSentInitialMessage = useRef(false);
   const debriefedIntros = useRef<Set<string>>(new Set()); // Track intros we've already debriefed
 
   const handleOnboardingComplete = () => {
@@ -92,6 +93,21 @@ const Chat = () => {
       trackEvent("chat_page_loaded" as any, { isAuthenticated: !!user });
     }
   }, [authLoading, user, trackEvent]);
+
+  // Auto-send initial message from variant C landing page
+  useEffect(() => {
+    if (!hasSentInitialMessage.current && !authLoading) {
+      const initialMessage = sessionStorage.getItem("chekinn_initial_message");
+      if (initialMessage) {
+        hasSentInitialMessage.current = true;
+        sessionStorage.removeItem("chekinn_initial_message");
+        // Small delay to ensure chat is ready
+        setTimeout(() => {
+          handleSend(initialMessage);
+        }, 500);
+      }
+    }
+  }, [authLoading]);
 
   // Get the active messages list based on auth state
   const activeMessages = user ? messages : localMessages;
@@ -122,15 +138,16 @@ const Chat = () => {
     prevActiveChat.current = activeChat;
   }, [activeChat, user, introductions]);
 
-  // Check if we should show login nudge for anonymous users
+  // Check if we should show login nudge for anonymous users (not for variant C)
+  const variant = sessionStorage.getItem("ab_variant");
   useEffect(() => {
-    if (!user) {
+    if (!user && variant !== "C") {
       const userMsgCount = localMessages.filter(m => m.role === "user").length;
       if (userMsgCount >= LOGIN_NUDGE_THRESHOLD) {
         setShowLoginNudge(true);
       }
     }
-  }, [localMessages, user]);
+  }, [localMessages, user, variant]);
 
   // Save anonymous chat to leads table
   const saveLeadToDb = async (msgs: Message[]) => {
@@ -384,6 +401,7 @@ const Chat = () => {
           messages: conversationHistory,
           userId: user?.id || null,
           isAuthenticated: !!user,
+          variant: sessionStorage.getItem("ab_variant") || undefined,
         }),
       });
 

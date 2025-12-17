@@ -401,7 +401,7 @@ const Chat = () => {
           messages: conversationHistory,
           userId: user?.id || null,
           isAuthenticated: !!user,
-          variant: sessionStorage.getItem("ab_variant") || undefined,
+          source: sessionStorage.getItem("chekinn_source") || undefined,
         }),
       });
 

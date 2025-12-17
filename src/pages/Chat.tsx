@@ -11,6 +11,8 @@ import IntroCard from "@/components/chat/IntroCard";
 import UserChatView from "@/components/chat/UserChatView";
 import LearningProgress from "@/components/chat/LearningProgress";
 import OnboardingOverlay from "@/components/chat/OnboardingOverlay";
+import UserProfileCard from "@/components/chat/UserProfileCard";
+import FloatingHelpButton from "@/components/chat/FloatingHelpButton";
 import { useFunnelTracking } from "@/hooks/useFunnelTracking";
 
 interface Message {
@@ -102,6 +104,7 @@ const Chat = () => {
   const [activeChat, setActiveChat] = useState<Introduction | null>(null);
   const [view, setView] = useState<"chekinn" | "connections">("chekinn");
   const [learningComplete, setLearningComplete] = useState(false);
+  const [userProfile, setUserProfile] = useState<any>(null);
   const [showLoginNudge, setShowLoginNudge] = useState(false);
   const [sessionId] = useState(() => getSessionId());
   const [showOnboarding, setShowOnboarding] = useState(false);
@@ -219,12 +222,13 @@ const Chat = () => {
     if (!user) return;
     const { data } = await supabase
       .from("profiles")
-      .select("learning_complete")
+      .select("learning_complete, full_name, role, industry, looking_for, skills, interests, ai_insights")
       .eq("id", user.id)
       .maybeSingle();
     
     if (data?.learning_complete) {
       setLearningComplete(true);
+      setUserProfile(data);
     }
   };
 
@@ -778,11 +782,15 @@ const Chat = () => {
 
       {view === "chekinn" || !user ? (
         <>
-          {/* Learning Progress */}
-          <LearningProgress 
-            messageCount={activeMessages.filter(m => m.role === "user").length}
-            learningComplete={learningComplete}
-          />
+          {/* Learning Progress or Profile Card */}
+          {learningComplete && userProfile ? (
+            <UserProfileCard profile={userProfile} />
+          ) : (
+            <LearningProgress 
+              messageCount={activeMessages.filter(m => m.role === "user").length}
+              learningComplete={learningComplete}
+            />
+          )}
           
           {/* Messages */}
           <div className="flex-1 overflow-y-auto p-4 space-y-4">
@@ -1022,6 +1030,9 @@ const Chat = () => {
           ) : null}
         </div>
       )}
+
+      {/* Floating Help Button */}
+      <FloatingHelpButton phoneNumber="7600504810" />
     </div>
   );
 };

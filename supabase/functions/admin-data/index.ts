@@ -147,11 +147,19 @@ Deno.serve(async (req) => {
     // Calculate funnel stats
     const events = funnelEvents || [];
     
-    // Count UPSC-specific CTA clicks (from metadata.variant = "UPSC")
-    const upscCtaClicks = events.filter(e => 
-      e.event_type === "cta_click" && e.metadata?.variant === "UPSC"
-    ).length;
+    // UPSC-specific events (variant = "UPSC" in metadata OR page_url contains /upsc)
+    const upscEvents = events.filter(e => 
+      e.metadata?.variant === "UPSC" || 
+      e.page_url?.includes("/upsc")
+    );
+    
+    // Main/Other events (not UPSC)
+    const mainEvents = events.filter(e => 
+      e.metadata?.variant !== "UPSC" && 
+      !e.page_url?.includes("/upsc")
+    );
 
+    // General funnel stats
     const funnelStats = {
       page_view: events.filter(e => e.event_type === "page_view").length,
       cta_click: events.filter(e => e.event_type === "cta_click").length,
@@ -161,12 +169,42 @@ Deno.serve(async (req) => {
       auth_complete: events.filter(e => e.event_type === "auth_complete").length,
       waitlist_success: events.filter(e => e.event_type === "waitlist_success").length,
       unique_sessions: new Set(events.map(e => e.session_id)).size,
-      upsc_cta_clicks: upscCtaClicks,
+      upsc_cta_clicks: upscEvents.filter(e => e.event_type === "cta_click").length,
       sources: events.reduce((acc, e) => {
         const source = e.source || 'direct';
         acc[source] = (acc[source] || 0) + 1;
         return acc;
       }, {} as Record<string, number>),
+    };
+
+    // UPSC-specific detailed stats
+    const upscStats = {
+      page_view: upscEvents.filter(e => e.event_type === "page_view").length,
+      cta_click: upscEvents.filter(e => e.event_type === "cta_click").length,
+      chat_page_loaded: upscEvents.filter(e => e.event_type === "chat_page_loaded").length,
+      auth_start: upscEvents.filter(e => e.event_type === "auth_start").length,
+      auth_complete: upscEvents.filter(e => e.event_type === "auth_complete").length,
+      unique_sessions: new Set(upscEvents.map(e => e.session_id)).size,
+      // CTA template breakdown
+      templates: upscEvents
+        .filter(e => e.event_type === "cta_click" && e.metadata?.template)
+        .reduce((acc, e) => {
+          const template = e.metadata?.template || "main_cta";
+          acc[template] = (acc[template] || 0) + 1;
+          return acc;
+        }, {} as Record<string, number>),
+      // Recent UPSC events
+      recentEvents: upscEvents.slice(0, 20),
+    };
+
+    // Main page stats for comparison
+    const mainStats = {
+      page_view: mainEvents.filter(e => e.event_type === "page_view").length,
+      cta_click: mainEvents.filter(e => e.event_type === "cta_click").length,
+      chat_page_loaded: mainEvents.filter(e => e.event_type === "chat_page_loaded").length,
+      auth_start: mainEvents.filter(e => e.event_type === "auth_start").length,
+      auth_complete: mainEvents.filter(e => e.event_type === "auth_complete").length,
+      unique_sessions: new Set(mainEvents.map(e => e.session_id)).size,
     };
 
     // Recent events for detailed view
@@ -177,6 +215,8 @@ Deno.serve(async (req) => {
         profiles: enrichedProfiles, 
         introductions: introsWithUsers,
         funnelStats,
+        upscStats,
+        mainStats,
         recentEvents,
         leads: leads || [],
       }),

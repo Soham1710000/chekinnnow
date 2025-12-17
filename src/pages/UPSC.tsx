@@ -3,26 +3,13 @@ import { useNavigate } from "react-router-dom";
 import { useFunnelTracking } from "@/hooks/useFunnelTracking";
 import { ArrowRight } from "lucide-react";
 
-// Relatable pain points - reduced for mobile
+// Relatable pain points for UPSC aspirants
 const painPoints = [
   "Where do I even start?",
-  "Stuck in answer writing",
-  "Need mentor guidance",
+  "Stuck with answer writing",
+  "How to pick my optional?",
   "Prelims giving anxiety",
 ];
-
-// Social proof marquee items
-const logoItems = (
-  <>
-    <span className="text-[11px] font-semibold text-muted-foreground/80 tracking-tight whitespace-nowrap">IAS Officers</span>
-    <span className="text-[11px] font-semibold text-muted-foreground/80 tracking-tight whitespace-nowrap">LBSNAA Alumni</span>
-    <span className="text-[11px] font-bold text-foreground/70 tracking-tight whitespace-nowrap">IIT Delhi</span>
-    <span className="text-[11px] font-semibold text-muted-foreground/80 tracking-tight whitespace-nowrap">Delhi University</span>
-    <span className="text-[11px] font-semibold text-muted-foreground/80 tracking-tight whitespace-nowrap">JNU</span>
-    <span className="text-[11px] font-bold text-foreground/70 tracking-tight whitespace-nowrap">SRCC</span>
-    <span className="text-[11px] font-semibold text-muted-foreground/80 tracking-tight whitespace-nowrap">Top 50 Rankers</span>
-  </>
-);
 
 const UPSC = () => {
   const { trackPageView, trackEvent } = useFunnelTracking();
@@ -46,87 +33,152 @@ const UPSC = () => {
   };
 
   return (
-    <main className="min-h-[100svh] bg-background flex flex-col">
-      {/* Scrolling social proof - no animation delay */}
-      <div className="w-full py-2.5 bg-muted/30 border-b border-border/40 overflow-hidden">
-        <div className="relative flex overflow-hidden">
-          <div className="flex shrink-0 animate-marquee items-center gap-6 px-4">
-            <span className="text-[10px] text-muted-foreground/60 uppercase tracking-widest font-medium whitespace-nowrap">Members from</span>
-            <span className="text-muted-foreground/20">•</span>
-            {logoItems}
-          </div>
-          <div className="flex shrink-0 animate-marquee items-center gap-6 px-4">
-            <span className="text-[10px] text-muted-foreground/60 uppercase tracking-widest font-medium whitespace-nowrap">Members from</span>
-            <span className="text-muted-foreground/20">•</span>
-            {logoItems}
-          </div>
-        </div>
-      </div>
-
-      {/* Main content */}
-      <div className="flex-1 flex items-center justify-center px-5 py-10 sm:py-16">
-        <div className="max-w-lg w-full space-y-10">
+    <main 
+      className="min-h-[100svh] flex flex-col"
+      style={{ 
+        backgroundColor: 'hsl(50 20% 98%)',
+        color: 'hsl(0 0% 11%)'
+      }}
+    >
+      {/* Main content - essay style centered layout */}
+      <div className="flex-1 flex flex-col justify-center px-6 py-16 sm:py-24">
+        <div className="max-w-[640px] w-full mx-auto space-y-16">
           
-          {/* Live badge */}
+          {/* Small trust indicator */}
           <div className="flex justify-center">
-            <div className="inline-flex items-center gap-2 px-3 py-1.5 rounded-full bg-muted/50 border border-border/50">
-              <span className="relative flex h-1.5 w-1.5">
-                <span className="animate-ping absolute inline-flex h-full w-full rounded-full bg-green-400 opacity-75"></span>
-                <span className="relative inline-flex rounded-full h-1.5 w-1.5 bg-green-500"></span>
+            <div 
+              className="inline-flex items-center gap-2.5 px-4 py-2 rounded-full text-sm"
+              style={{ 
+                backgroundColor: 'hsl(50 10% 93%)',
+                color: 'hsl(0 0% 40%)'
+              }}
+            >
+              <span className="relative flex h-2 w-2">
+                <span className="animate-ping absolute inline-flex h-full w-full rounded-full opacity-75" style={{ backgroundColor: 'hsl(140 50% 45%)' }}></span>
+                <span className="relative inline-flex rounded-full h-2 w-2" style={{ backgroundColor: 'hsl(140 50% 40%)' }}></span>
               </span>
-              <span className="text-[11px] text-muted-foreground">50+ aspirants connected</span>
+              <span>50+ aspirants connected this week</span>
             </div>
           </div>
 
-          {/* Empathetic headline */}
-          <div className="text-center space-y-4">
-            <h1 className="text-2xl sm:text-3xl md:text-4xl font-semibold text-foreground leading-tight tracking-tight">
+          {/* Headline - essay style typography */}
+          <div className="text-center space-y-6">
+            <h1 
+              className="text-[clamp(2rem,5vw,3rem)] font-semibold leading-[1.2] tracking-tight"
+              style={{ color: 'hsl(0 0% 11%)' }}
+            >
               UPSC is lonely.
               <br />
-              <span className="text-muted-foreground font-normal">It doesn't have to be.</span>
+              <span 
+                className="font-normal"
+                style={{ color: 'hsl(0 0% 40%)' }}
+              >
+                It doesn't have to be.
+              </span>
             </h1>
-            <p className="text-sm sm:text-base text-muted-foreground/80 max-w-sm mx-auto">
-              Tell us what you're struggling with. We'll connect you with someone who's been there.
+            <p 
+              className="text-lg sm:text-xl leading-relaxed max-w-md mx-auto"
+              style={{ color: 'hsl(0 0% 45%)' }}
+            >
+              Tell us what you're going through. We'll connect you with someone who's been there.
             </p>
           </div>
 
-          {/* Relatable pain points */}
-          <div className="space-y-4">
-            <p className="text-center text-xs text-muted-foreground/70 font-medium">
+          {/* Subtle divider */}
+          <div className="flex justify-center">
+            <div 
+              className="w-12 h-px"
+              style={{ backgroundColor: 'hsl(50 10% 80%)' }}
+            />
+          </div>
+
+          {/* Pain points - soft card style */}
+          <div className="space-y-5">
+            <p 
+              className="text-center text-sm font-medium tracking-wide uppercase"
+              style={{ color: 'hsl(0 0% 55%)' }}
+            >
               Sound familiar?
             </p>
-            <div className="grid grid-cols-2 gap-2.5 max-w-sm mx-auto">
+            <div className="grid grid-cols-1 sm:grid-cols-2 gap-3 max-w-md mx-auto">
               {painPoints.map((point, index) => (
                 <button
                   key={index}
                   onClick={() => handlePainPointClick(point)}
-                  className="px-4 py-3 rounded-xl bg-primary/10 hover:bg-primary/20 border border-primary/20 hover:border-primary/40 transition-all duration-150 text-sm font-medium text-foreground active:scale-[0.97]"
+                  className="px-5 py-4 rounded-xl text-left transition-all duration-200 active:scale-[0.98]"
+                  style={{ 
+                    backgroundColor: 'hsl(50 15% 95%)',
+                    border: '1px solid hsl(50 10% 88%)',
+                    color: 'hsl(0 0% 20%)'
+                  }}
+                  onMouseEnter={(e) => {
+                    e.currentTarget.style.backgroundColor = 'hsl(50 15% 92%)';
+                    e.currentTarget.style.borderColor = 'hsl(220 38% 20%)';
+                  }}
+                  onMouseLeave={(e) => {
+                    e.currentTarget.style.backgroundColor = 'hsl(50 15% 95%)';
+                    e.currentTarget.style.borderColor = 'hsl(50 10% 88%)';
+                  }}
                 >
-                  {point}
+                  <span className="text-[15px] font-medium">{point}</span>
                 </button>
               ))}
             </div>
           </div>
 
-          {/* Main CTA */}
+          {/* Main CTA - solid dark, rounded, soft shadow */}
           <div className="text-center space-y-4 pt-4">
             <button
               onClick={handleMainCTA}
-              className="inline-flex items-center gap-2.5 px-8 py-3.5 rounded-full bg-foreground text-background font-semibold text-base shadow-lg hover:shadow-xl transition-all duration-150 active:scale-[0.98] animate-pulse-glow"
+              className="inline-flex items-center gap-3 px-8 py-4 rounded-full font-semibold text-base transition-all duration-200 active:scale-[0.98]"
+              style={{ 
+                backgroundColor: 'hsl(220 38% 20%)',
+                color: 'hsl(0 0% 98%)',
+                boxShadow: '0 4px 20px -4px hsl(220 38% 20% / 0.35)'
+              }}
+              onMouseEnter={(e) => {
+                e.currentTarget.style.boxShadow = '0 8px 30px -4px hsl(220 38% 20% / 0.45)';
+                e.currentTarget.style.transform = 'translateY(-1px)';
+              }}
+              onMouseLeave={(e) => {
+                e.currentTarget.style.boxShadow = '0 4px 20px -4px hsl(220 38% 20% / 0.35)';
+                e.currentTarget.style.transform = 'translateY(0)';
+              }}
             >
               Talk to us
               <ArrowRight className="w-4 h-4" />
             </button>
-            <p className="text-xs text-muted-foreground/50">
-              No signup needed
+            <p 
+              className="text-sm"
+              style={{ color: 'hsl(0 0% 55%)' }}
+            >
+              No signup needed • Takes 2 minutes
+            </p>
+          </div>
+
+          {/* Social proof - subtle, understated */}
+          <div 
+            className="pt-8 border-t text-center"
+            style={{ borderColor: 'hsl(50 10% 88%)' }}
+          >
+            <p 
+              className="text-sm leading-relaxed"
+              style={{ color: 'hsl(0 0% 50%)' }}
+            >
+              Members include IAS Officers, LBSNAA Alumni,
+              <br className="hidden sm:block" />
+              {" "}and aspirants from IIT Delhi, JNU, DU & SRCC
             </p>
           </div>
         </div>
       </div>
 
-      {/* Footer */}
-      <footer className="py-6 text-center">
-        <p className="text-[11px] text-muted-foreground/35">
+      {/* Footer - minimal */}
+      <footer className="py-8 text-center">
+        <p 
+          className="text-xs"
+          style={{ color: 'hsl(0 0% 60%)' }}
+        >
           ChekInn — where aspirants find their people
         </p>
       </footer>

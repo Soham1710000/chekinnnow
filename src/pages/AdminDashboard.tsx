@@ -85,6 +85,26 @@ interface FunnelStats {
   upsc_cta_clicks: number;
 }
 
+interface UPSCStats {
+  page_view: number;
+  cta_click: number;
+  chat_page_loaded: number;
+  auth_start: number;
+  auth_complete: number;
+  unique_sessions: number;
+  templates: Record<string, number>;
+  recentEvents: FunnelEvent[];
+}
+
+interface MainStats {
+  page_view: number;
+  cta_click: number;
+  chat_page_loaded: number;
+  auth_start: number;
+  auth_complete: number;
+  unique_sessions: number;
+}
+
 interface FunnelEvent {
   id: string;
   event_type: string;
@@ -118,6 +138,8 @@ const AdminDashboard = () => {
   const [profiles, setProfiles] = useState<Profile[]>([]);
   const [introductions, setIntroductions] = useState<Introduction[]>([]);
   const [funnelStats, setFunnelStats] = useState<FunnelStats | null>(null);
+  const [upscStats, setUpscStats] = useState<UPSCStats | null>(null);
+  const [mainStats, setMainStats] = useState<MainStats | null>(null);
   const [sourceFilter, setSourceFilter] = useState<"all" | "upsc" | "main">("all");
   const [recentEvents, setRecentEvents] = useState<FunnelEvent[]>([]);
   const [leads, setLeads] = useState<Lead[]>([]);
@@ -174,6 +196,8 @@ const AdminDashboard = () => {
       setProfiles(data.profiles || []);
       setIntroductions(data.introductions || []);
       setFunnelStats(data.funnelStats || null);
+      setUpscStats(data.upscStats || null);
+      setMainStats(data.mainStats || null);
       setRecentEvents(data.recentEvents || []);
       setLeads(data.leads || []);
       setLoading(false);
@@ -217,6 +241,8 @@ const AdminDashboard = () => {
       setProfiles(data.profiles || []);
       setIntroductions(data.introductions || []);
       setFunnelStats(data.funnelStats || null);
+      setUpscStats(data.upscStats || null);
+      setMainStats(data.mainStats || null);
       setRecentEvents(data.recentEvents || []);
       setLeads(data.leads || []);
     } catch (error) {
@@ -667,6 +693,14 @@ const AdminDashboard = () => {
           <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-4">
             <TabsList>
               <TabsTrigger value="funnel">Funnel</TabsTrigger>
+              <TabsTrigger value="upsc" className="text-orange-600 data-[state=active]:bg-orange-500/10">
+                UPSC
+                {upscStats && upscStats.page_view > 0 && (
+                  <span className="ml-1.5 bg-orange-500 text-white text-xs px-1.5 py-0.5 rounded-full">
+                    {upscStats.page_view}
+                  </span>
+                )}
+              </TabsTrigger>
               <TabsTrigger value="leads">
                 Leads
                 {leads.filter(l => !l.converted_at).length > 0 && (
@@ -910,6 +944,210 @@ const AdminDashboard = () => {
                   ))
                 )}
               </div>
+            </div>
+          </TabsContent>
+
+          {/* UPSC Analytics Tab */}
+          <TabsContent value="upsc" className="space-y-4">
+            <div className="bg-gradient-to-r from-orange-500/10 to-amber-500/10 border border-orange-500/20 rounded-xl p-4">
+              <h2 className="text-lg font-semibold mb-4 flex items-center gap-2">
+                <TrendingUp className="w-5 h-5 text-orange-500" />
+                UPSC Landing Page Analytics
+              </h2>
+              
+              {upscStats ? (
+                <div className="space-y-6">
+                  {/* Key Metrics */}
+                  <div className="grid grid-cols-2 md:grid-cols-3 lg:grid-cols-6 gap-4">
+                    <div className="bg-card border border-border rounded-xl p-4">
+                      <div className="flex items-center gap-2 mb-2">
+                        <Eye className="w-4 h-4 text-blue-500" />
+                        <span className="text-sm text-muted-foreground">Page Views</span>
+                      </div>
+                      <p className="text-2xl font-bold text-orange-600">{upscStats.page_view}</p>
+                    </div>
+                    <div className="bg-card border border-border rounded-xl p-4">
+                      <div className="flex items-center gap-2 mb-2">
+                        <MousePointer className="w-4 h-4 text-green-500" />
+                        <span className="text-sm text-muted-foreground">CTA Clicks</span>
+                      </div>
+                      <p className="text-2xl font-bold text-orange-600">{upscStats.cta_click}</p>
+                    </div>
+                    <div className="bg-card border border-border rounded-xl p-4">
+                      <div className="flex items-center gap-2 mb-2">
+                        <MessageCircle className="w-4 h-4 text-cyan-500" />
+                        <span className="text-sm text-muted-foreground">Chat Loaded</span>
+                      </div>
+                      <p className="text-2xl font-bold text-orange-600">{upscStats.chat_page_loaded}</p>
+                    </div>
+                    <div className="bg-card border border-border rounded-xl p-4">
+                      <div className="flex items-center gap-2 mb-2">
+                        <UserPlus className="w-4 h-4 text-yellow-500" />
+                        <span className="text-sm text-muted-foreground">Auth Started</span>
+                      </div>
+                      <p className="text-2xl font-bold text-orange-600">{upscStats.auth_start}</p>
+                    </div>
+                    <div className="bg-card border border-border rounded-xl p-4">
+                      <div className="flex items-center gap-2 mb-2">
+                        <CheckCircle className="w-4 h-4 text-emerald-500" />
+                        <span className="text-sm text-muted-foreground">Auth Complete</span>
+                      </div>
+                      <p className="text-2xl font-bold text-orange-600">{upscStats.auth_complete}</p>
+                    </div>
+                    <div className="bg-card border border-border rounded-xl p-4">
+                      <div className="flex items-center gap-2 mb-2">
+                        <Users className="w-4 h-4 text-gray-500" />
+                        <span className="text-sm text-muted-foreground">Sessions</span>
+                      </div>
+                      <p className="text-2xl font-bold text-orange-600">{upscStats.unique_sessions}</p>
+                    </div>
+                  </div>
+
+                  {/* UPSC Conversion Rates */}
+                  {upscStats.page_view > 0 && (
+                    <div className="bg-card border border-border rounded-xl p-4">
+                      <h3 className="font-semibold mb-3">UPSC Conversion Funnel</h3>
+                      <div className="grid grid-cols-2 md:grid-cols-5 gap-4">
+                        <div>
+                          <p className="text-sm text-muted-foreground">View → Click</p>
+                          <p className="text-xl font-bold text-orange-600">
+                            {((upscStats.cta_click / upscStats.page_view) * 100).toFixed(1)}%
+                          </p>
+                        </div>
+                        <div>
+                          <p className="text-sm text-muted-foreground">Click → Chat</p>
+                          <p className="text-xl font-bold text-orange-600">
+                            {upscStats.cta_click > 0 
+                              ? ((upscStats.chat_page_loaded / upscStats.cta_click) * 100).toFixed(1) 
+                              : 0}%
+                          </p>
+                        </div>
+                        <div>
+                          <p className="text-sm text-muted-foreground">Chat → Auth Start</p>
+                          <p className="text-xl font-bold text-orange-600">
+                            {upscStats.chat_page_loaded > 0 
+                              ? ((upscStats.auth_start / upscStats.chat_page_loaded) * 100).toFixed(1) 
+                              : 0}%
+                          </p>
+                        </div>
+                        <div>
+                          <p className="text-sm text-muted-foreground">Auth → Complete</p>
+                          <p className="text-xl font-bold text-orange-600">
+                            {upscStats.auth_start > 0 
+                              ? ((upscStats.auth_complete / upscStats.auth_start) * 100).toFixed(1) 
+                              : 0}%
+                          </p>
+                        </div>
+                        <div>
+                          <p className="text-sm text-muted-foreground">Overall</p>
+                          <p className="text-xl font-bold text-orange-500">
+                            {((upscStats.auth_complete / upscStats.page_view) * 100).toFixed(1)}%
+                          </p>
+                        </div>
+                      </div>
+                    </div>
+                  )}
+
+                  {/* CTA Template Breakdown */}
+                  {Object.keys(upscStats.templates || {}).length > 0 && (
+                    <div className="bg-card border border-border rounded-xl p-4">
+                      <h3 className="font-semibold mb-3">Pain Point Clicks</h3>
+                      <div className="space-y-2">
+                        {Object.entries(upscStats.templates)
+                          .sort(([, a], [, b]) => b - a)
+                          .map(([template, count]) => (
+                            <div key={template} className="flex justify-between items-center">
+                              <span className="text-sm">{template}</span>
+                              <span className="font-medium text-orange-600">{count}</span>
+                            </div>
+                          ))}
+                      </div>
+                    </div>
+                  )}
+
+                  {/* UPSC vs Main Comparison */}
+                  {mainStats && (
+                    <div className="bg-card border border-border rounded-xl p-4">
+                      <h3 className="font-semibold mb-3">UPSC vs Main Page Comparison</h3>
+                      <div className="grid grid-cols-2 md:grid-cols-4 gap-4">
+                        <div>
+                          <p className="text-sm text-muted-foreground">Page Views</p>
+                          <div className="flex items-baseline gap-2">
+                            <span className="text-lg font-bold text-orange-600">{upscStats.page_view}</span>
+                            <span className="text-muted-foreground">vs</span>
+                            <span className="text-lg font-bold">{mainStats.page_view}</span>
+                          </div>
+                        </div>
+                        <div>
+                          <p className="text-sm text-muted-foreground">Click Rate</p>
+                          <div className="flex items-baseline gap-2">
+                            <span className="text-lg font-bold text-orange-600">
+                              {upscStats.page_view > 0 ? ((upscStats.cta_click / upscStats.page_view) * 100).toFixed(1) : 0}%
+                            </span>
+                            <span className="text-muted-foreground">vs</span>
+                            <span className="text-lg font-bold">
+                              {mainStats.page_view > 0 ? ((mainStats.cta_click / mainStats.page_view) * 100).toFixed(1) : 0}%
+                            </span>
+                          </div>
+                        </div>
+                        <div>
+                          <p className="text-sm text-muted-foreground">Signups</p>
+                          <div className="flex items-baseline gap-2">
+                            <span className="text-lg font-bold text-orange-600">{upscStats.auth_complete}</span>
+                            <span className="text-muted-foreground">vs</span>
+                            <span className="text-lg font-bold">{mainStats.auth_complete}</span>
+                          </div>
+                        </div>
+                        <div>
+                          <p className="text-sm text-muted-foreground">Overall Conversion</p>
+                          <div className="flex items-baseline gap-2">
+                            <span className="text-lg font-bold text-orange-600">
+                              {upscStats.page_view > 0 ? ((upscStats.auth_complete / upscStats.page_view) * 100).toFixed(1) : 0}%
+                            </span>
+                            <span className="text-muted-foreground">vs</span>
+                            <span className="text-lg font-bold">
+                              {mainStats.page_view > 0 ? ((mainStats.auth_complete / mainStats.page_view) * 100).toFixed(1) : 0}%
+                            </span>
+                          </div>
+                        </div>
+                      </div>
+                    </div>
+                  )}
+
+                  {/* Recent UPSC Events */}
+                  {(upscStats.recentEvents?.length ?? 0) > 0 && (
+                    <div className="bg-card border border-border rounded-xl p-4">
+                      <h3 className="font-semibold mb-3">Recent UPSC Activity</h3>
+                      <div className="space-y-2 max-h-[300px] overflow-y-auto">
+                        {upscStats.recentEvents.map((event) => (
+                          <div key={event.id} className="flex items-center justify-between py-2 border-b border-border last:border-0">
+                            <div className="flex items-center gap-3">
+                              <span className={`px-2 py-1 rounded text-xs font-medium ${
+                                event.event_type === 'page_view' ? 'bg-blue-100 text-blue-700' :
+                                event.event_type === 'cta_click' ? 'bg-green-100 text-green-700' :
+                                event.event_type === 'chat_page_loaded' ? 'bg-cyan-100 text-cyan-700' :
+                                event.event_type === 'auth_start' ? 'bg-yellow-100 text-yellow-700' :
+                                event.event_type === 'auth_complete' ? 'bg-emerald-100 text-emerald-700' :
+                                'bg-gray-100 text-gray-700'
+                              }`}>
+                                {event.event_type}
+                              </span>
+                              <span className="text-sm text-muted-foreground truncate max-w-[150px]">
+                                {(event as any).metadata?.template || event.page_url}
+                              </span>
+                            </div>
+                            <span className="text-xs text-muted-foreground">
+                              {new Date(event.created_at).toLocaleTimeString()}
+                            </span>
+                          </div>
+                        ))}
+                      </div>
+                    </div>
+                  )}
+                </div>
+              ) : (
+                <p className="text-muted-foreground text-center py-8">No UPSC analytics data yet. Data will appear once users visit the /upsc page.</p>
+              )}
             </div>
           </TabsContent>
 

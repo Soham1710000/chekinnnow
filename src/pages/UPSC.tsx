@@ -307,21 +307,6 @@ const UPSC = () => {
         </p>
       </footer>
 
-      {/* Floating Help Button */}
-      <div className="fixed bottom-6 right-6 z-50">
-        <button
-          onClick={handleWhatsApp}
-          className="flex items-center gap-2 px-4 py-3 rounded-full shadow-lg hover:shadow-xl hover:scale-105 transition-all duration-200"
-          style={{ 
-            backgroundColor: 'hsl(140 50% 40%)',
-            color: 'white'
-          }}
-          aria-label="Chat on WhatsApp"
-        >
-          <Phone className="w-5 h-5" />
-          <span className="text-sm font-medium">Need help?</span>
-        </button>
-      </div>
     </main>
   );
 };

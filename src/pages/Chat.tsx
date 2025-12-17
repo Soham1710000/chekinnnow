@@ -812,6 +812,22 @@ const Chat = () => {
                     {msg.content}
                   </div>
                   
+                  {/* Inline Sign Up button when AI prompts to create account */}
+                  {msg.role === "assistant" && !user && msg.content.toLowerCase().includes("create account") && (
+                    <motion.div
+                      initial={{ opacity: 0, y: 5 }}
+                      animate={{ opacity: 1, y: 0 }}
+                      className="mt-2"
+                    >
+                      <Button
+                        onClick={() => navigate("/auth")}
+                        className="bg-primary hover:bg-primary/90 text-primary-foreground font-semibold px-6 py-2 rounded-full shadow-lg hover:shadow-xl transition-all hover:scale-105"
+                      >
+                        Create Account (30 sec) →
+                      </Button>
+                    </motion.div>
+                  )}
+                  
                   {/* Template buttons and blurred match preview after first AI message */}
                   {index === 0 && msg.role === "assistant" && activeMessages.length === 1 && (
                     <div className="mt-3 space-y-3 animate-fade-in">

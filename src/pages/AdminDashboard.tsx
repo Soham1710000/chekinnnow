@@ -22,6 +22,9 @@ import {
   UserPlus,
   CheckCircle,
   Download,
+  Repeat,
+  Activity,
+  BarChart3,
 } from "lucide-react";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import {
@@ -50,6 +53,10 @@ interface Profile {
   created_at: string;
   chat_messages?: any[];
   message_count?: number;
+  active_days?: number;
+  is_returning?: boolean;
+  first_chat?: string;
+  last_chat?: string;
 }
 
 interface Introduction {
@@ -137,6 +144,17 @@ interface Lead {
   updated_at: string;
 }
 
+interface EngagementMetrics {
+  total_users: number;
+  users_with_messages: number;
+  returning_users: number;
+  learning_complete: number;
+  avg_messages_per_user: number;
+  total_messages: number;
+  active_intros: number;
+  total_intros: number;
+}
+
 // Password is verified server-side only - not stored in client code
 
 const AdminDashboard = () => {
@@ -155,6 +173,7 @@ const AdminDashboard = () => {
   const [sourceFilter, setSourceFilter] = useState<"all" | "upsc" | "cat" | "main">("all");
   const [recentEvents, setRecentEvents] = useState<FunnelEvent[]>([]);
   const [leads, setLeads] = useState<Lead[]>([]);
+  const [engagementMetrics, setEngagementMetrics] = useState<EngagementMetrics | null>(null);
   const [funnelTimeRange, setFunnelTimeRange] = useState(24);
   const [searchTerm, setSearchTerm] = useState("");
   const [loading, setLoading] = useState(true);
@@ -213,6 +232,7 @@ const AdminDashboard = () => {
       setMainStats(data.mainStats || null);
       setRecentEvents(data.recentEvents || []);
       setLeads(data.leads || []);
+      setEngagementMetrics(data.engagementMetrics || null);
       setLoading(false);
     } catch {
       setPasswordError(true);
@@ -259,6 +279,7 @@ const AdminDashboard = () => {
       setMainStats(data.mainStats || null);
       setRecentEvents(data.recentEvents || []);
       setLeads(data.leads || []);
+      setEngagementMetrics(data.engagementMetrics || null);
     } catch (error) {
       console.error("Error loading data:", error);
       toast({
@@ -606,8 +627,8 @@ const AdminDashboard = () => {
       </header>
 
       <div className="max-w-7xl mx-auto p-4">
-        {/* Stats */}
-        <div className="grid grid-cols-2 md:grid-cols-4 gap-4 mb-6">
+        {/* Top Stats Row */}
+        <div className="grid grid-cols-2 md:grid-cols-4 lg:grid-cols-6 gap-4 mb-6">
           <div className="bg-card border border-border rounded-xl p-4">
             <div className="flex items-center gap-3">
               <div className="p-2 bg-primary/10 rounded-lg">
@@ -616,6 +637,19 @@ const AdminDashboard = () => {
               <div>
                 <p className="text-2xl font-bold">{profiles.length}</p>
                 <p className="text-sm text-muted-foreground">Total Users</p>
+              </div>
+            </div>
+          </div>
+          <div className="bg-card border border-border rounded-xl p-4">
+            <div className="flex items-center gap-3">
+              <div className="p-2 bg-amber-500/10 rounded-lg">
+                <Repeat className="w-5 h-5 text-amber-500" />
+              </div>
+              <div>
+                <p className="text-2xl font-bold">
+                  {engagementMetrics?.returning_users || profiles.filter(p => p.is_returning).length}
+                </p>
+                <p className="text-sm text-muted-foreground">Returning</p>
               </div>
             </div>
           </div>
@@ -634,6 +668,19 @@ const AdminDashboard = () => {
           </div>
           <div className="bg-card border border-border rounded-xl p-4">
             <div className="flex items-center gap-3">
+              <div className="p-2 bg-cyan-500/10 rounded-lg">
+                <Activity className="w-5 h-5 text-cyan-500" />
+              </div>
+              <div>
+                <p className="text-2xl font-bold">
+                  {engagementMetrics?.avg_messages_per_user || 0}
+                </p>
+                <p className="text-sm text-muted-foreground">Avg Msgs/User</p>
+              </div>
+            </div>
+          </div>
+          <div className="bg-card border border-border rounded-xl p-4">
+            <div className="flex items-center gap-3">
               <div className="p-2 bg-blue-500/10 rounded-lg">
                 <Link2 className="w-5 h-5 text-blue-500" />
               </div>
@@ -646,17 +693,62 @@ const AdminDashboard = () => {
           <div className="bg-card border border-border rounded-xl p-4">
             <div className="flex items-center gap-3">
               <div className="p-2 bg-purple-500/10 rounded-lg">
-                <Link2 className="w-5 h-5 text-purple-500" />
+                <BarChart3 className="w-5 h-5 text-purple-500" />
               </div>
               <div>
                 <p className="text-2xl font-bold">
-                  {introductions.filter((i) => i.status === "active").length}
+                  {engagementMetrics?.total_messages || 0}
                 </p>
-                <p className="text-sm text-muted-foreground">Active Chats</p>
+                <p className="text-sm text-muted-foreground">Total Msgs</p>
               </div>
             </div>
           </div>
         </div>
+
+        {/* Engagement Metrics Card */}
+        {engagementMetrics && (
+          <div className="bg-gradient-to-r from-amber-500/10 to-orange-500/10 border border-border rounded-xl p-4 mb-6">
+            <h3 className="font-semibold mb-3 flex items-center gap-2">
+              <Repeat className="w-4 h-4" />
+              Engagement Overview
+            </h3>
+            <div className="grid grid-cols-2 md:grid-cols-4 lg:grid-cols-6 gap-4">
+              <div>
+                <p className="text-xs text-muted-foreground mb-1">Users w/ Messages</p>
+                <span className="text-lg font-bold">{engagementMetrics.users_with_messages}</span>
+                <span className="text-xs text-muted-foreground ml-1">
+                  ({((engagementMetrics.users_with_messages / engagementMetrics.total_users) * 100).toFixed(0)}%)
+                </span>
+              </div>
+              <div>
+                <p className="text-xs text-muted-foreground mb-1">Returning Users</p>
+                <span className="text-lg font-bold text-amber-600">{engagementMetrics.returning_users}</span>
+                <span className="text-xs text-muted-foreground ml-1">
+                  ({engagementMetrics.users_with_messages > 0 
+                    ? ((engagementMetrics.returning_users / engagementMetrics.users_with_messages) * 100).toFixed(0) 
+                    : 0}%)
+                </span>
+              </div>
+              <div>
+                <p className="text-xs text-muted-foreground mb-1">Learning Complete</p>
+                <span className="text-lg font-bold text-green-600">{engagementMetrics.learning_complete}</span>
+              </div>
+              <div>
+                <p className="text-xs text-muted-foreground mb-1">Avg Msgs/User</p>
+                <span className="text-lg font-bold">{engagementMetrics.avg_messages_per_user}</span>
+              </div>
+              <div>
+                <p className="text-xs text-muted-foreground mb-1">Active Intros</p>
+                <span className="text-lg font-bold text-blue-600">{engagementMetrics.active_intros}</span>
+                <span className="text-xs text-muted-foreground ml-1">/ {engagementMetrics.total_intros}</span>
+              </div>
+              <div>
+                <p className="text-xs text-muted-foreground mb-1">Total Messages</p>
+                <span className="text-lg font-bold">{engagementMetrics.total_messages}</span>
+              </div>
+            </div>
+          </div>
+        )}
 
         {/* Email Section */}
         <div className="bg-card border border-border rounded-xl p-4 mb-6">
@@ -1533,6 +1625,12 @@ const AdminDashboard = () => {
                         </p>
                       )}
                       <div className="flex items-center gap-2 pt-2 flex-wrap">
+                        {profile.is_returning && (
+                          <span className="px-2 py-0.5 rounded-full text-xs bg-amber-500/10 text-amber-600 flex items-center gap-1">
+                            <Repeat className="w-3 h-3" />
+                            Returning ({profile.active_days}d)
+                          </span>
+                        )}
                         <span
                           className={`px-2 py-0.5 rounded-full text-xs ${
                             profile.learning_complete
@@ -1550,6 +1648,12 @@ const AdminDashboard = () => {
                           </span>
                         )}
                       </div>
+                      {profile.is_returning && profile.first_chat && profile.last_chat && (
+                        <p className="text-xs text-muted-foreground mt-2">
+                          First: {new Date(profile.first_chat).toLocaleDateString()} • 
+                          Last: {new Date(profile.last_chat).toLocaleDateString()}
+                        </p>
+                      )}
                     </div>
                   </div>
                 ))}

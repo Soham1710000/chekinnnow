@@ -1,11 +1,13 @@
 import { motion, AnimatePresence } from "framer-motion";
-import { useState, useEffect, lazy, Suspense } from "react";
+import { useState, useEffect, lazy, Suspense, memo, useCallback } from "react";
 import { useSearchParams, useNavigate } from "react-router-dom";
 import { Button } from "@/components/ui/button";
 import { ChevronDown, Users } from "lucide-react";
 import { supabase } from "@/integrations/supabase/client";
 import { useFunnelTracking } from "@/hooks/useFunnelTracking";
-import OnboardingOverlay from "@/components/chat/OnboardingOverlay";
+
+// Lazy load overlays - only needed on click
+const OnboardingOverlay = lazy(() => import("@/components/chat/OnboardingOverlay"));
 
 // Lazy load the modal - only needed on click
 const WaitlistModal = lazy(() => import("@/components/waitlist/WaitlistModal").then(m => ({ default: m.WaitlistModal })));
@@ -134,8 +136,8 @@ const renderBoldText = (text: string) => {
   );
 };
 
-// Floating Profile Card with attached message
-const FloatingProfileCard = ({ profile }: { profile: typeof profiles[0] }) => (
+// Floating Profile Card with attached message - memoized to prevent re-renders
+const FloatingProfileCard = memo(({ profile }: { profile: typeof profiles[0] }) => (
   <motion.div
     className="absolute -left-6 sm:-left-10 md:-left-28 -top-4 sm:-top-2 md:top-4 z-30 w-[170px] sm:w-[200px] md:w-[260px]"
     animate={{ y: [0, -6, 0] }}
@@ -176,10 +178,10 @@ const FloatingProfileCard = ({ profile }: { profile: typeof profiles[0] }) => (
       </motion.div>
     </AnimatePresence>
   </motion.div>
-);
+));
 
-// Half iPhone Mockup with cycling content
-const IPhoneMockup = ({ currentIndex }: { currentIndex: number }) => {
+// Half iPhone Mockup with cycling content - memoized
+const IPhoneMockup = memo(({ currentIndex }: { currentIndex: number }) => {
   const currentProfile = profiles[currentIndex];
 
   return (
@@ -259,15 +261,15 @@ const IPhoneMockup = ({ currentIndex }: { currentIndex: number }) => {
       </div>
     </motion.div>
   );
-};
+});
 
-const NetworkVisualization = ({ currentIndex }: { currentIndex: number }) => {
+const NetworkVisualization = memo(({ currentIndex }: { currentIndex: number }) => {
   return (
     <div className="relative w-full flex justify-center pl-4 sm:pl-8 md:pl-16">
       <IPhoneMockup currentIndex={currentIndex} />
     </div>
   );
-};
+});
 
 const BASE_WAITLIST_COUNT = 7912; // Base offset for display
 
@@ -492,12 +494,14 @@ export const NetworkHero = () => {
         </Suspense>
       )}
 
-      {/* Explainer Overlay */}
+      {/* Explainer Overlay - lazy loaded */}
       <AnimatePresence>
         {showExplainer && (
-          <div className="fixed inset-0 z-50 bg-background">
-            <OnboardingOverlay onStart={handleExplainerContinue} />
-          </div>
+          <Suspense fallback={<div className="fixed inset-0 z-50 bg-background" />}>
+            <div className="fixed inset-0 z-50 bg-background">
+              <OnboardingOverlay onStart={handleExplainerContinue} />
+            </div>
+          </Suspense>
         )}
       </AnimatePresence>
     </section>

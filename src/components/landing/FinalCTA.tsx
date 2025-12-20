@@ -1,9 +1,11 @@
-import { useRef, useState } from "react";
+import { useRef, useState, lazy, Suspense } from "react";
 import { motion, useInView, AnimatePresence } from "framer-motion";
 import { useNavigate } from "react-router-dom";
 import { Button } from "@/components/ui/button";
-import OnboardingOverlay from "@/components/chat/OnboardingOverlay";
 import { supabase } from "@/integrations/supabase/client";
+
+// Lazy load OnboardingOverlay - only needed on click
+const OnboardingOverlay = lazy(() => import("@/components/chat/OnboardingOverlay"));
 
 export const FinalCTA = () => {
   const ref = useRef(null);
@@ -51,12 +53,14 @@ export const FinalCTA = () => {
         </div>
       </section>
 
-      {/* Explainer Overlay */}
+      {/* Explainer Overlay - lazy loaded */}
       <AnimatePresence>
         {showExplainer && (
-          <div className="fixed inset-0 z-50 bg-background">
-            <OnboardingOverlay onStart={handleExplainerContinue} />
-          </div>
+          <Suspense fallback={<div className="fixed inset-0 z-50 bg-background" />}>
+            <div className="fixed inset-0 z-50 bg-background">
+              <OnboardingOverlay onStart={handleExplainerContinue} />
+            </div>
+          </Suspense>
         )}
       </AnimatePresence>
     </>

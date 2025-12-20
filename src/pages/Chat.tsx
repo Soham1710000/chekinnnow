@@ -433,10 +433,29 @@ const Chat = () => {
     setMessages((prev) => [...prev, data as Message]);
   };
 
+  // Track if this is first message of current session
+  const isFirstMessageOfSessionRef = useRef(true);
+  
   const getAIResponseStreaming = async (
     conversationHistory: { role: string; content: string }[],
     onDelta: (text: string) => void
   ): Promise<string | null> => {
+    // Check if user is returning (has existing messages in DB)
+    const isReturningUser = user && messages.length > 0;
+    // Check if they have pending or active intros
+    const hasPendingIntros = introductions.some(i => 
+      i.status === "pending" || 
+      i.status === "accepted_a" || 
+      i.status === "accepted_b" ||
+      i.status === "active"
+    );
+    const isFirstMessageOfSession = isFirstMessageOfSessionRef.current;
+    
+    // Mark that we've sent first message
+    if (isFirstMessageOfSession) {
+      isFirstMessageOfSessionRef.current = false;
+    }
+    
     try {
       const response = await fetch(CHAT_URL, {
         method: "POST",
@@ -449,6 +468,9 @@ const Chat = () => {
           userId: user?.id || null,
           isAuthenticated: !!user,
           source: sessionStorage.getItem("chekinn_source") || undefined,
+          isReturningUser,
+          isFirstMessageOfSession,
+          hasPendingIntros,
         }),
       });
 

@@ -6,11 +6,105 @@ const corsHeaders = {
   "Access-Control-Allow-Headers": "authorization, x-client-info, apikey, content-type",
 };
 
-const getSystemPrompt = (isAuthenticated: boolean, source?: string, messageCount?: number, conversationHistory?: string) => {
+// Social Observer prompt for returning UPSC users with no pending intros
+const getSocialObserverPrompt = () => `You are ChekInn in SOCIAL OBSERVER mode.
+
+## ACTIVATION CONDITIONS (already verified)
+You are speaking to a returning UPSC aspirant who has no pending introductions. This is their first message of this session.
+
+## YOUR ROLE
+You are a socially aware friend who has been quietly around UPSC prep spaces recently.
+
+You are NOT here to:
+- help, advise, teach, analyse, validate, motivate, solve, or make introductions
+
+You ARE here to:
+- Casually share ONE socially interesting thing you've noticed lately — like a friend mentioning something offhand after sensing shifts in prep circles
+
+## TONE & VOICE
+- Warm, informal, chai-time conversation
+- Slightly knowing, never confident
+- Observational, not instructional
+- Calm, grounded, human
+
+Sound like: Someone who's been "around", not someone explaining.
+Never sound like: a coach, mentor, analyst, therapist, news source, or content creator.
+
+## LANGUAGE RULES (STRICT)
+USE phrases like:
+- "lately…", "recently…", "this week…"
+- "I've been noticing…", "something that's been floating around…"
+
+MUST:
+- Hedge naturally ("feels like", "might be", "hard to tell yet")
+
+MUST NOT:
+- Use absolutes (everyone, always, never)
+- Name people, institutes, books, platforms, locations
+- Give advice or suggestions
+- Validate explicitly ("this is normal", "you're not alone")
+- Ask action-oriented questions
+- Ask for introductions
+- Use lists, bullets, frameworks
+- Stack multiple observations
+
+## CONTENT STRUCTURE
+1. A soft, casual opening
+2. ONE recent, socially interesting observation about UPSC prep
+3. ONE quiet emotional or situational implication (not instructional)
+4. A short pause (line break or brief sentence)
+
+The observation must feel: early, still forming, socially sensed, not yet mainstream.
+
+## ENDING (IMPORTANT)
+End with EXACTLY ONE light, open-ended line that invites reflection, not action.
+
+Examples:
+- "Have you been feeling this too?"
+- "Does this line up with what you're seeing?"
+- "Curious if this crossed your mind."
+
+Do NOT ask:
+- "What will you do?"
+- "Do you want help?"
+- "Should I connect you?"
+
+## LENGTH
+- 6–10 lines maximum
+- Feels like a WhatsApp voice note converted to text
+- One thought dropped casually, then silence
+
+## GOAL
+Make the user feel like they're talking to someone who's been quietly around UPSC prep lately — not a tool, not a mentor, not an expert.
+
+If the user responds, continue naturally as a friend would.
+If they don't respond, do not repeat or push.`;
+
+const getSystemPrompt = (
+  isAuthenticated: boolean, 
+  source?: string, 
+  messageCount?: number, 
+  conversationHistory?: string,
+  isReturningUser?: boolean,
+  isFirstMessageOfSession?: boolean,
+  hasPendingIntros?: boolean
+) => {
   const isUPSC = source === "upsc";
   const isCAT = source === "cat";
   const questionNum = messageCount || 0;
   const hasDeliveredConnection = questionNum >= 2;
+  
+  // Check if Social Observer mode should be activated
+  const shouldUseSocialObserver = isUPSC && 
+    isAuthenticated && 
+    isReturningUser && 
+    isFirstMessageOfSession && 
+    !hasPendingIntros;
+  
+  if (shouldUseSocialObserver) {
+    console.log("Activating Social Observer mode for returning UPSC user");
+    return getSocialObserverPrompt();
+  }
   
   // Post-connection depth-building prompt (applies after connection is offered)
   const depthBuildingSection = hasDeliveredConnection ? `
@@ -178,7 +272,7 @@ serve(async (req) => {
   }
 
   try {
-    const { messages, userId, isAuthenticated, source } = await req.json();
+    const { messages, userId, isAuthenticated, source, isReturningUser, isFirstMessageOfSession, hasPendingIntros } = await req.json();
     
     const LOVABLE_API_KEY = Deno.env.get("LOVABLE_API_KEY");
     if (!LOVABLE_API_KEY) {
@@ -195,7 +289,7 @@ serve(async (req) => {
     const dropOffSignals = ["ok", "k", "yes", "no", "hmm", "ya", "sure", "idk", "not sure", "maybe", "fine", "okay"];
     const isDropOffRisk = dropOffSignals.some(signal => lastUserMessage.trim() === signal || lastUserMessage.length < 5);
     
-    console.log(`Chat: user=${userId}, source=${source}, questions=${questionCount}, dropOffRisk=${isDropOffRisk}, lastMsg="${lastUserMessage}"`);
+    console.log(`Chat: user=${userId}, source=${source}, questions=${questionCount}, dropOffRisk=${isDropOffRisk}, returning=${isReturningUser}, firstMsg=${isFirstMessageOfSession}, pendingIntros=${hasPendingIntros}`);
 
     // Call Lovable AI with streaming
     const response = await fetch("https://ai.gateway.lovable.dev/v1/chat/completions", {
@@ -207,7 +301,15 @@ serve(async (req) => {
       body: JSON.stringify({
         model: "google/gemini-2.5-flash",
         messages: [
-          { role: "system", content: getSystemPrompt(isAuthenticated === true, source, questionCount) },
+          { role: "system", content: getSystemPrompt(
+            isAuthenticated === true, 
+            source, 
+            questionCount,
+            undefined,
+            isReturningUser,
+            isFirstMessageOfSession,
+            hasPendingIntros
+          ) },
           ...messages,
         ],
         stream: true,

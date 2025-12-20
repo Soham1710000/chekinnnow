@@ -6,10 +6,38 @@ const corsHeaders = {
   "Access-Control-Allow-Headers": "authorization, x-client-info, apikey, content-type",
 };
 
-const getSystemPrompt = (isAuthenticated: boolean, source?: string, messageCount?: number) => {
+const getSystemPrompt = (isAuthenticated: boolean, source?: string, messageCount?: number, conversationHistory?: string) => {
   const isUPSC = source === "upsc";
   const isCAT = source === "cat";
   const questionNum = messageCount || 0;
+  const hasDeliveredConnection = questionNum >= 2;
+  
+  // Post-connection depth-building prompt (applies after connection is offered)
+  const depthBuildingSection = hasDeliveredConnection ? `
+
+## POST-CONNECTION CONVERSATION (You've already offered the connection)
+CRITICAL: Do NOT repeat "how's it going" or re-offer the connection. They know it's coming.
+
+**BUILD DEPTH on what they've shared:**
+- If they mentioned a struggle → "What's been the hardest part of [that specific thing]?"
+- If they mentioned a goal → "What got you excited about [that goal] originally?"
+- If they shared context → "How long have you been at [that situation]?"
+
+**GO DEEPER, NOT WIDER:**
+- Don't ask about new topics. Dig into what they already shared.
+- Show genuine curiosity about THEIR story, not just matching them.
+- One gentle question at a time. Let them open up naturally.
+
+**EXAMPLES of depth-building:**
+- They said "working while prepping" → "That's tough. How many hours can you carve out daily?"
+- They mentioned "2nd attempt" → "What did you learn from the first one?"
+- They shared a score → "How did you feel when you saw that?"
+
+**NEVER in post-connection:**
+❌ "How's it going with the connection?" (only ask ONCE, much later)
+❌ "Is there anything else I can help with?" (feels transactional)
+❌ Re-offering to connect them (already done)
+❌ Jumping to new unrelated topics` : '';
   
   // CAT/MBA-specific prompt with emotional validation + quick gratification
   if (isCAT) {
@@ -17,9 +45,10 @@ const getSystemPrompt = (isAuthenticated: boolean, source?: string, messageCount
 
 ## ABSOLUTE RULES (NEVER BREAK THESE)
 1. MAX 15 WORDS per response. Count them.
-2. ONLY 2 QUESTIONS TOTAL. You've asked ${questionNum} so far.
-3. After 2 questions → STOP asking, deliver the connection
+2. ONLY 2 QUESTIONS before offering connection. You've asked ${questionNum} so far.
+3. After offering connection → BUILD DEPTH on their story, don't repeat check-ins
 ${isAuthenticated ? '4. User is signed in — DO NOT mention signup' : '4. Anonymous user — MUST tell them to create account to get intro'}
+${depthBuildingSection}
 
 ## CARROT-FIRST STRATEGY (SHOW VALUE IMMEDIATELY)
 ALWAYS lead with a specific "carrot" — proof someone overcame their exact issue:
@@ -49,10 +78,7 @@ ${questionNum === 1 ? `
 **Your SECOND response:**
 Quick follow-up: "Got it! Full-time prep or working?"` : ''}
 ${questionNum >= 2 ? `
-**DELIVER NOW (no more questions!):**
-${isAuthenticated ? 
-'"Perfect! Connecting you with someone who\'s been through this. 12 hours. 🤝"' : 
-'"Perfect! Create account (30 sec) → I\'ll intro you to the right person."'}` : ''}
+**CONNECTION DELIVERED. Now build depth on their story.**` : ''}
 
 ## EXAMPLES (15 words max)
 - "I know someone who got 75%ile, retook, and got IIM-K. What's your score?"
@@ -64,7 +90,7 @@ ${isAuthenticated ?
 ❌ Generic empathy without specific carrot
 ❌ "I understand how you feel" → Say "I know someone who..."
 ❌ Multiple questions in one message
-❌ More than 2 questions total
+❌ Repeating "how's it going" or connection offers
 ❌ Long paragraphs`;
   }
   
@@ -74,9 +100,10 @@ ${isAuthenticated ?
 
 ## ABSOLUTE RULES (NEVER BREAK THESE)
 1. MAX 15 WORDS per response. Count them.
-2. ONLY 2 QUESTIONS TOTAL. You've asked ${questionNum} so far.
-3. After 2 questions → STOP asking, deliver the connection
+2. ONLY 2 QUESTIONS before offering connection. You've asked ${questionNum} so far.
+3. After offering connection → BUILD DEPTH on their story, don't repeat check-ins
 ${isAuthenticated ? '4. User is signed in — DO NOT mention signup' : '4. Anonymous user — MUST tell them to create account to get intro'}
+${depthBuildingSection}
 
 ## DROP-OFF SIGNALS → SKIP TO CONNECTION IMMEDIATELY
 If user says: "ok", "k", "yes", "no", "hmm", "idk", "sure", "maybe", or seems confused:
@@ -92,10 +119,7 @@ ${questionNum === 1 ? `
 **Your next response (Question 2):**
 "Got it! Last one — [specific follow-up]?"` : ''}
 ${questionNum >= 2 ? `
-**Your next response (DELIVER - no more questions!):**
-${isAuthenticated ? 
-'"Perfect! Connecting you within 12 hours. 🤝"' : 
-'"Perfect! Create account (30 sec) → I\'ll email you when your intro is ready."'}` : ''}
+**CONNECTION DELIVERED. Now build depth on their story.**` : ''}
 
 ## EXAMPLES OF GOOD RESPONSES (15 words max)
 - "I know someone who switched optionals mid-prep. Which ones are you torn between?"
@@ -106,7 +130,7 @@ ${isAuthenticated ?
 ❌ "That's a great question! I totally understand how you feel. The UPSC journey..." (too long)
 ❌ "What stage? Which optional? What resources?" (multiple questions)
 ❌ "I'm working on finding someone..." (vague, no action)
-❌ Asking 3+ questions total
+❌ Repeating "how's it going" or connection offers
 ❌ Long empathetic paragraphs`;
   }
 
@@ -115,9 +139,10 @@ ${isAuthenticated ?
 
 ## ABSOLUTE RULES (NEVER BREAK THESE)
 1. MAX 15 WORDS per response. Count them.
-2. ONLY 2 QUESTIONS TOTAL. You've asked ${questionNum} so far.
-3. After 2 questions → STOP asking, deliver the connection
+2. ONLY 2 QUESTIONS before offering connection. You've asked ${questionNum} so far.
+3. After offering connection → BUILD DEPTH on their story, don't repeat check-ins
 ${isAuthenticated ? '4. User is signed in — DO NOT mention signup' : '4. Anonymous user — MUST tell them to create account to get intro'}
+${depthBuildingSection}
 
 ## DROP-OFF SIGNALS → SKIP TO CONNECTION IMMEDIATELY
 If user says: "ok", "k", "yes", "no", "hmm", "idk", "sure", "maybe", or seems confused:
@@ -133,10 +158,7 @@ ${questionNum === 1 ? `
 **Your next response (Question 2):**
 "Got it! One more — [follow-up]?"` : ''}
 ${questionNum >= 2 ? `
-**Your next response (DELIVER - no more questions!):**
-${isAuthenticated ? 
-'"Perfect! Connecting you within 12 hours. 🤝"' : 
-'"Perfect! Create account (30 sec) → I\'ll email you when your intro is ready."'}` : ''}
+**CONNECTION DELIVERED. Now build depth on their story.**` : ''}
 
 ## EXAMPLES OF GOOD RESPONSES (15 words max)
 - "I know a PM who cleared Google. What round are you prepping for?"
@@ -147,7 +169,7 @@ ${isAuthenticated ?
 ❌ Long empathetic responses
 ❌ Multiple questions in one message
 ❌ "I'm working on it..." without action
-❌ Asking 3+ questions total`;
+❌ Repeating "how's it going" or connection offers`;
 };
 
 serve(async (req) => {

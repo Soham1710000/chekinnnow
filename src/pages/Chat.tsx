@@ -112,6 +112,7 @@ const Chat = () => {
     created_at: new Date().toISOString(),
   }]); // Pre-populate for instant load
   const [introductions, setIntroductions] = useState<Introduction[]>([]);
+  const [unreadCounts, setUnreadCounts] = useState<Record<string, number>>({});
   const [input, setInput] = useState("");
   const [loading, setLoading] = useState(false); // Start false for instant render
   const [sending, setSending] = useState(false);
@@ -168,8 +169,84 @@ const Chat = () => {
       loadIntroductions();
       subscribeToMessages();
       checkLearningStatus();
+      loadUnreadCounts();
+      subscribeToUserChats();
     }
   }, [user]);
+
+  // Load unread message counts for each introduction
+  const loadUnreadCounts = async () => {
+    if (!user) return;
+    
+    const { data, error } = await supabase
+      .from("user_chats")
+      .select("introduction_id")
+      .eq("receiver_id", user.id)
+      .eq("read", false);
+    
+    if (error) {
+      console.error("Error loading unread counts:", error);
+      return;
+    }
+    
+    const counts: Record<string, number> = {};
+    data?.forEach(msg => {
+      counts[msg.introduction_id] = (counts[msg.introduction_id] || 0) + 1;
+    });
+    setUnreadCounts(counts);
+  };
+
+  // Subscribe to new messages in user chats
+  const subscribeToUserChats = () => {
+    if (!user) return;
+    
+    const channel = supabase
+      .channel("user-chats-unread")
+      .on(
+        "postgres_changes",
+        {
+          event: "INSERT",
+          schema: "public",
+          table: "user_chats",
+          filter: `receiver_id=eq.${user.id}`,
+        },
+        (payload) => {
+          const introId = payload.new.introduction_id;
+          // Only increment if not in active chat for that intro
+          if (!activeChat || activeChat.id !== introId) {
+            setUnreadCounts(prev => ({
+              ...prev,
+              [introId]: (prev[introId] || 0) + 1
+            }));
+          }
+        }
+      )
+      .subscribe();
+    
+    return () => {
+      supabase.removeChannel(channel);
+    };
+  };
+
+  // Clear unread count when opening a chat
+  const handleOpenChat = async (intro: Introduction) => {
+    setActiveChat(intro);
+    
+    // Mark messages as read
+    if (user) {
+      await supabase
+        .from("user_chats")
+        .update({ read: true })
+        .eq("introduction_id", intro.id)
+        .eq("receiver_id", user.id)
+        .eq("read", false);
+      
+      setUnreadCounts(prev => ({
+        ...prev,
+        [intro.id]: 0
+      }));
+    }
+  };
 
   // Check in on active intros when user comes back from a user-to-user chat
   const prevActiveChat = useRef<Introduction | null>(null);
@@ -1043,15 +1120,20 @@ const Chat = () => {
               {activeIntros.map((intro) => (
                 <button
                   key={intro.id}
-                  onClick={() => setActiveChat(intro)}
-                  className="w-full p-4 bg-card border border-border rounded-xl text-left hover:bg-muted/50 transition-colors"
+                  onClick={() => handleOpenChat(intro)}
+                  className="w-full p-4 bg-card border border-border rounded-xl text-left hover:bg-muted/50 transition-colors relative"
                 >
                   <div className="flex items-center gap-3">
-                    <div className="w-12 h-12 rounded-full bg-primary/10 flex items-center justify-center text-primary font-semibold">
+                    <div className="w-12 h-12 rounded-full bg-primary/10 flex items-center justify-center text-primary font-semibold relative">
                       {intro.other_user?.full_name?.charAt(0) || "?"}
+                      {unreadCounts[intro.id] > 0 && (
+                        <span className="absolute -top-1 -right-1 min-w-5 h-5 px-1 bg-destructive text-destructive-foreground text-xs font-bold rounded-full flex items-center justify-center">
+                          {unreadCounts[intro.id] > 9 ? "9+" : unreadCounts[intro.id]}
+                        </span>
+                      )}
                     </div>
                     <div className="flex-1 min-w-0">
-                      <h3 className="font-medium truncate">
+                      <h3 className={`font-medium truncate ${unreadCounts[intro.id] > 0 ? "font-semibold" : ""}`}>
                         {intro.other_user?.full_name || "Anonymous"}
                       </h3>
                       <p className="text-sm text-muted-foreground truncate">

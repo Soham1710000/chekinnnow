@@ -74,12 +74,61 @@ Deno.serve(async (req) => {
     
     console.log("Chats grouped by users:", Object.keys(chatsByUser).length, "users with messages");
 
-    // Enrich profiles with chat data
-    const enrichedProfiles = (profiles || []).map((profile) => ({
-      ...profile,
-      chat_messages: chatsByUser[profile.id] || [],
-      message_count: (chatsByUser[profile.id] || []).length,
-    }));
+    // Calculate returning user metrics (users who chatted on multiple days)
+    const returningUserStats = {
+      total_returning: 0,
+      returning_users: [] as { id: string; active_days: number; session_count: number; first_chat: string; last_chat: string }[],
+    };
+
+    // Group funnel events by user for session counting (we'll calculate this after fetching funnel_events)
+    // For now, calculate active days from chat messages
+    const userActiveDays: Record<string, Set<string>> = {};
+    (chatMessages || []).forEach((msg) => {
+      if (!userActiveDays[msg.user_id]) {
+        userActiveDays[msg.user_id] = new Set();
+      }
+      const date = new Date(msg.created_at).toISOString().split("T")[0];
+      userActiveDays[msg.user_id].add(date);
+    });
+
+    // Enrich profiles with chat data and returning user status
+    const enrichedProfiles = (profiles || []).map((profile) => {
+      const messages = chatsByUser[profile.id] || [];
+      const activeDays = userActiveDays[profile.id]?.size || 0;
+      const isReturning = activeDays > 1;
+      
+      // Get first and last chat dates
+      let firstChat = null;
+      let lastChat = null;
+      if (messages.length > 0) {
+        const sorted = [...messages].sort((a, b) => 
+          new Date(a.created_at).getTime() - new Date(b.created_at).getTime()
+        );
+        firstChat = sorted[0]?.created_at;
+        lastChat = sorted[sorted.length - 1]?.created_at;
+      }
+
+      if (isReturning) {
+        returningUserStats.total_returning++;
+        returningUserStats.returning_users.push({
+          id: profile.id,
+          active_days: activeDays,
+          session_count: activeDays, // Approximate from days for now
+          first_chat: firstChat,
+          last_chat: lastChat,
+        });
+      }
+
+      return {
+        ...profile,
+        chat_messages: messages,
+        message_count: messages.length,
+        active_days: activeDays,
+        is_returning: isReturning,
+        first_chat: firstChat,
+        last_chat: lastChat,
+      };
+    });
 
     // Fetch all introductions
     const { data: introductions, error: introsError } = await supabase
@@ -239,6 +288,20 @@ Deno.serve(async (req) => {
     // Recent events for detailed view
     const recentEvents = events.slice(0, 50);
 
+    // Calculate engagement metrics
+    const engagementMetrics = {
+      total_users: enrichedProfiles.length,
+      users_with_messages: enrichedProfiles.filter(p => p.message_count > 0).length,
+      returning_users: returningUserStats.total_returning,
+      learning_complete: enrichedProfiles.filter(p => p.learning_complete).length,
+      avg_messages_per_user: enrichedProfiles.length > 0 
+        ? Math.round(enrichedProfiles.reduce((sum, p) => sum + p.message_count, 0) / enrichedProfiles.length * 10) / 10
+        : 0,
+      total_messages: (chatMessages || []).length,
+      active_intros: (introductions || []).filter(i => i.status === "active").length,
+      total_intros: (introductions || []).length,
+    };
+
     return new Response(
       JSON.stringify({ 
         profiles: enrichedProfiles, 
@@ -249,6 +312,8 @@ Deno.serve(async (req) => {
         mainStats,
         recentEvents,
         leads: leads || [],
+        returningUserStats,
+        engagementMetrics,
       }),
       { headers: { ...corsHeaders, "Content-Type": "application/json" } }
     );

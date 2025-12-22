@@ -1,4 +1,4 @@
-import { useRef } from "react";
+import { useRef, forwardRef } from "react";
 import { motion, useInView } from "framer-motion";
 
 const steps = [
@@ -23,12 +23,12 @@ const steps = [
 ];
 
 const StepCard = ({ step, index }: { step: typeof steps[0]; index: number }) => {
-  const ref = useRef(null);
-  const isInView = useInView(ref, { once: true, margin: "-100px" });
+  const cardRef = useRef(null);
+  const isInView = useInView(cardRef, { once: true, margin: "-100px" });
 
   return (
     <motion.div
-      ref={ref}
+      ref={cardRef}
       initial={{ opacity: 0, y: 40 }}
       animate={isInView ? { opacity: 1, y: 0 } : {}}
       transition={{ 
@@ -73,13 +73,19 @@ const StepCard = ({ step, index }: { step: typeof steps[0]; index: number }) => 
   );
 };
 
-export const HowItWorks = () => {
-  // Force rebuild for cache invalidation
-  const ref = useRef(null);
-  const isInView = useInView(ref, { once: true, margin: "-100px" });
+export const HowItWorks = forwardRef<HTMLElement>((_, forwardedRef) => {
+  const internalRef = useRef(null);
+  const isInView = useInView(internalRef, { once: true, margin: "-100px" });
 
   return (
-    <section ref={ref} className="py-12 md:py-16 lg:py-20 bg-background">
+    <section 
+      ref={(node) => {
+        internalRef.current = node;
+        if (typeof forwardedRef === 'function') forwardedRef(node);
+        else if (forwardedRef) forwardedRef.current = node;
+      }} 
+      className="py-12 md:py-16 lg:py-20 bg-background"
+    >
       <div className="container-apple">
         <motion.div
           initial={{ opacity: 0, y: 30 }}
@@ -101,4 +107,6 @@ export const HowItWorks = () => {
       </div>
     </section>
   );
-};
+});
+
+HowItWorks.displayName = "HowItWorks";

@@ -1,3 +1,4 @@
+import { forwardRef } from "react";
 import { motion } from "framer-motion";
 
 const footerLinks = [
@@ -6,9 +7,9 @@ const footerLinks = [
   { label: "Contact", href: "#" },
 ];
 
-export const Footer = () => {
+export const Footer = forwardRef<HTMLElement>((_, ref) => {
   return (
-    <footer className="py-12 bg-background border-t border-border/50">
+    <footer ref={ref} className="py-12 bg-background border-t border-border/50">
       <div className="container-apple">
         <div className="flex flex-col md:flex-row items-center justify-between gap-6">
           <motion.div
@@ -49,4 +50,6 @@ export const Footer = () => {
       </div>
     </footer>
   );
-};
+});
+
+Footer.displayName = "Footer";

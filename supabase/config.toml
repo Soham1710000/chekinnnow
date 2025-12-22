@@ -20,3 +20,6 @@ verify_jwt = false
 
 [functions.backfill-profiles]
 verify_jwt = false
+
+[functions.summarize-learnings]
+verify_jwt = false

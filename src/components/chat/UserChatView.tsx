@@ -3,7 +3,7 @@ import { useAuth } from "@/hooks/useAuth";
 import { supabase } from "@/integrations/supabase/client";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
-import { Send, ArrowLeft, Paperclip, X, FileText, Image as ImageIcon } from "lucide-react";
+import { Send, ArrowLeft, Paperclip, X, FileText, ChevronDown, ChevronUp, Sparkles } from "lucide-react";
 import { motion, AnimatePresence } from "framer-motion";
 import { useToast } from "@/hooks/use-toast";
 
@@ -21,6 +21,7 @@ interface Introduction {
   user_a_id: string;
   user_b_id: string;
   status: string;
+  intro_message?: string;
   other_user?: {
     full_name: string;
     avatar_url: string;
@@ -43,6 +44,7 @@ const UserChatView = ({ introduction, onBack }: UserChatViewProps) => {
   const [uploading, setUploading] = useState(false);
   const [selectedFile, setSelectedFile] = useState<File | null>(null);
   const [previewUrl, setPreviewUrl] = useState<string | null>(null);
+  const [introExpanded, setIntroExpanded] = useState(false);
   const messagesEndRef = useRef<HTMLDivElement>(null);
   const fileInputRef = useRef<HTMLInputElement>(null);
 
@@ -291,6 +293,53 @@ const UserChatView = ({ introduction, onBack }: UserChatViewProps) => {
 
       {/* Messages */}
       <div className="flex-1 overflow-y-auto p-4 space-y-3">
+        {/* Intro Message Banner */}
+        {introduction.intro_message && (
+          <motion.div
+            initial={{ opacity: 0, y: -10 }}
+            animate={{ opacity: 1, y: 0 }}
+            className="mb-4"
+          >
+            <button
+              onClick={() => setIntroExpanded(!introExpanded)}
+              className="w-full text-left"
+            >
+              <div className="bg-gradient-to-r from-primary/5 via-primary/10 to-primary/5 border border-primary/20 rounded-xl px-4 py-3">
+                <div className="flex items-center gap-2 text-primary">
+                  <Sparkles className="w-4 h-4 flex-shrink-0" />
+                  <span className="text-xs font-medium">Why you were matched</span>
+                  <div className="flex-1" />
+                  {introExpanded ? (
+                    <ChevronUp className="w-4 h-4" />
+                  ) : (
+                    <ChevronDown className="w-4 h-4" />
+                  )}
+                </div>
+                <AnimatePresence>
+                  {introExpanded && (
+                    <motion.div
+                      initial={{ height: 0, opacity: 0 }}
+                      animate={{ height: "auto", opacity: 1 }}
+                      exit={{ height: 0, opacity: 0 }}
+                      transition={{ duration: 0.2 }}
+                      className="overflow-hidden"
+                    >
+                      <p className="text-sm text-muted-foreground mt-2 leading-relaxed">
+                        {introduction.intro_message}
+                      </p>
+                    </motion.div>
+                  )}
+                </AnimatePresence>
+                {!introExpanded && (
+                  <p className="text-xs text-muted-foreground mt-1 truncate">
+                    {introduction.intro_message.slice(0, 60)}...
+                  </p>
+                )}
+              </div>
+            </button>
+          </motion.div>
+        )}
+
         <AnimatePresence mode="popLayout">
           {messages.map((msg) => (
             <motion.div
@@ -312,10 +361,16 @@ const UserChatView = ({ introduction, onBack }: UserChatViewProps) => {
           ))}
         </AnimatePresence>
         
-        {messages.length === 0 && (
+        {messages.length === 0 && !introduction.intro_message && (
           <div className="text-center py-8 text-muted-foreground">
             <p>Start the conversation!</p>
             <p className="text-sm mt-1">Say hello to {introduction.other_user?.full_name || "your new connection"}</p>
+          </div>
+        )}
+        
+        {messages.length === 0 && introduction.intro_message && (
+          <div className="text-center py-4 text-muted-foreground">
+            <p className="text-sm">Tap the banner above to see why you were matched</p>
           </div>
         )}
         

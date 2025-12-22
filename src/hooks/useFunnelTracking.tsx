@@ -11,7 +11,9 @@ type FunnelEvent =
   | "waitlist_success"
   | "chat_page_loaded"
   | "save_progress_shown"
-  | "save_progress_captured";
+  | "save_progress_captured"
+  | "linkedin_enriched"
+  | "linkedin_skipped";
 
 // Generate or retrieve session ID for anonymous tracking
 const getSessionId = (): string => {

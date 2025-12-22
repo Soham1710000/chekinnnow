@@ -224,6 +224,7 @@ export type Database = {
           interests: string[] | null
           learning_complete: boolean | null
           learning_messages_count: number | null
+          linkedin_url: string | null
           looking_for: string | null
           role: string | null
           skills: string[] | null
@@ -244,6 +245,7 @@ export type Database = {
           interests?: string[] | null
           learning_complete?: boolean | null
           learning_messages_count?: number | null
+          linkedin_url?: string | null
           looking_for?: string | null
           role?: string | null
           skills?: string[] | null
@@ -264,6 +266,7 @@ export type Database = {
           interests?: string[] | null
           learning_complete?: boolean | null
           learning_messages_count?: number | null
+          linkedin_url?: string | null
           looking_for?: string | null
           role?: string | null
           skills?: string[] | null

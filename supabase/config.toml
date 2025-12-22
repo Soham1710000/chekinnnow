@@ -23,3 +23,6 @@ verify_jwt = false
 
 [functions.summarize-learnings]
 verify_jwt = false
+
+[functions.enrich-linkedin]
+verify_jwt = false

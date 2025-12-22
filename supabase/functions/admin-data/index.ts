@@ -51,17 +51,40 @@ Deno.serve(async (req) => {
 
     if (profilesError) throw profilesError;
 
-    // Fetch all chat messages (AI chats)
-    const { data: chatMessages, error: chatError } = await supabase
-      .from("chat_messages")
-      .select("*")
-      .order("created_at", { ascending: false });
-
-    console.log("Chat messages fetched:", chatMessages?.length || 0, "Error:", chatError);
-
-    if (chatError) {
-      console.error("Chat messages error:", chatError);
+    // Fetch all chat messages (AI chats) - paginate to bypass 1000 row limit
+    let allChatMessages: any[] = [];
+    let lastCreatedAt: string | null = null;
+    let hasMore = true;
+    
+    while (hasMore) {
+      let query = supabase
+        .from("chat_messages")
+        .select("*")
+        .order("created_at", { ascending: false })
+        .limit(1000);
+      
+      if (lastCreatedAt) {
+        query = query.lt("created_at", lastCreatedAt);
+      }
+      
+      const { data: batch, error: chatError } = await query;
+      
+      if (chatError) {
+        console.error("Chat messages error:", chatError);
+        break;
+      }
+      
+      if (batch && batch.length > 0) {
+        allChatMessages = [...allChatMessages, ...batch];
+        lastCreatedAt = batch[batch.length - 1].created_at;
+        hasMore = batch.length === 1000;
+      } else {
+        hasMore = false;
+      }
     }
+    
+    const chatMessages = allChatMessages;
+    console.log("Chat messages fetched (all pages):", chatMessages.length);
 
     // Group chat messages by user
     const chatsByUser: Record<string, any[]> = {};

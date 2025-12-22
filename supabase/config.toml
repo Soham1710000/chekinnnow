@@ -17,3 +17,6 @@ verify_jwt = false
 
 [functions.send-temp-password]
 verify_jwt = false
+
+[functions.backfill-profiles]
+verify_jwt = false

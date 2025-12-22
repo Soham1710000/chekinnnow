@@ -25,6 +25,7 @@ import {
   Repeat,
   Activity,
   BarChart3,
+  Sparkles,
 } from "lucide-react";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import {
@@ -205,6 +206,13 @@ const AdminDashboard = () => {
   const [sendingEmail, setSendingEmail] = useState(false);
   const [emailTestMode, setEmailTestMode] = useState(true);
   const [testEmail, setTestEmail] = useState("");
+
+  // Backfill state
+  const [backfillRunning, setBackfillRunning] = useState(false);
+  const [backfillResults, setBackfillResults] = useState<{
+    summary: { total: number; processed: number; skipped: number; errors: number; wouldProcess?: number; dryRun?: boolean };
+    results: any[];
+  } | null>(null);
 
   const handlePasswordSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
@@ -468,6 +476,42 @@ const AdminDashboard = () => {
     }
   };
 
+  const handleRunBackfill = async (dryRun: boolean) => {
+    setBackfillRunning(true);
+    setBackfillResults(null);
+
+    try {
+      const { data, error } = await supabase.functions.invoke("backfill-profiles", {
+        body: { password: adminPassword, dryRun },
+      });
+
+      if (error) throw error;
+      if (data?.error) throw new Error(data.error);
+
+      setBackfillResults(data);
+      
+      toast({
+        title: dryRun ? "Dry run complete" : "Backfill complete!",
+        description: dryRun 
+          ? `Would process ${data.summary?.wouldProcess || 0} profiles`
+          : `Processed ${data.summary?.processed || 0} profiles successfully`,
+      });
+
+      if (!dryRun) {
+        loadData(); // Refresh data after backfill
+      }
+    } catch (error: any) {
+      console.error("Backfill error:", error);
+      toast({
+        title: "Backfill failed",
+        description: error.message || "Unknown error",
+        variant: "destructive",
+      });
+    } finally {
+      setBackfillRunning(false);
+    }
+  };
+
   const handleExportCSV = () => {
     // Combine AI chats and user-to-user chats
     const rows: string[] = [];
@@ -611,6 +655,32 @@ const AdminDashboard = () => {
             <h1 className="font-bold text-lg">ChekInn Admin</h1>
           </div>
           <div className="flex items-center gap-2">
+            <Button 
+              variant="outline" 
+              size="sm" 
+              onClick={() => handleRunBackfill(true)}
+              disabled={backfillRunning}
+            >
+              {backfillRunning ? (
+                <Loader2 className="w-4 h-4 mr-2 animate-spin" />
+              ) : (
+                <Sparkles className="w-4 h-4 mr-2" />
+              )}
+              {backfillRunning ? "Running..." : "Backfill Dry Run"}
+            </Button>
+            <Button 
+              variant="default" 
+              size="sm" 
+              onClick={() => handleRunBackfill(false)}
+              disabled={backfillRunning}
+            >
+              {backfillRunning ? (
+                <Loader2 className="w-4 h-4 mr-2 animate-spin" />
+              ) : (
+                <Sparkles className="w-4 h-4 mr-2" />
+              )}
+              Run Backfill
+            </Button>
             <Button variant="outline" size="sm" onClick={handleExportCSV}>
               <Download className="w-4 h-4 mr-2" />
               Export CSV
@@ -793,6 +863,65 @@ const AdminDashboard = () => {
             </p>
           )}
         </div>
+
+        {/* Backfill Results Banner */}
+        {backfillResults && (
+          <div className="bg-card border border-border rounded-xl p-4 mb-6">
+            <div className="flex items-center justify-between mb-3">
+              <h3 className="font-semibold flex items-center gap-2">
+                <Sparkles className="w-4 h-4 text-primary" />
+                Backfill Results {backfillResults.summary.dryRun ? "(Dry Run)" : ""}
+              </h3>
+              <Button 
+                variant="ghost" 
+                size="sm" 
+                onClick={() => setBackfillResults(null)}
+              >
+                <XCircle className="w-4 h-4" />
+              </Button>
+            </div>
+            <div className="grid grid-cols-4 gap-4 text-sm">
+              <div>
+                <p className="text-muted-foreground">Total Profiles</p>
+                <p className="font-bold text-lg">{backfillResults.summary.total}</p>
+              </div>
+              <div>
+                <p className="text-muted-foreground">Processed</p>
+                <p className="font-bold text-lg text-green-500">
+                  {backfillResults.summary.processed || backfillResults.summary.wouldProcess || 0}
+                </p>
+              </div>
+              <div>
+                <p className="text-muted-foreground">Skipped (low msgs)</p>
+                <p className="font-bold text-lg text-amber-500">{backfillResults.summary.skipped}</p>
+              </div>
+              <div>
+                <p className="text-muted-foreground">Errors</p>
+                <p className="font-bold text-lg text-red-500">{backfillResults.summary.errors}</p>
+              </div>
+            </div>
+            {backfillResults.results.filter(r => r.status === "success").length > 0 && (
+              <div className="mt-4 pt-4 border-t border-border">
+                <p className="text-sm text-muted-foreground mb-2">Successfully processed:</p>
+                <div className="flex flex-wrap gap-2">
+                  {backfillResults.results
+                    .filter(r => r.status === "success")
+                    .slice(0, 10)
+                    .map((r, i) => (
+                      <span key={i} className="text-xs bg-green-500/10 text-green-500 px-2 py-1 rounded">
+                        {r.insights?.full_name || r.userId.slice(0, 8)}
+                      </span>
+                    ))}
+                  {backfillResults.results.filter(r => r.status === "success").length > 10 && (
+                    <span className="text-xs text-muted-foreground">
+                      +{backfillResults.results.filter(r => r.status === "success").length - 10} more
+                    </span>
+                  )}
+                </div>
+              </div>
+            )}
+          </div>
+        )}
 
         {/* Tabs */}
         <Tabs defaultValue="funnel" className="space-y-4">

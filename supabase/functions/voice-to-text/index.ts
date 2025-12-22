@@ -1,9 +1,40 @@
+import "https://deno.land/x/xhr@0.1.0/mod.ts";
 import { serve } from "https://deno.land/std@0.168.0/http/server.ts";
 
 const corsHeaders = {
   'Access-Control-Allow-Origin': '*',
   'Access-Control-Allow-Headers': 'authorization, x-client-info, apikey, content-type',
 };
+
+// Process base64 in chunks to prevent memory issues
+function processBase64Chunks(base64String: string, chunkSize = 32768) {
+  const chunks: Uint8Array[] = [];
+  let position = 0;
+  
+  while (position < base64String.length) {
+    const chunk = base64String.slice(position, position + chunkSize);
+    const binaryChunk = atob(chunk);
+    const bytes = new Uint8Array(binaryChunk.length);
+    
+    for (let i = 0; i < binaryChunk.length; i++) {
+      bytes[i] = binaryChunk.charCodeAt(i);
+    }
+    
+    chunks.push(bytes);
+    position += chunkSize;
+  }
+
+  const totalLength = chunks.reduce((acc, chunk) => acc + chunk.length, 0);
+  const result = new Uint8Array(totalLength);
+  let offset = 0;
+
+  for (const chunk of chunks) {
+    result.set(chunk, offset);
+    offset += chunk.length;
+  }
+
+  return result;
+}
 
 serve(async (req) => {
   // Handle CORS preflight requests
@@ -18,55 +49,36 @@ serve(async (req) => {
       throw new Error('No audio data provided');
     }
 
-    console.log(`[voice-to-text] Processing audio, duration: ${duration}s`);
+    console.log(`[voice-to-text] Processing audio with OpenAI Whisper, duration: ${duration}s`);
 
-    const LOVABLE_API_KEY = Deno.env.get("LOVABLE_API_KEY");
-    if (!LOVABLE_API_KEY) {
-      throw new Error("LOVABLE_API_KEY is not configured");
+    const OPENAI_API_KEY = Deno.env.get("OPENAI_API_KEY");
+    if (!OPENAI_API_KEY) {
+      throw new Error("OPENAI_API_KEY is not configured");
     }
 
-    // Use Lovable AI for transcription with Gemini
-    // We'll send the audio as base64 and ask for transcription + translation
-    const response = await fetch("https://ai.gateway.lovable.dev/v1/chat/completions", {
-      method: "POST",
+    // Process audio in chunks to prevent memory issues
+    const binaryAudio = processBase64Chunks(audio);
+    
+    // Prepare form data for Whisper API
+    const formData = new FormData();
+    const blob = new Blob([binaryAudio], { type: 'audio/webm' });
+    formData.append('file', blob, 'audio.webm');
+    formData.append('model', 'whisper-1');
+    // Enable automatic language detection and translation to English
+    formData.append('response_format', 'verbose_json');
+
+    // Send to OpenAI Whisper API
+    const response = await fetch('https://api.openai.com/v1/audio/transcriptions', {
+      method: 'POST',
       headers: {
-        Authorization: `Bearer ${LOVABLE_API_KEY}`,
-        "Content-Type": "application/json",
+        'Authorization': `Bearer ${OPENAI_API_KEY}`,
       },
-      body: JSON.stringify({
-        model: "google/gemini-2.5-flash",
-        messages: [
-          {
-            role: "system",
-            content: `You are a speech transcription and translation assistant. 
-You will receive audio content and must:
-1. Transcribe the speech accurately
-2. If the speech is NOT in English, translate it to English
-3. Return ONLY the English text, nothing else - no explanations, no quotes, just the transcribed/translated text
-4. If you cannot understand the audio, return: "[Unable to transcribe audio]"`
-          },
-          {
-            role: "user",
-            content: [
-              {
-                type: "text",
-                text: "Transcribe and translate this audio to English. Return only the English text."
-              },
-              {
-                type: "image_url",
-                image_url: {
-                  url: `data:audio/webm;base64,${audio}`
-                }
-              }
-            ]
-          }
-        ],
-      }),
+      body: formData,
     });
 
     if (!response.ok) {
       const errorText = await response.text();
-      console.error(`[voice-to-text] AI gateway error: ${response.status}`, errorText);
+      console.error(`[voice-to-text] OpenAI API error: ${response.status}`, errorText);
       
       if (response.status === 429) {
         return new Response(
@@ -74,25 +86,45 @@ You will receive audio content and must:
           { status: 429, headers: { ...corsHeaders, "Content-Type": "application/json" } }
         );
       }
-      if (response.status === 402) {
-        return new Response(
-          JSON.stringify({ error: "Service temporarily unavailable. Please try text input." }),
-          { status: 402, headers: { ...corsHeaders, "Content-Type": "application/json" } }
-        );
-      }
       
-      throw new Error(`AI gateway error: ${response.status}`);
+      throw new Error(`OpenAI API error: ${response.status}`);
     }
 
-    const data = await response.json();
-    const transcribedText = data.choices?.[0]?.message?.content?.trim() || "";
+    const result = await response.json();
+    const transcribedText = result.text || "";
+    const detectedLanguage = result.language || "unknown";
 
-    console.log(`[voice-to-text] Transcription result: "${transcribedText.substring(0, 100)}..."`);
+    console.log(`[voice-to-text] Transcription successful. Language: ${detectedLanguage}, Text: "${transcribedText.substring(0, 100)}..."`);
+
+    // If non-English, translate using OpenAI translations endpoint
+    let finalText = transcribedText;
+    if (detectedLanguage !== "english" && detectedLanguage !== "en") {
+      console.log(`[voice-to-text] Detected non-English (${detectedLanguage}), translating...`);
+      
+      const translationFormData = new FormData();
+      translationFormData.append('file', blob, 'audio.webm');
+      translationFormData.append('model', 'whisper-1');
+      
+      const translationResponse = await fetch('https://api.openai.com/v1/audio/translations', {
+        method: 'POST',
+        headers: {
+          'Authorization': `Bearer ${OPENAI_API_KEY}`,
+        },
+        body: translationFormData,
+      });
+      
+      if (translationResponse.ok) {
+        const translationResult = await translationResponse.json();
+        finalText = translationResult.text || transcribedText;
+        console.log(`[voice-to-text] Translation successful: "${finalText.substring(0, 100)}..."`);
+      }
+    }
 
     return new Response(
       JSON.stringify({ 
-        text: transcribedText,
-        detected_language: "auto", // Gemini handles detection internally
+        text: finalText,
+        original_text: transcribedText,
+        detected_language: detectedLanguage,
         duration_seconds: duration
       }),
       { headers: { ...corsHeaders, "Content-Type": "application/json" } }

@@ -9,9 +9,12 @@ import { motion } from "framer-motion";
 import { Loader2, ArrowLeft, Sparkles } from "lucide-react";
 import { z } from "zod";
 import { useFunnelTracking } from "@/hooks/useFunnelTracking";
+import { LinkedInStep } from "@/components/auth/LinkedInStep";
 
 const emailSchema = z.string().email("Please enter a valid email");
 const passwordSchema = z.string().min(6, "Password must be at least 6 characters");
+
+type AuthStep = "credentials" | "linkedin";
 
 const Auth = () => {
   const { user, loading: authLoading } = useAuth();
@@ -20,6 +23,8 @@ const Auth = () => {
   const { trackEvent, trackPageView } = useFunnelTracking();
   const hasTrackedAuthStart = useRef(false);
   
+  const [step, setStep] = useState<AuthStep>("credentials");
+  const [newUserId, setNewUserId] = useState<string | null>(null);
   const [isSignUp, setIsSignUp] = useState(true);
   const [isForgotPassword, setIsForgotPassword] = useState(false);
   const [forgotStep, setForgotStep] = useState<"request" | "reset">("request");
@@ -142,11 +147,12 @@ const Auth = () => {
     }
   }, [email, password, isSignUp, trackEvent]);
 
+  // Redirect logged-in users (but not during LinkedIn step)
   useEffect(() => {
-    if (!authLoading && user) {
+    if (!authLoading && user && step === "credentials" && !newUserId) {
       navigate("/chat");
     }
-  }, [user, authLoading, navigate]);
+  }, [user, authLoading, navigate, step, newUserId]);
 
   const handleAuth = async (e: React.FormEvent) => {
     e.preventDefault();
@@ -168,7 +174,7 @@ const Auth = () => {
     }
 
     if (isSignUp) {
-      const { error } = await supabase.auth.signUp({
+      const { data: authData, error } = await supabase.auth.signUp({
         email,
         password,
         options: {
@@ -197,10 +203,16 @@ const Auth = () => {
       trackEvent("auth_complete", { mode: "signup", email });
       toast({
         title: "You're in! 🎉",
-        description: "Let's get to know you.",
+        description: "One more quick step to help us know you better.",
       });
-      // Navigate immediately after successful signup
-      navigate("/chat");
+      
+      // Show LinkedIn step for new signups
+      if (authData.user) {
+        setNewUserId(authData.user.id);
+        setStep("linkedin");
+      } else {
+        navigate("/chat");
+      }
     } else {
       const { error } = await supabase.auth.signInWithPassword({
         email,
@@ -232,11 +244,22 @@ const Auth = () => {
     );
   }
 
+  // Handle LinkedIn step completion
+  const handleLinkedInComplete = () => {
+    trackEvent("linkedin_enriched", { userId: newUserId });
+    navigate("/chat");
+  };
+
+  const handleLinkedInSkip = () => {
+    trackEvent("linkedin_skipped", { userId: newUserId });
+    navigate("/chat");
+  };
+
   return (
     <div className="min-h-screen bg-background flex flex-col">
       <header className="p-4">
         <button 
-          onClick={() => navigate("/")} 
+          onClick={() => step === "linkedin" ? setStep("credentials") : navigate("/")} 
           className="flex items-center gap-2 text-muted-foreground hover:text-foreground transition-colors"
         >
           <ArrowLeft className="w-5 h-5" />
@@ -245,11 +268,18 @@ const Auth = () => {
       </header>
 
       <div className="flex-1 flex items-center justify-center px-4 py-8">
-        <motion.div
-          initial={{ opacity: 0, y: 20 }}
-          animate={{ opacity: 1, y: 0 }}
-          className="w-full max-w-sm"
-        >
+        {step === "linkedin" && newUserId ? (
+          <LinkedInStep 
+            userId={newUserId} 
+            onComplete={handleLinkedInComplete} 
+            onSkip={handleLinkedInSkip} 
+          />
+        ) : (
+          <motion.div
+            initial={{ opacity: 0, y: 20 }}
+            animate={{ opacity: 1, y: 0 }}
+            className="w-full max-w-sm"
+          >
           {/* Quick step indicator */}
           <div className="flex items-center justify-center gap-2 mb-6">
             <div className="flex items-center gap-1.5 px-3 py-1.5 bg-primary/10 rounded-full">
@@ -459,6 +489,7 @@ const Auth = () => {
             </>
           )}
         </motion.div>
+        )}
       </div>
     </div>
   );

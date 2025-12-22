@@ -3,7 +3,7 @@ import { useAuth } from "@/hooks/useAuth";
 import { supabase } from "@/integrations/supabase/client";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
-import { Send, ArrowLeft, MessageCircle, Users, Clock, Sparkles } from "lucide-react";
+import { Send, ArrowLeft, MessageCircle, Users, Clock, Sparkles, Mic, Keyboard } from "lucide-react";
 import { motion, AnimatePresence } from "framer-motion";
 import { useNavigate } from "react-router-dom";
 import { useToast } from "@/hooks/use-toast";
@@ -15,8 +15,10 @@ import UserProfileCard from "@/components/chat/UserProfileCard";
 import ChatDebriefModal from "@/components/chat/ChatDebriefModal";
 import LearningSummaryNudge from "@/components/chat/LearningSummaryNudge";
 import SaveProgressNudge from "@/components/chat/SaveProgressNudge";
+import VoiceInput from "@/components/chat/VoiceInput";
 
 import { useFunnelTracking } from "@/hooks/useFunnelTracking";
+import { useVoiceExperiment, InputMode } from "@/hooks/useVoiceExperiment";
 
 interface Message {
   id: string;
@@ -98,6 +100,9 @@ const Chat = () => {
   const navigate = useNavigate();
   const { toast } = useToast();
   const { trackEvent } = useFunnelTracking();
+  
+  // Voice experiment
+  const voiceExperiment = useVoiceExperiment();
   const [messages, setMessages] = useState<Message[]>([]);
   const [source] = useState(() => getSource());
   const isUPSC = source === "upsc";
@@ -1173,22 +1178,62 @@ const Chat = () => {
             <div ref={messagesEndRef} />
           </div>
 
-          {/* Input */}
-          <div className="border-t border-border p-4 bg-background">
-            <div className="flex gap-2">
-              <Input
-                value={input}
-                onChange={(e) => setInput(e.target.value)}
-                onKeyDown={(e) => e.key === "Enter" && !e.shiftKey && handleSend()}
-                placeholder={showLoginNudge && !user ? "Sign up to continue..." : "Type a message..."}
-                className="flex-1"
-                disabled={sending || (showLoginNudge && !user)}
-              />
-              <Button onClick={() => handleSend()} disabled={!input.trim() || sending || (showLoginNudge && !user)} size="icon">
-                <Send className="w-4 h-4" />
-              </Button>
+          {/* Input - Voice or Text based on experiment variant */}
+          {voiceExperiment.currentInputMode === "voice" || voiceExperiment.isRecording ? (
+            <VoiceInput
+              isRecording={voiceExperiment.isRecording}
+              recordingDuration={voiceExperiment.recordingDuration}
+              audioLevel={voiceExperiment.audioLevel}
+              onStartRecording={voiceExperiment.startRecording}
+              onStopRecording={voiceExperiment.stopRecording}
+              onCancelRecording={voiceExperiment.cancelRecording}
+              onSwitchToText={() => voiceExperiment.switchInputMode("text")}
+              onTranscriptReady={(text) => {
+                voiceExperiment.trackMessageSent("voice", voiceExperiment.recordingDuration);
+                handleSend(text);
+              }}
+              disabled={sending || (showLoginNudge && !user)}
+              isVoiceFirst={voiceExperiment.isVoiceFirst}
+            />
+          ) : (
+            <div className="border-t border-border p-4 bg-background">
+              <div className="flex gap-2">
+                <Input
+                  value={input}
+                  onChange={(e) => setInput(e.target.value)}
+                  onKeyDown={(e) => {
+                    if (e.key === "Enter" && !e.shiftKey) {
+                      voiceExperiment.trackMessageSent("text");
+                      handleSend();
+                    }
+                  }}
+                  placeholder={showLoginNudge && !user ? "Sign up to continue..." : "Type a message..."}
+                  className="flex-1"
+                  disabled={sending || (showLoginNudge && !user)}
+                />
+                <Button
+                  variant="ghost"
+                  size="icon"
+                  onClick={() => voiceExperiment.switchInputMode("voice")}
+                  disabled={sending || (showLoginNudge && !user)}
+                  className="text-muted-foreground hover:text-primary"
+                  title="Use voice instead"
+                >
+                  <Mic className="w-4 h-4" />
+                </Button>
+                <Button 
+                  onClick={() => {
+                    voiceExperiment.trackMessageSent("text");
+                    handleSend();
+                  }} 
+                  disabled={!input.trim() || sending || (showLoginNudge && !user)} 
+                  size="icon"
+                >
+                  <Send className="w-4 h-4" />
+                </Button>
+              </div>
             </div>
-          </div>
+          )}
         </>
       ) : (
         /* Connections View */

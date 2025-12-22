@@ -62,6 +62,10 @@ async function getDecision(
       ? earlierMessages.map((m: any) => `${m.role}: ${m.content.slice(0, 100)}...`).join("\n")
       : "No prior context.";
 
+    // Force transition after message threshold
+    const userMessageCount = messages.filter((m: any) => m.role === "user").length;
+    const shouldForceTransition = userMessageCount >= 6; // After 6 user messages (12 total), force transition
+
     const decisionPrompt = `You are an internal decision engine for ChekInn.
 
 Your job is to decide HOW the assistant should respond, not WHAT it should say.
@@ -83,7 +87,7 @@ Interaction modes:
 Rules:
 - Default to "reflect"
 - Use "guide" only if the user asks what to do or feels stuck
-- Never force social connection
+${shouldForceTransition ? '- IMPORTANT: We have enough context now. Set consider_social to TRUE.' : '- Consider social connection only if we have 2-3 key facts about the user.'}
 - Prefer emotional safety over advice`;
 
     const userPrompt = `Conversation so far:
@@ -141,11 +145,14 @@ Return JSON with:
     const decision = JSON.parse(jsonString.trim());
     console.log("Decision layer output:", JSON.stringify(decision));
     
+    // Force consider_social if threshold reached
+    const parsedConsiderSocial = shouldForceTransition ? true : (decision.consider_social || false);
+    
     return {
       mode: decision.mode || "reflect",
       tone: decision.tone || "soft",
       use_experiences: decision.use_experiences || false,
-      consider_social: decision.consider_social || false
+      consider_social: parsedConsiderSocial
     };
   } catch (error) {
     console.error("Decision layer error:", error);
@@ -193,7 +200,8 @@ async function assembleContext(
 function buildSystemPrompt(
   decision: DecisionOutput,
   profileContext: ProfileContext | null,
-  userContext: UserContext
+  userContext: UserContext,
+  messageCount: number
 ): string {
   const { mode, tone, use_experiences, consider_social } = decision;
   const { source, isAuthenticated } = userContext;
@@ -223,8 +231,14 @@ function buildSystemPrompt(
 
   // Connection transition guidance
   const connectionGuidance = isAuthenticated 
-    ? `When you have enough context, say: "I have a sense of where you're at. The ChekInn team will look for someone who's been through this and reach out within 12-24 hours via email."`
-    : `When you have enough context, say: "I have a sense of where you're at. The ChekInn team will look for someone who's been through this — just drop your email so they can reach you within 12-24 hours."`;
+    ? `Say: "I have a sense of where you're at. The ChekInn team will look for someone who's been through this and reach out within 12-24 hours via email."`
+    : `Say: "I have a sense of where you're at. The ChekInn team will look for someone who's been through this — just drop your email so they can reach you within 12-24 hours."`;
+
+  // Force transition after threshold
+  const shouldTransitionNow = messageCount >= 6;
+  const transitionInstruction = shouldTransitionNow 
+    ? `\n\n⚠️ CRITICAL: You have gathered enough context (${messageCount} messages). In THIS response, you MUST transition to connection. Do NOT ask more questions. ${connectionGuidance}`
+    : "";
 
   return `You are ChekInn — a warm, focused companion who gathers context efficiently.
 
@@ -232,14 +246,17 @@ Your role is to understand the user quickly so you can connect them with the rig
 
 CURRENT MODE: ${mode}
 TONE: ${tone}
+MESSAGE COUNT: ${messageCount} user messages so far
 ${sourceContext}
-${personalContextSection}
+${personalContextSection}${transitionInstruction}
+
 ––––– CORE BEHAVIOR –––––
 
-1. Combine empathy WITH a question in every response.
+1. Combine empathy WITH a question in every response (unless transitioning).
 2. Keep responses to 1-2 sentences max.
 3. Ask specific, concrete questions — not open-ended ones.
 4. Move the conversation forward, don't just reflect.
+5. ${shouldTransitionNow ? 'STOP ASKING QUESTIONS. Transition to connection NOW.' : 'After 2-3 key facts, transition to connection.'}
 
 GOOD examples:
 - "That sounds heavy — are you in Prelims prep or Mains right now?"
@@ -264,7 +281,7 @@ For general users:
 2. What they're trying to figure out
 3. What kind of person would help
 
-Once you have 2-3 key facts, you have enough context.
+Once you have 2-3 key facts, you have enough context. ${shouldTransitionNow ? 'You definitely have enough now!' : ''}
 
 ––––– CONTEXT USAGE –––––
 
@@ -272,10 +289,10 @@ ${use_experiences ? "You may briefly reference others in similar situations to b
 
 ––––– TRANSITION TO CONNECTION –––––
 
-${consider_social ? `When you have enough context (2-3 key facts gathered):
+${consider_social || shouldTransitionNow ? `${shouldTransitionNow ? 'MANDATORY: Transition NOW. ' : 'When you have enough context: '}
 ${connectionGuidance}
 
-Don't keep asking questions indefinitely. Move to connection once you understand their situation.` : "Do not mention social connections or introductions in this response."}
+Do not keep asking questions indefinitely. Move to connection once you understand their situation.` : "Do not mention social connections or introductions in this response."}
 
 ––––– HARD CONSTRAINTS –––––
 
@@ -284,12 +301,13 @@ Don't keep asking questions indefinitely. Move to connection once you understand
 - Never fabricate facts or claim capabilities you don't have.
 - Never claim you've already found someone.
 - Keep it conversational and concise.
+${shouldTransitionNow ? '- DO NOT ASK MORE QUESTIONS. TRANSITION NOW.' : ''}
 
 ––––– RESPONSE FORMAT –––––
 
-[Brief empathy/acknowledgment] + [Specific question OR transition to connection]
+${shouldTransitionNow ? '[Brief acknowledgment of what you learned] + [Transition message asking for email or confirming next steps]' : '[Brief empathy/acknowledgment] + [Specific question OR transition to connection]'}
 
-Example: "That's a real grind. Are you doing this alongside work or full-time prep?"`;
+Example: ${shouldTransitionNow ? '"Sounds like you\'re a 2nd attempt candidate focused on Mains with Sociology optional. The ChekInn team will find someone who\'s been through this — just drop your email so they can reach you within 12-24 hours."' : '"That\'s a real grind. Are you doing this alongside work or full-time prep?"'}`;
 }
 
 // =============================================================================
@@ -469,17 +487,18 @@ serve(async (req) => {
     };
 
     const userMessages = messages.filter((m: any) => m.role === "user");
-    console.log(`Chat: user=${userId}, source=${source}, msgCount=${userMessages.length}, returning=${isReturningUser}, firstMsg=${isFirstMessageOfSession}`);
+    const userMessageCount = userMessages.length;
+    console.log(`Chat: user=${userId}, source=${source}, msgCount=${userMessageCount}, returning=${isReturningUser}, firstMsg=${isFirstMessageOfSession}`);
 
     // STEP 1: Get decision (fast, non-streaming)
     const decision = await getDecision(messages, userContext, LOVABLE_API_KEY);
-    console.log(`Decision: mode=${decision.mode}, tone=${decision.tone}, social=${decision.consider_social}`);
+    console.log(`Decision: mode=${decision.mode}, tone=${decision.tone}, social=${decision.consider_social}, forceTransition=${userMessageCount >= 6}`);
 
     // STEP 2: Assemble context (profile data)
     const profileContext = await assembleContext(userId, LOVABLE_API_KEY);
 
-    // STEP 3: Build clean system prompt
-    const systemPrompt = buildSystemPrompt(decision, profileContext, userContext);
+    // STEP 3: Build clean system prompt with message count
+    const systemPrompt = buildSystemPrompt(decision, profileContext, userContext, userMessageCount);
 
     // Only send recent messages (last 8 turns = 16 messages max)
     const recentMessages = messages.slice(-16);

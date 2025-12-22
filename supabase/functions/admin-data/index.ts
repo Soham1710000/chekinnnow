@@ -311,6 +311,92 @@ Deno.serve(async (req) => {
     // Recent events for detailed view
     const recentEvents = events.slice(0, 50);
 
+    // ===== VOICE EXPERIMENT ANALYTICS =====
+    const voiceEvents = events.filter(e => 
+      e.event_type === "experiment_assigned" ||
+      e.event_type === "voice_recording_started" ||
+      e.event_type === "voice_recording_completed" ||
+      e.event_type === "voice_recording_abandoned" ||
+      e.event_type === "input_mode_switched" ||
+      e.event_type === "message_sent"
+    );
+
+    // Sessions by variant
+    const voiceFirstSessions = new Set(
+      events.filter(e => e.event_type === "experiment_assigned" && e.metadata?.variant === "VOICE_FIRST")
+        .map(e => e.session_id)
+    );
+    const textFirstSessions = new Set(
+      events.filter(e => e.event_type === "experiment_assigned" && e.metadata?.variant === "TEXT_FIRST")
+        .map(e => e.session_id)
+    );
+
+    // Message counts by input mode
+    const voiceMessages = events.filter(e => e.event_type === "message_sent" && e.metadata?.input_mode === "voice");
+    const textMessages = events.filter(e => e.event_type === "message_sent" && e.metadata?.input_mode === "text");
+
+    // Voice recording stats
+    const voiceRecordingsStarted = events.filter(e => e.event_type === "voice_recording_started").length;
+    const voiceRecordingsCompleted = events.filter(e => e.event_type === "voice_recording_completed");
+    const voiceRecordingsAbandoned = events.filter(e => e.event_type === "voice_recording_abandoned").length;
+
+    // Calculate avg voice duration
+    const voiceDurations = voiceRecordingsCompleted
+      .map(e => e.metadata?.duration_seconds || 0)
+      .filter(d => d > 0);
+    const avgVoiceDuration = voiceDurations.length > 0 
+      ? Math.round(voiceDurations.reduce((a, b) => a + b, 0) / voiceDurations.length * 10) / 10
+      : 0;
+    const maxVoiceDuration = voiceDurations.length > 0 ? Math.max(...voiceDurations) : 0;
+
+    // Messages per session by variant
+    const getMessagesPerSession = (sessionIds: Set<string>) => {
+      const sessionMessages: Record<string, number> = {};
+      events.filter(e => e.event_type === "message_sent" && sessionIds.has(e.session_id || ""))
+        .forEach(e => {
+          sessionMessages[e.session_id || ""] = (sessionMessages[e.session_id || ""] || 0) + 1;
+        });
+      const counts = Object.values(sessionMessages);
+      return counts.length > 0 ? Math.round(counts.reduce((a, b) => a + b, 0) / counts.length * 10) / 10 : 0;
+    };
+
+    // Auth completion by variant
+    const voiceFirstAuthComplete = events.filter(e => 
+      e.event_type === "auth_complete" && voiceFirstSessions.has(e.session_id || "")
+    ).length;
+    const textFirstAuthComplete = events.filter(e => 
+      e.event_type === "auth_complete" && textFirstSessions.has(e.session_id || "")
+    ).length;
+
+    const voiceExperimentStats = {
+      voice_first_sessions: voiceFirstSessions.size,
+      text_first_sessions: textFirstSessions.size,
+      voice_messages_count: voiceMessages.length,
+      text_messages_count: textMessages.length,
+      voice_recordings_started: voiceRecordingsStarted,
+      voice_recordings_completed: voiceRecordingsCompleted.length,
+      voice_recordings_abandoned: voiceRecordingsAbandoned,
+      voice_abandon_rate: voiceRecordingsStarted > 0 
+        ? Math.round((voiceRecordingsAbandoned / voiceRecordingsStarted) * 100) 
+        : 0,
+      avg_voice_duration_seconds: avgVoiceDuration,
+      max_voice_duration_seconds: maxVoiceDuration,
+      avg_messages_voice_first: getMessagesPerSession(voiceFirstSessions),
+      avg_messages_text_first: getMessagesPerSession(textFirstSessions),
+      voice_first_auth_complete: voiceFirstAuthComplete,
+      text_first_auth_complete: textFirstAuthComplete,
+      voice_first_conversion_rate: voiceFirstSessions.size > 0 
+        ? Math.round((voiceFirstAuthComplete / voiceFirstSessions.size) * 100) 
+        : 0,
+      text_first_conversion_rate: textFirstSessions.size > 0 
+        ? Math.round((textFirstAuthComplete / textFirstSessions.size) * 100) 
+        : 0,
+      // Input mode switches
+      mode_switches: events.filter(e => e.event_type === "input_mode_switched").length,
+      // Recent voice events
+      recent_voice_events: voiceEvents.slice(0, 30),
+    };
+
     // Calculate engagement metrics
     const engagementMetrics = {
       total_users: enrichedProfiles.length,
@@ -337,6 +423,7 @@ Deno.serve(async (req) => {
         leads: leads || [],
         returningUserStats,
         engagementMetrics,
+        voiceExperimentStats,
       }),
       { headers: { ...corsHeaders, "Content-Type": "application/json" } }
     );

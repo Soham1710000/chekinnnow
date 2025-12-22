@@ -13,7 +13,16 @@ type FunnelEvent =
   | "save_progress_shown"
   | "save_progress_captured"
   | "linkedin_enriched"
-  | "linkedin_skipped";
+  | "linkedin_skipped"
+  // Voice experiment events
+  | "experiment_assigned"
+  | "voice_recording_started"
+  | "voice_recording_completed"
+  | "voice_recording_abandoned"
+  | "voice_recording_error"
+  | "voice_transcription_error"
+  | "input_mode_switched"
+  | "message_sent";
 
 // Generate or retrieve session ID for anonymous tracking
 const getSessionId = (): string => {

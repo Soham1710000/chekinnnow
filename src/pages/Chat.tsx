@@ -126,7 +126,6 @@ const Chat = () => {
   const [userProfile, setUserProfile] = useState<any>(null);
   const [showLoginNudge, setShowLoginNudge] = useState(false);
   const [showSaveProgress, setShowSaveProgress] = useState(false);
-  const [emailCaptured, setEmailCaptured] = useState(false);
   const [sessionId] = useState(() => getSessionId());
   const [showOnboarding, setShowOnboarding] = useState(false);
   const [showDebriefModal, setShowDebriefModal] = useState(false);
@@ -336,7 +335,7 @@ const Chat = () => {
   // Check if we should show save progress nudge (after 3 messages) or login nudge (after 5)
   const variant = sessionStorage.getItem("ab_variant");
   useEffect(() => {
-    if (!user && variant !== "C" && !emailCaptured) {
+    if (!user && variant !== "C") {
       const userMsgCount = localMessages.filter(m => m.role === "user").length;
       
       // Show save progress nudge at 3 messages (mid-conversation)
@@ -351,7 +350,7 @@ const Chat = () => {
         setShowLoginNudge(true);
       }
     }
-  }, [localMessages, user, variant, emailCaptured, trackEvent]);
+  }, [localMessages, user, variant, trackEvent]);
 
   // Save anonymous chat to leads table
   const saveLeadToDb = async (msgs: Message[]) => {
@@ -1080,20 +1079,14 @@ const Chat = () => {
               {/* Progress Indicator - DISABLED for now */}
 
               {/* Save Progress Nudge - shown after 3 messages (mid-conversation) */}
-              {showSaveProgress && !user && !emailCaptured && !showLoginNudge && (
+              {showSaveProgress && !user && !showLoginNudge && (
                 <SaveProgressNudge
-                  sessionId={sessionId}
-                  onEmailCaptured={(email) => {
-                    setEmailCaptured(true);
-                    setShowSaveProgress(false);
-                    trackEvent("save_progress_captured" as any, { email });
-                  }}
                   onDismiss={() => setShowSaveProgress(false)}
                 />
               )}
 
               {/* Login Nudge for Anonymous Users - shown after 5 messages */}
-              {showLoginNudge && !user && !emailCaptured && (
+              {showLoginNudge && !user && (
                 <motion.div
                   initial={{ opacity: 0, scale: 0.95, y: 20 }}
                   animate={{ opacity: 1, scale: 1, y: 0 }}
@@ -1108,15 +1101,17 @@ const Chat = () => {
                     I've learned enough about you. Quick signup so I can save your profile and find the right connections for you.
                   </p>
                   
-                  <SaveProgressNudge
-                    sessionId={sessionId}
-                    onEmailCaptured={(email) => {
-                      setEmailCaptured(true);
-                      setShowLoginNudge(false);
-                      trackEvent("save_progress_captured" as any, { email });
-                    }}
-                    onDismiss={() => navigate("/auth")}
-                  />
+                  <Button 
+                    onClick={() => navigate("/auth")} 
+                    className="w-full"
+                    size="lg"
+                  >
+                    Continue with Email →
+                  </Button>
+                  
+                  <p className="text-xs text-muted-foreground text-center mt-3">
+                    Takes 30 seconds • Your conversation is saved
+                  </p>
                 </motion.div>
               )}
 
@@ -1185,11 +1180,11 @@ const Chat = () => {
                 value={input}
                 onChange={(e) => setInput(e.target.value)}
                 onKeyDown={(e) => e.key === "Enter" && !e.shiftKey && handleSend()}
-                placeholder={showLoginNudge && !user && !emailCaptured ? "Enter email above to continue..." : "Type a message..."}
+                placeholder={showLoginNudge && !user ? "Sign up to continue..." : "Type a message..."}
                 className="flex-1"
-                disabled={sending || (showLoginNudge && !user && !emailCaptured)}
+                disabled={sending || (showLoginNudge && !user)}
               />
-              <Button onClick={() => handleSend()} disabled={!input.trim() || sending || (showLoginNudge && !user && !emailCaptured)} size="icon">
+              <Button onClick={() => handleSend()} disabled={!input.trim() || sending || (showLoginNudge && !user)} size="icon">
                 <Send className="w-4 h-4" />
               </Button>
             </div>

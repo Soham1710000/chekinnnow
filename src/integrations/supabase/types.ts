@@ -14,6 +14,56 @@ export type Database = {
   }
   public: {
     Tables: {
+      chat_debriefs: {
+        Row: {
+          ai_summary: string | null
+          chat_quality: string | null
+          created_at: string
+          id: string
+          introduction_id: string
+          key_learnings: string[] | null
+          rating: number | null
+          updated_at: string
+          user_id: string
+          what_learned: string | null
+          would_chat_again: boolean | null
+        }
+        Insert: {
+          ai_summary?: string | null
+          chat_quality?: string | null
+          created_at?: string
+          id?: string
+          introduction_id: string
+          key_learnings?: string[] | null
+          rating?: number | null
+          updated_at?: string
+          user_id: string
+          what_learned?: string | null
+          would_chat_again?: boolean | null
+        }
+        Update: {
+          ai_summary?: string | null
+          chat_quality?: string | null
+          created_at?: string
+          id?: string
+          introduction_id?: string
+          key_learnings?: string[] | null
+          rating?: number | null
+          updated_at?: string
+          user_id?: string
+          what_learned?: string | null
+          would_chat_again?: boolean | null
+        }
+        Relationships: [
+          {
+            foreignKeyName: "chat_debriefs_introduction_id_fkey"
+            columns: ["introduction_id"]
+            isOneToOne: false
+            referencedRelation: "introductions"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
       chat_messages: {
         Row: {
           content: string

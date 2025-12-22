@@ -12,6 +12,8 @@ import UserChatView from "@/components/chat/UserChatView";
 import LearningProgress from "@/components/chat/LearningProgress";
 import OnboardingOverlay from "@/components/chat/OnboardingOverlay";
 import UserProfileCard from "@/components/chat/UserProfileCard";
+import ChatDebriefModal from "@/components/chat/ChatDebriefModal";
+import LearningSummaryNudge from "@/components/chat/LearningSummaryNudge";
 
 import { useFunnelTracking } from "@/hooks/useFunnelTracking";
 
@@ -123,10 +125,15 @@ const Chat = () => {
   const [showLoginNudge, setShowLoginNudge] = useState(false);
   const [sessionId] = useState(() => getSessionId());
   const [showOnboarding, setShowOnboarding] = useState(false);
+  const [showDebriefModal, setShowDebriefModal] = useState(false);
+  const [debriefIntro, setDebriefIntro] = useState<Introduction | null>(null);
+  const [hasDebriefs, setHasDebriefs] = useState(false);
+  const [showLearningSummary, setShowLearningSummary] = useState(true);
   const messagesEndRef = useRef<HTMLDivElement>(null);
   const hasTrackedPageLoad = useRef(false);
   const hasSentInitialMessage = useRef(false);
   const debriefedIntros = useRef<Set<string>>(new Set()); // Track intros we've already debriefed
+  const chatMessageCounts = useRef<Record<string, number>>({}); // Track message counts per intro
 
   const handleOnboardingComplete = () => {
     sessionStorage.setItem("chekinn_onboarding_seen", "true");
@@ -171,8 +178,25 @@ const Chat = () => {
       checkLearningStatus();
       loadUnreadCounts();
       subscribeToUserChats();
+      loadDebriefStatus();
     }
   }, [user]);
+
+  // Load debrief status for returning users
+  const loadDebriefStatus = async () => {
+    if (!user) return;
+    
+    const { data, error } = await supabase
+      .from("chat_debriefs")
+      .select("id, introduction_id")
+      .eq("user_id", user.id);
+    
+    if (!error && data && data.length > 0) {
+      setHasDebriefs(true);
+      // Mark debriefed intros so we don't ask again
+      data.forEach((d) => debriefedIntros.current.add(d.introduction_id));
+    }
+  };
 
   // Load unread message counts for each introduction
   const loadUnreadCounts = async () => {
@@ -228,8 +252,16 @@ const Chat = () => {
     };
   };
 
-  // Clear unread count when opening a chat
+  // Clear unread count when opening a chat and track message count
   const handleOpenChat = async (intro: Introduction) => {
+    // Store current message count before entering chat
+    const { count } = await supabase
+      .from("user_chats")
+      .select("id", { count: "exact", head: true })
+      .eq("introduction_id", intro.id);
+    
+    chatMessageCounts.current[intro.id] = count || 0;
+    
     setActiveChat(intro);
     
     // Mark messages as read
@@ -253,10 +285,45 @@ const Chat = () => {
   useEffect(() => {
     // If user just closed a user-to-user chat (activeChat went from something to null)
     if (prevActiveChat.current && !activeChat && user && introductions.length > 0) {
-      // Small delay to let the UI settle
-      setTimeout(() => {
-        checkInOnActiveIntros();
-      }, 500);
+      const closedIntro = prevActiveChat.current;
+      
+      // Check if this is the first time returning from this chat with messages
+      // and we haven't debriefed yet
+      const shouldDebrief = async () => {
+        // Check current message count
+        const { count: newCount } = await supabase
+          .from("user_chats")
+          .select("id", { count: "exact", head: true })
+          .eq("introduction_id", closedIntro.id);
+        
+        const previousCount = chatMessageCounts.current[closedIntro.id] || 0;
+        const hasNewMessages = (newCount || 0) > previousCount;
+        const hasEnoughMessages = (newCount || 0) >= 3; // At least 3 messages exchanged
+        
+        // Show debrief if: has enough messages, hasn't been debriefed, and user participated
+        if (hasEnoughMessages && !debriefedIntros.current.has(closedIntro.id)) {
+          // Check if user actually sent messages in this chat
+          const { count: userMsgCount } = await supabase
+            .from("user_chats")
+            .select("id", { count: "exact", head: true })
+            .eq("introduction_id", closedIntro.id)
+            .eq("sender_id", user.id);
+          
+          if ((userMsgCount || 0) >= 1) {
+            // Show debrief modal
+            setDebriefIntro(closedIntro);
+            setShowDebriefModal(true);
+            return;
+          }
+        }
+        
+        // Otherwise, do the regular check-in
+        setTimeout(() => {
+          checkInOnActiveIntros();
+        }, 500);
+      };
+      
+      shouldDebrief();
     }
     prevActiveChat.current = activeChat;
   }, [activeChat, user, introductions]);
@@ -818,8 +885,33 @@ const Chat = () => {
     );
   }
 
+  // Handle debrief completion
+  const handleDebriefComplete = () => {
+    if (debriefIntro) {
+      debriefedIntros.current.add(debriefIntro.id);
+      setHasDebriefs(true);
+    }
+    setShowDebriefModal(false);
+    setDebriefIntro(null);
+  };
+
   return (
     <div className="min-h-screen bg-background flex flex-col relative">
+      {/* Debrief Modal */}
+      {showDebriefModal && debriefIntro && user && (
+        <ChatDebriefModal
+          isOpen={showDebriefModal}
+          onClose={() => {
+            setShowDebriefModal(false);
+            setDebriefIntro(null);
+          }}
+          introductionId={debriefIntro.id}
+          otherUserName={debriefIntro.other_user?.full_name || "your connection"}
+          userId={user.id}
+          onComplete={handleDebriefComplete}
+        />
+      )}
+
       {/* Onboarding overlay for new users */}
       <AnimatePresence>
         {showOnboarding && (
@@ -907,6 +999,15 @@ const Chat = () => {
           
           {/* Messages */}
           <div className="flex-1 overflow-y-auto p-4 space-y-4">
+            {/* Learning Summary Nudge for returning users with debriefs */}
+            {user && hasDebriefs && showLearningSummary && activeIntros.length > 0 && (
+              <LearningSummaryNudge
+                userId={user.id}
+                hasDebriefs={hasDebriefs}
+                onDismiss={() => setShowLearningSummary(false)}
+              />
+            )}
+
             <AnimatePresence mode="popLayout">
               {activeMessages.map((msg, index) => (
                 <motion.div

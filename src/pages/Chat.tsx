@@ -14,6 +14,7 @@ import OnboardingOverlay from "@/components/chat/OnboardingOverlay";
 import UserProfileCard from "@/components/chat/UserProfileCard";
 import ChatDebriefModal from "@/components/chat/ChatDebriefModal";
 import LearningSummaryNudge from "@/components/chat/LearningSummaryNudge";
+import SaveProgressNudge from "@/components/chat/SaveProgressNudge";
 
 import { useFunnelTracking } from "@/hooks/useFunnelTracking";
 
@@ -45,6 +46,7 @@ interface Introduction {
 
 const CHAT_URL = `${import.meta.env.VITE_SUPABASE_URL}/functions/v1/chat-ai`;
 const LOGIN_NUDGE_THRESHOLD = 5;
+const SAVE_PROGRESS_THRESHOLD = 3; // Show save progress nudge after 3 messages
 
 // Generate or get session ID for anonymous users
 const getSessionId = () => {
@@ -123,6 +125,8 @@ const Chat = () => {
   const [learningComplete, setLearningComplete] = useState(false);
   const [userProfile, setUserProfile] = useState<any>(null);
   const [showLoginNudge, setShowLoginNudge] = useState(false);
+  const [showSaveProgress, setShowSaveProgress] = useState(false);
+  const [emailCaptured, setEmailCaptured] = useState(false);
   const [sessionId] = useState(() => getSessionId());
   const [showOnboarding, setShowOnboarding] = useState(false);
   const [showDebriefModal, setShowDebriefModal] = useState(false);
@@ -132,6 +136,7 @@ const Chat = () => {
   const messagesEndRef = useRef<HTMLDivElement>(null);
   const hasTrackedPageLoad = useRef(false);
   const hasSentInitialMessage = useRef(false);
+  const hasShownSaveProgress = useRef(false);
   const debriefedIntros = useRef<Set<string>>(new Set()); // Track intros we've already debriefed
   const chatMessageCounts = useRef<Record<string, number>>({}); // Track message counts per intro
 
@@ -328,16 +333,25 @@ const Chat = () => {
     prevActiveChat.current = activeChat;
   }, [activeChat, user, introductions]);
 
-  // Check if we should show login nudge for anonymous users (not for variant C)
+  // Check if we should show save progress nudge (after 3 messages) or login nudge (after 5)
   const variant = sessionStorage.getItem("ab_variant");
   useEffect(() => {
-    if (!user && variant !== "C") {
+    if (!user && variant !== "C" && !emailCaptured) {
       const userMsgCount = localMessages.filter(m => m.role === "user").length;
+      
+      // Show save progress nudge at 3 messages (mid-conversation)
+      if (userMsgCount >= SAVE_PROGRESS_THRESHOLD && !hasShownSaveProgress.current) {
+        hasShownSaveProgress.current = true;
+        setShowSaveProgress(true);
+        trackEvent("save_progress_shown" as any);
+      }
+      
+      // Show login nudge at 5 messages (blocks further input)
       if (userMsgCount >= LOGIN_NUDGE_THRESHOLD) {
         setShowLoginNudge(true);
       }
     }
-  }, [localMessages, user, variant]);
+  }, [localMessages, user, variant, emailCaptured, trackEvent]);
 
   // Save anonymous chat to leads table
   const saveLeadToDb = async (msgs: Message[]) => {
@@ -1065,8 +1079,21 @@ const Chat = () => {
 
               {/* Progress Indicator - DISABLED for now */}
 
-              {/* Login Nudge for Anonymous Users */}
-              {showLoginNudge && !user && (
+              {/* Save Progress Nudge - shown after 3 messages (mid-conversation) */}
+              {showSaveProgress && !user && !emailCaptured && !showLoginNudge && (
+                <SaveProgressNudge
+                  sessionId={sessionId}
+                  onEmailCaptured={(email) => {
+                    setEmailCaptured(true);
+                    setShowSaveProgress(false);
+                    trackEvent("save_progress_captured" as any, { email });
+                  }}
+                  onDismiss={() => setShowSaveProgress(false)}
+                />
+              )}
+
+              {/* Login Nudge for Anonymous Users - shown after 5 messages */}
+              {showLoginNudge && !user && !emailCaptured && (
                 <motion.div
                   initial={{ opacity: 0, scale: 0.95, y: 20 }}
                   animate={{ opacity: 1, scale: 1, y: 0 }}
@@ -1081,17 +1108,15 @@ const Chat = () => {
                     I've learned enough about you. Quick signup so I can save your profile and find the right connections for you.
                   </p>
                   
-                  <Button 
-                    onClick={() => navigate("/auth")} 
-                    className="w-full"
-                    size="lg"
-                  >
-                    Continue with Email →
-                  </Button>
-                  
-                  <p className="text-xs text-muted-foreground text-center mt-3">
-                    Takes 30 seconds • Your conversation is saved
-                  </p>
+                  <SaveProgressNudge
+                    sessionId={sessionId}
+                    onEmailCaptured={(email) => {
+                      setEmailCaptured(true);
+                      setShowLoginNudge(false);
+                      trackEvent("save_progress_captured" as any, { email });
+                    }}
+                    onDismiss={() => navigate("/auth")}
+                  />
                 </motion.div>
               )}
 
@@ -1160,11 +1185,11 @@ const Chat = () => {
                 value={input}
                 onChange={(e) => setInput(e.target.value)}
                 onKeyDown={(e) => e.key === "Enter" && !e.shiftKey && handleSend()}
-                placeholder={showLoginNudge && !user ? "Sign up to continue..." : "Type a message..."}
+                placeholder={showLoginNudge && !user && !emailCaptured ? "Enter email above to continue..." : "Type a message..."}
                 className="flex-1"
-                disabled={sending || (showLoginNudge && !user)}
+                disabled={sending || (showLoginNudge && !user && !emailCaptured)}
               />
-              <Button onClick={() => handleSend()} disabled={!input.trim() || sending || (showLoginNudge && !user)} size="icon">
+              <Button onClick={() => handleSend()} disabled={!input.trim() || sending || (showLoginNudge && !user && !emailCaptured)} size="icon">
                 <Send className="w-4 h-4" />
               </Button>
             </div>

@@ -274,6 +274,33 @@ export type Database = {
         }
         Relationships: []
       }
+      undercurrents: {
+        Row: {
+          active: boolean | null
+          created_at: string
+          id: string
+          interpretation: string
+          observation: string
+          uncertainty_clause: string
+        }
+        Insert: {
+          active?: boolean | null
+          created_at?: string
+          id?: string
+          interpretation: string
+          observation: string
+          uncertainty_clause: string
+        }
+        Update: {
+          active?: boolean | null
+          created_at?: string
+          id?: string
+          interpretation?: string
+          observation?: string
+          uncertainty_clause?: string
+        }
+        Relationships: []
+      }
       user_chats: {
         Row: {
           content: string
@@ -312,6 +339,51 @@ export type Database = {
           },
         ]
       }
+      user_reputation: {
+        Row: {
+          created_at: string
+          discretion_score: number
+          frozen_until: string | null
+          id: string
+          impact_score: number
+          last_active_at: string | null
+          pull_score: number
+          thought_quality: number
+          undercurrents_unlocked: boolean | null
+          undercurrents_unlocked_at: string | null
+          updated_at: string
+          user_id: string
+        }
+        Insert: {
+          created_at?: string
+          discretion_score?: number
+          frozen_until?: string | null
+          id?: string
+          impact_score?: number
+          last_active_at?: string | null
+          pull_score?: number
+          thought_quality?: number
+          undercurrents_unlocked?: boolean | null
+          undercurrents_unlocked_at?: string | null
+          updated_at?: string
+          user_id: string
+        }
+        Update: {
+          created_at?: string
+          discretion_score?: number
+          frozen_until?: string | null
+          id?: string
+          impact_score?: number
+          last_active_at?: string | null
+          pull_score?: number
+          thought_quality?: number
+          undercurrents_unlocked?: boolean | null
+          undercurrents_unlocked_at?: string | null
+          updated_at?: string
+          user_id?: string
+        }
+        Relationships: []
+      }
       user_roles: {
         Row: {
           id: string
@@ -329,6 +401,56 @@ export type Database = {
           user_id?: string
         }
         Relationships: []
+      }
+      user_undercurrent_interactions: {
+        Row: {
+          created_at: string
+          id: string
+          responded_at: string | null
+          response_evaluated: boolean | null
+          response_prompt: string | null
+          response_text: string | null
+          undercurrent_id: string
+          user_id: string
+          viewed_at: string
+          week_number: number
+          year: number
+        }
+        Insert: {
+          created_at?: string
+          id?: string
+          responded_at?: string | null
+          response_evaluated?: boolean | null
+          response_prompt?: string | null
+          response_text?: string | null
+          undercurrent_id: string
+          user_id: string
+          viewed_at?: string
+          week_number: number
+          year: number
+        }
+        Update: {
+          created_at?: string
+          id?: string
+          responded_at?: string | null
+          response_evaluated?: boolean | null
+          response_prompt?: string | null
+          response_text?: string | null
+          undercurrent_id?: string
+          user_id?: string
+          viewed_at?: string
+          week_number?: number
+          year?: number
+        }
+        Relationships: [
+          {
+            foreignKeyName: "user_undercurrent_interactions_undercurrent_id_fkey"
+            columns: ["undercurrent_id"]
+            isOneToOne: false
+            referencedRelation: "undercurrents"
+            referencedColumns: ["id"]
+          },
+        ]
       }
       waitlist: {
         Row: {

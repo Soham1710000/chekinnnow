@@ -16,9 +16,12 @@ import ChatDebriefModal from "@/components/chat/ChatDebriefModal";
 import LearningSummaryNudge from "@/components/chat/LearningSummaryNudge";
 import SaveProgressNudge from "@/components/chat/SaveProgressNudge";
 import VoiceInput from "@/components/chat/VoiceInput";
+import { UndercurrentCard, UndercurrentsFirstAccess, UndercurrentsIndicator } from "@/components/undercurrents/UndercurrentCard";
 
 import { useFunnelTracking } from "@/hooks/useFunnelTracking";
 import { useVoiceInput, InputMode } from "@/hooks/useVoiceExperiment";
+import { useUndercurrents } from "@/hooks/useUndercurrents";
+import { trackReputationAction } from "@/lib/undercurrents";
 
 interface Message {
   id: string;
@@ -101,8 +104,13 @@ const Chat = () => {
   const { toast } = useToast();
   const { trackEvent } = useFunnelTracking();
   
-  // Voice experiment
+  // Voice input
   const voiceExperiment = useVoiceInput();
+  
+  // Undercurrents (reputation-gated feature)
+  const undercurrents = useUndercurrents();
+  const [showUndercurrent, setShowUndercurrent] = useState(false);
+  
   const [messages, setMessages] = useState<Message[]>([]);
   const [source] = useState(() => getSource());
   const isUPSC = source === "upsc";
@@ -770,6 +778,9 @@ const Chat = () => {
         // Save final message to DB (replace streaming placeholder)
         setMessages((prev) => prev.filter(m => m.id !== streamingMsgId));
         await sendBotMessage(aiResponse);
+        
+        // Track reputation silently
+        trackReputationAction('message_sent');
       }
     } else {
       // Anonymous: store locally
@@ -915,6 +926,34 @@ const Chat = () => {
 
   return (
     <div className="min-h-screen bg-background flex flex-col relative">
+      {/* Undercurrents - Reputation-gated feature */}
+      <AnimatePresence>
+        {undercurrents.isFirstAccess && (
+          <UndercurrentsFirstAccess onDismiss={undercurrents.dismissFirstAccess} />
+        )}
+      </AnimatePresence>
+      
+      <AnimatePresence>
+        {showUndercurrent && undercurrents.currentUndercurrent && (
+          <UndercurrentCard
+            undercurrent={undercurrents.currentUndercurrent}
+            prompt={undercurrents.currentPrompt}
+            onSubmitResponse={undercurrents.submitResponse}
+            onDismiss={() => setShowUndercurrent(false)}
+          />
+        )}
+      </AnimatePresence>
+      
+      {undercurrents.hasAccess && undercurrents.canReceiveNew && !showUndercurrent && (
+        <UndercurrentsIndicator
+          canReceiveNew={undercurrents.canReceiveNew}
+          onClick={() => {
+            undercurrents.fetchNewUndercurrent();
+            setShowUndercurrent(true);
+          }}
+        />
+      )}
+
       {/* Debrief Modal */}
       {showDebriefModal && debriefIntro && user && (
         <ChatDebriefModal

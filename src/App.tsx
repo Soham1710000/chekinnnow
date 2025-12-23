@@ -22,6 +22,7 @@ const Chat = lazy(() => import("./pages/Chat"));
 const Auth = lazy(() => import("./pages/Auth"));
 const AdminDashboard = lazy(() => import("./pages/AdminDashboard"));
 const CarouselDemo = lazy(() => import("./pages/CarouselDemo"));
+const Reputation = lazy(() => import("./pages/Reputation"));
 const NotFound = lazy(() => import("./pages/NotFound"));
 
 // Minimal route loading fallback - memoized to prevent re-renders
@@ -61,6 +62,7 @@ const App = () => (
                 <Route path="/auth" element={<Auth />} />
                 <Route path="/dashboard" element={<AdminDashboard />} />
                 <Route path="/demo/carousel" element={<CarouselDemo />} />
+                <Route path="/reputation" element={<Reputation />} />
                 <Route path="*" element={<NotFound />} />
               </Routes>
             </Suspense>

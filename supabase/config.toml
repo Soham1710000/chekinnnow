@@ -29,3 +29,9 @@ verify_jwt = false
 
 [functions.voice-to-text]
 verify_jwt = false
+
+[functions.reputation-engine]
+verify_jwt = false
+
+[functions.undercurrents]
+verify_jwt = false

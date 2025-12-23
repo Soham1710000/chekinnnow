@@ -35,3 +35,6 @@ verify_jwt = false
 
 [functions.undercurrents]
 verify_jwt = false
+
+[functions.evaluate-p2p-chat]
+verify_jwt = false

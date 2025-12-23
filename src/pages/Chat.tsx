@@ -18,7 +18,7 @@ import SaveProgressNudge from "@/components/chat/SaveProgressNudge";
 import VoiceInput from "@/components/chat/VoiceInput";
 
 import { useFunnelTracking } from "@/hooks/useFunnelTracking";
-import { useVoiceExperiment, InputMode } from "@/hooks/useVoiceExperiment";
+import { useVoiceInput, InputMode } from "@/hooks/useVoiceExperiment";
 
 interface Message {
   id: string;
@@ -102,7 +102,7 @@ const Chat = () => {
   const { trackEvent } = useFunnelTracking();
   
   // Voice experiment
-  const voiceExperiment = useVoiceExperiment();
+  const voiceExperiment = useVoiceInput();
   const [messages, setMessages] = useState<Message[]>([]);
   const [source] = useState(() => getSource());
   const isUPSC = source === "upsc";
@@ -1193,7 +1193,6 @@ const Chat = () => {
                 handleSend(text);
               }}
               disabled={sending || (showLoginNudge && !user)}
-              isVoiceFirst={voiceExperiment.isVoiceFirst}
             />
           ) : (
             <div className="border-t border-border p-4 bg-background">

@@ -2,22 +2,9 @@ import { useState, useEffect, useCallback, useRef } from "react";
 import { supabase } from "@/integrations/supabase/client";
 import { useFunnelTracking } from "./useFunnelTracking";
 
-export type ExperimentVariant = "VOICE_FIRST" | "TEXT_FIRST";
 export type InputMode = "voice" | "text";
 
-interface VoiceExperimentState {
-  variant: ExperimentVariant;
-  currentInputMode: InputMode;
-  isRecording: boolean;
-  recordingDuration: number;
-  audioLevel: number;
-  voiceMessagesCount: number;
-  textMessagesCount: number;
-  sessionStartTime: number;
-}
-
-interface UseVoiceExperimentReturn {
-  variant: ExperimentVariant;
+interface UseVoiceInputReturn {
   currentInputMode: InputMode;
   isRecording: boolean;
   recordingDuration: number;
@@ -27,33 +14,11 @@ interface UseVoiceExperimentReturn {
   cancelRecording: () => void;
   switchInputMode: (mode: InputMode) => void;
   trackMessageSent: (mode: InputMode, durationSeconds?: number) => void;
-  isVoiceFirst: boolean;
 }
 
-const VARIANT_STORAGE_KEY = "chekinn_experiment_variant";
-const VOICE_STATS_KEY = "chekinn_voice_stats";
-
-// Generate or retrieve experiment variant (50/50 split)
-const getOrAssignVariant = (): ExperimentVariant => {
-  const stored = localStorage.getItem(VARIANT_STORAGE_KEY);
-  if (stored === "VOICE_FIRST" || stored === "TEXT_FIRST") {
-    return stored;
-  }
-  
-  // Random 50/50 assignment
-  const variant: ExperimentVariant = Math.random() < 0.5 ? "VOICE_FIRST" : "TEXT_FIRST";
-  localStorage.setItem(VARIANT_STORAGE_KEY, variant);
-  sessionStorage.setItem(VARIANT_STORAGE_KEY, variant);
-  
-  return variant;
-};
-
-export const useVoiceExperiment = (): UseVoiceExperimentReturn => {
+export const useVoiceInput = (): UseVoiceInputReturn => {
   const { trackEvent } = useFunnelTracking();
-  const [variant] = useState<ExperimentVariant>(() => getOrAssignVariant());
-  const [currentInputMode, setCurrentInputMode] = useState<InputMode>(() => 
-    variant === "VOICE_FIRST" ? "voice" : "text"
-  );
+  const [currentInputMode, setCurrentInputMode] = useState<InputMode>("text");
   const [isRecording, setIsRecording] = useState(false);
   const [recordingDuration, setRecordingDuration] = useState(0);
   const [audioLevel, setAudioLevel] = useState(0);
@@ -65,14 +30,6 @@ export const useVoiceExperiment = (): UseVoiceExperimentReturn => {
   const animationFrameRef = useRef<number | null>(null);
   const recordingStartTimeRef = useRef<number>(0);
   const durationIntervalRef = useRef<ReturnType<typeof setInterval> | null>(null);
-
-  // Track variant assignment on mount
-  useEffect(() => {
-    trackEvent("experiment_assigned" as any, { 
-      variant,
-      first_input_mode: currentInputMode 
-    });
-  }, []);
 
   // Audio level visualization
   const updateAudioLevel = useCallback(() => {
@@ -124,7 +81,7 @@ export const useVoiceExperiment = (): UseVoiceExperimentReturn => {
       recordingStartTimeRef.current = Date.now();
       
       // Start recording
-      mediaRecorder.start(100); // Collect data every 100ms
+      mediaRecorder.start(100);
       setIsRecording(true);
       setRecordingDuration(0);
       
@@ -142,16 +99,15 @@ export const useVoiceExperiment = (): UseVoiceExperimentReturn => {
       // Start audio level visualization
       updateAudioLevel();
       
-      trackEvent("voice_recording_started" as any, { variant });
+      trackEvent("voice_recording_started" as any, {});
       
     } catch (error) {
       console.error("Error starting recording:", error);
       trackEvent("voice_recording_error" as any, { 
-        variant, 
         error: error instanceof Error ? error.message : "Unknown error" 
       });
     }
-  }, [variant, trackEvent, updateAudioLevel]);
+  }, [trackEvent, updateAudioLevel]);
 
   const stopRecording = useCallback(async (): Promise<string | null> => {
     return new Promise((resolve) => {
@@ -194,13 +150,12 @@ export const useVoiceExperiment = (): UseVoiceExperimentReturn => {
             
             if (error) {
               console.error("Transcription error:", error);
-              trackEvent("voice_transcription_error" as any, { variant, error: error.message });
+              trackEvent("voice_transcription_error" as any, { error: error.message });
               resolve(null);
               return;
             }
             
             trackEvent("voice_recording_completed" as any, { 
-              variant, 
               duration_seconds: duration,
               transcript_length: data?.text?.length || 0,
               detected_language: data?.detected_language || 'unknown'
@@ -219,7 +174,7 @@ export const useVoiceExperiment = (): UseVoiceExperimentReturn => {
       
       mediaRecorderRef.current.stop();
     });
-  }, [variant, trackEvent]);
+  }, [trackEvent]);
 
   const cancelRecording = useCallback(() => {
     if (mediaRecorderRef.current && mediaRecorderRef.current.state === 'recording') {
@@ -241,27 +196,24 @@ export const useVoiceExperiment = (): UseVoiceExperimentReturn => {
     setAudioLevel(0);
     
     trackEvent("voice_recording_abandoned" as any, { 
-      variant,
       duration_at_abandon: Math.floor((Date.now() - recordingStartTimeRef.current) / 1000)
     });
-  }, [variant, trackEvent]);
+  }, [trackEvent]);
 
   const switchInputMode = useCallback((mode: InputMode) => {
     setCurrentInputMode(mode);
     trackEvent("input_mode_switched" as any, { 
-      variant,
       from_mode: currentInputMode,
       to_mode: mode 
     });
-  }, [variant, currentInputMode, trackEvent]);
+  }, [currentInputMode, trackEvent]);
 
   const trackMessageSent = useCallback((mode: InputMode, durationSeconds?: number) => {
     trackEvent("message_sent" as any, { 
-      variant,
       input_mode: mode,
       voice_duration_seconds: mode === "voice" ? durationSeconds : undefined
     });
-  }, [variant, trackEvent]);
+  }, [trackEvent]);
 
   // Cleanup on unmount
   useEffect(() => {
@@ -279,7 +231,6 @@ export const useVoiceExperiment = (): UseVoiceExperimentReturn => {
   }, []);
 
   return {
-    variant,
     currentInputMode,
     isRecording,
     recordingDuration,
@@ -289,6 +240,5 @@ export const useVoiceExperiment = (): UseVoiceExperimentReturn => {
     cancelRecording,
     switchInputMode,
     trackMessageSent,
-    isVoiceFirst: variant === "VOICE_FIRST",
   };
 };

@@ -14,7 +14,6 @@ interface VoiceInputProps {
   onSwitchToText: () => void;
   onTranscriptReady: (text: string) => void;
   disabled?: boolean;
-  isVoiceFirst: boolean;
 }
 
 const formatDuration = (seconds: number): string => {
@@ -33,7 +32,6 @@ export const VoiceInput = ({
   onSwitchToText,
   onTranscriptReady,
   disabled,
-  isVoiceFirst,
 }: VoiceInputProps) => {
   const [isProcessing, setIsProcessing] = useState(false);
 

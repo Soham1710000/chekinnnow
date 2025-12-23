@@ -1,5 +1,3 @@
-import { useState } from "react";
-import { motion, AnimatePresence } from "framer-motion";
 import { Send, Mic } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
@@ -11,7 +9,6 @@ interface ChatInputProps {
   onChange: (value: string) => void;
   onSend: (text?: string) => void;
   currentInputMode: InputMode;
-  isVoiceFirst: boolean;
   isRecording: boolean;
   recordingDuration: number;
   audioLevel: number;
@@ -28,7 +25,6 @@ export const ChatInput = ({
   onChange,
   onSend,
   currentInputMode,
-  isVoiceFirst,
   isRecording,
   recordingDuration,
   audioLevel,
@@ -63,15 +59,26 @@ export const ChatInput = ({
         onSwitchToText={() => onSwitchInputMode("text")}
         onTranscriptReady={handleTranscriptReady}
         disabled={disabled}
-        isVoiceFirst={isVoiceFirst}
       />
     );
   }
 
-  // Text input mode
+  // Text input mode (default) with voice button on left
   return (
     <div className="border-t border-border p-4 bg-background">
       <div className="flex gap-2">
+        {/* Voice button on left */}
+        <Button
+          variant="ghost"
+          size="icon"
+          onClick={() => onSwitchInputMode("voice")}
+          disabled={disabled}
+          className="text-muted-foreground hover:text-primary"
+          title="Use voice instead"
+        >
+          <Mic className="w-4 h-4" />
+        </Button>
+        
         <Input
           value={value}
           onChange={(e) => onChange(e.target.value)}
@@ -80,33 +87,6 @@ export const ChatInput = ({
           className="flex-1"
           disabled={disabled}
         />
-        
-        {/* Voice toggle button - show for text-first variant or when user switched to text */}
-        {!isVoiceFirst && (
-          <Button
-            variant="ghost"
-            size="icon"
-            onClick={() => onSwitchInputMode("voice")}
-            disabled={disabled}
-            className="text-muted-foreground hover:text-primary"
-            title="Use voice instead"
-          >
-            <Mic className="w-4 h-4" />
-          </Button>
-        )}
-        
-        {isVoiceFirst && (
-          <Button
-            variant="ghost"
-            size="icon"
-            onClick={() => onSwitchInputMode("voice")}
-            disabled={disabled}
-            className="text-muted-foreground hover:text-primary"
-            title="Use voice instead"
-          >
-            <Mic className="w-4 h-4" />
-          </Button>
-        )}
         
         <Button 
           onClick={() => onSend()} 

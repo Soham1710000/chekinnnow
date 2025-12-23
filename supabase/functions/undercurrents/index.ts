@@ -270,18 +270,60 @@ async function generateUndercurrent(supabaseAdmin: any, userId: string) {
   }
 
   try {
-    // Get some conversation context (anonymized themes)
-    const { data: messages } = await supabaseAdmin
+    // Get AI onboarding chat themes
+    const { data: aiMessages } = await supabaseAdmin
       .from('chat_messages')
-      .select('content, role')
+      .select('content, role, created_at')
+      .eq('role', 'user')
       .order('created_at', { ascending: false })
-      .limit(50);
+      .limit(100);
 
-    const conversationThemes = messages
-      ?.filter((m: any) => m.role === 'user')
-      .map((m: any) => m.content)
-      .slice(0, 10)
+    // Get P2P chat themes (anonymized, from multiple conversations)
+    const { data: p2pMessages } = await supabaseAdmin
+      .from('user_chats')
+      .select('content, created_at, introduction_id')
+      .order('created_at', { ascending: false })
+      .limit(200);
+
+    // Group P2P messages by introduction to identify cross-conversation patterns
+    const introGroups: Record<string, string[]> = {};
+    p2pMessages?.forEach((m: any) => {
+      if (!introGroups[m.introduction_id]) {
+        introGroups[m.introduction_id] = [];
+      }
+      introGroups[m.introduction_id].push(m.content);
+    });
+
+    // Only include if we have multiple distinct conversations
+    const distinctConversations = Object.keys(introGroups).length;
+    const hasMultipleP2PConversations = distinctConversations >= 3;
+
+    // Check temporal spread (messages over multiple days)
+    const p2pDates = p2pMessages?.map((m: any) => new Date(m.created_at).toDateString()) || [];
+    const uniqueDays = new Set(p2pDates).size;
+    const hasPersistence = uniqueDays >= 2;
+
+    // Prepare anonymized themes
+    const aiThemes = aiMessages
+      ?.map((m: any) => m.content)
+      .slice(0, 15)
       .join(' | ') || '';
+
+    // Only include P2P if criteria met
+    const p2pThemes = (hasMultipleP2PConversations && hasPersistence)
+      ? Object.values(introGroups)
+          .map(msgs => msgs.slice(0, 3).join(' '))
+          .slice(0, 10)
+          .join(' | ')
+      : '';
+
+    // If no significant data, return null
+    if (!aiThemes && !p2pThemes) {
+      console.log('Insufficient data for undercurrent generation');
+      return null;
+    }
+
+    console.log(`Generating undercurrent: ${distinctConversations} P2P convos, ${uniqueDays} days, include P2P: ${hasMultipleP2PConversations && hasPersistence}`);
 
     const response = await fetch('https://api.lovable.dev/v1/chat/completions', {
       method: 'POST',
@@ -294,10 +336,20 @@ async function generateUndercurrent(supabaseAdmin: any, userId: string) {
         messages: [
           {
             role: 'system',
-            content: `You are an observer of quiet belief shifts forming across trusted conversations.
-You do NOT inform, excite, persuade, or speculate loudly.
+            content: `You are ChekInn's Undercurrents Engine.
 
-Generate ONE undercurrent with this exact structure:
+Your job is to observe multiple private P2P chats and surface a quiet belief shift ONLY if it genuinely exists.
+
+Generate an Undercurrent ONLY when:
+- The same theme appears independently across multiple chats
+- It persists over time (not a one-off)
+- It reflects a shift in BELIEF, not a fact or event
+
+If unsure, output: {"skip": true}
+
+Silence is correct. Do NOT manufacture patterns.
+
+When you DO find something, generate with this structure:
 1. OBSERVATION (1-2 lines): A pattern you've noticed
 2. INTERPRETATION (2-3 lines): What this might suggest
 3. UNCERTAINTY (1 line): An acknowledgment of what remains unknown
@@ -307,24 +359,32 @@ RULES:
 - Frame as observations with unresolved edges
 - Max 80 words TOTAL
 - Tone: calm, discreet, non-urgent
+- This must be a BELIEF SHIFT, not news or facts
 
 Respond in JSON format:
 {
   "observation": "...",
   "interpretation": "...",
   "uncertainty": "..."
-}`
+}
+
+OR if nothing genuine exists:
+{"skip": true}`
           },
           {
             role: 'user',
-            content: `Based on these anonymized conversation themes from professional networks, surface a quiet belief shift:
+            content: `Analyze these anonymized conversation themes from professional networks.
 
-Themes: ${conversationThemes || 'general professional networking and career discussions'}
+AI ONBOARDING CHATS:
+${aiThemes || '(none)'}
 
-Generate an undercurrent. Remember: no names, no certainty, under 80 words total.`
+${p2pThemes ? `P2P CONVERSATIONS (${distinctConversations} distinct, spanning ${uniqueDays} days):
+${p2pThemes}` : '(insufficient P2P data)'}
+
+Surface a quiet belief shift ONLY if a genuine cross-conversation pattern exists. If unsure, return {"skip": true}.`
           }
         ],
-        temperature: 0.7,
+        temperature: 0.5,
       }),
     });
 
@@ -341,13 +401,23 @@ Generate an undercurrent. Remember: no names, no certainty, under 80 words total
     // Parse JSON from response
     let parsed;
     try {
-      // Handle markdown code blocks
       const jsonMatch = content.match(/```json\s*([\s\S]*?)\s*```/) || 
                         content.match(/```\s*([\s\S]*?)\s*```/);
       const jsonStr = jsonMatch ? jsonMatch[1] : content;
       parsed = JSON.parse(jsonStr);
     } catch (e) {
       console.error('Failed to parse undercurrent JSON:', content);
+      return null;
+    }
+
+    // Check if AI decided to skip
+    if (parsed.skip) {
+      console.log('AI determined no genuine pattern exists - skipping');
+      return null;
+    }
+
+    if (!parsed.observation || !parsed.interpretation || !parsed.uncertainty) {
+      console.log('Incomplete undercurrent response - skipping');
       return null;
     }
 

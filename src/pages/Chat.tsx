@@ -12,8 +12,8 @@ import UserChatView from "@/components/chat/UserChatView";
 import LearningProgress from "@/components/chat/LearningProgress";
 import OnboardingOverlay from "@/components/chat/OnboardingOverlay";
 import UserProfileCard from "@/components/chat/UserProfileCard";
-import ChatDebriefModal from "@/components/chat/ChatDebriefModal";
-import LearningSummaryNudge from "@/components/chat/LearningSummaryNudge";
+
+
 import SaveProgressNudge from "@/components/chat/SaveProgressNudge";
 import VoiceInput from "@/components/chat/VoiceInput";
 import { UndercurrentCard, UndercurrentsFirstAccess, UndercurrentsIndicator } from "@/components/undercurrents/UndercurrentCard";
@@ -21,7 +21,7 @@ import { UndercurrentCard, UndercurrentsFirstAccess, UndercurrentsIndicator } fr
 import { useFunnelTracking } from "@/hooks/useFunnelTracking";
 import { useVoiceInput, InputMode } from "@/hooks/useVoiceExperiment";
 import { useUndercurrents } from "@/hooks/useUndercurrents";
-import { trackReputationAction } from "@/lib/undercurrents";
+import { trackReputationAction, evaluateP2PChat } from "@/lib/undercurrents";
 
 interface Message {
   id: string;
@@ -141,15 +141,12 @@ const Chat = () => {
   const [showSaveProgress, setShowSaveProgress] = useState(false);
   const [sessionId] = useState(() => getSessionId());
   const [showOnboarding, setShowOnboarding] = useState(false);
-  const [showDebriefModal, setShowDebriefModal] = useState(false);
-  const [debriefIntro, setDebriefIntro] = useState<Introduction | null>(null);
-  const [hasDebriefs, setHasDebriefs] = useState(false);
-  const [showLearningSummary, setShowLearningSummary] = useState(true);
+  const evaluatedIntros = useRef<Set<string>>(new Set());
+  
   const messagesEndRef = useRef<HTMLDivElement>(null);
   const hasTrackedPageLoad = useRef(false);
   const hasSentInitialMessage = useRef(false);
   const hasShownSaveProgress = useRef(false);
-  const debriefedIntros = useRef<Set<string>>(new Set()); // Track intros we've already debriefed
   const chatMessageCounts = useRef<Record<string, number>>({}); // Track message counts per intro
 
   const handleOnboardingComplete = () => {
@@ -195,23 +192,22 @@ const Chat = () => {
       checkLearningStatus();
       loadUnreadCounts();
       subscribeToUserChats();
-      loadDebriefStatus();
+      loadEvaluatedStatus();
     }
   }, [user]);
 
-  // Load debrief status for returning users
-  const loadDebriefStatus = async () => {
+  // Load evaluated intro status for returning users
+  const loadEvaluatedStatus = async () => {
     if (!user) return;
     
+    // Mark already-evaluated intros so we don't evaluate again
     const { data, error } = await supabase
       .from("chat_debriefs")
       .select("id, introduction_id")
       .eq("user_id", user.id);
     
     if (!error && data && data.length > 0) {
-      setHasDebriefs(true);
-      // Mark debriefed intros so we don't ask again
-      data.forEach((d) => debriefedIntros.current.add(d.introduction_id));
+      data.forEach((d) => evaluatedIntros.current.add(d.introduction_id));
     }
   };
 
@@ -297,50 +293,37 @@ const Chat = () => {
     }
   };
 
-  // Check in on active intros when user comes back from a user-to-user chat
+  // Trigger P2P evaluation silently when closing a chat (no user feedback)
   const prevActiveChat = useRef<Introduction | null>(null);
   useEffect(() => {
     // If user just closed a user-to-user chat (activeChat went from something to null)
     if (prevActiveChat.current && !activeChat && user && introductions.length > 0) {
       const closedIntro = prevActiveChat.current;
       
-      // Check if this is the first time returning from this chat with messages
-      // and we haven't debriefed yet
-      const shouldDebrief = async () => {
+      // Silently evaluate P2P chat for reputation (no user feedback needed)
+      const triggerEvaluation = async () => {
         // Check current message count
-        const { count: newCount } = await supabase
+        const { count: msgCount } = await supabase
           .from("user_chats")
           .select("id", { count: "exact", head: true })
           .eq("introduction_id", closedIntro.id);
         
-        const previousCount = chatMessageCounts.current[closedIntro.id] || 0;
-        const hasNewMessages = (newCount || 0) > previousCount;
-        const hasEnoughMessages = (newCount || 0) >= 3; // At least 3 messages exchanged
+        const hasEnoughMessages = (msgCount || 0) >= 5; // At least 5 messages for meaningful evaluation
         
-        // Show debrief if: has enough messages, hasn't been debriefed, and user participated
-        if (hasEnoughMessages && !debriefedIntros.current.has(closedIntro.id)) {
-          // Check if user actually sent messages in this chat
-          const { count: userMsgCount } = await supabase
-            .from("user_chats")
-            .select("id", { count: "exact", head: true })
-            .eq("introduction_id", closedIntro.id)
-            .eq("sender_id", user.id);
-          
-          if ((userMsgCount || 0) >= 1) {
-            // Show debrief modal
-            setDebriefIntro(closedIntro);
-            setShowDebriefModal(true);
-            return;
-          }
+        // Only evaluate if: has enough messages and hasn't been evaluated yet
+        if (hasEnoughMessages && !evaluatedIntros.current.has(closedIntro.id)) {
+          evaluatedIntros.current.add(closedIntro.id);
+          // Trigger P2P reputation evaluation silently in background
+          evaluateP2PChat(closedIntro.id, 'chat_end');
         }
         
-        // Otherwise, do the regular check-in
+        // Do the regular check-in
         setTimeout(() => {
           checkInOnActiveIntros();
         }, 500);
       };
       
-      shouldDebrief();
+      triggerEvaluation();
     }
     prevActiveChat.current = activeChat;
   }, [activeChat, user, introductions]);
@@ -522,12 +505,12 @@ const Chat = () => {
     
     // Find active intros we haven't checked in on
     const activeIntrosToCheckIn = introductions.filter(
-      intro => intro.status === "active" && !debriefedIntros.current.has(intro.id)
+      intro => intro.status === "active" && !evaluatedIntros.current.has(intro.id)
     );
     
     if (activeIntrosToCheckIn.length > 0) {
       const intro = activeIntrosToCheckIn[0];
-      debriefedIntros.current.add(intro.id);
+      evaluatedIntros.current.add(intro.id);
       const otherName = intro.other_user?.full_name || "them";
       
       const checkInMessages = [
@@ -914,15 +897,6 @@ const Chat = () => {
     );
   }
 
-  // Handle debrief completion
-  const handleDebriefComplete = () => {
-    if (debriefIntro) {
-      debriefedIntros.current.add(debriefIntro.id);
-      setHasDebriefs(true);
-    }
-    setShowDebriefModal(false);
-    setDebriefIntro(null);
-  };
 
   return (
     <div className="min-h-screen bg-background flex flex-col relative">
@@ -954,20 +928,6 @@ const Chat = () => {
         />
       )}
 
-      {/* Debrief Modal */}
-      {showDebriefModal && debriefIntro && user && (
-        <ChatDebriefModal
-          isOpen={showDebriefModal}
-          onClose={() => {
-            setShowDebriefModal(false);
-            setDebriefIntro(null);
-          }}
-          introductionId={debriefIntro.id}
-          otherUserName={debriefIntro.other_user?.full_name || "your connection"}
-          userId={user.id}
-          onComplete={handleDebriefComplete}
-        />
-      )}
 
       {/* Onboarding overlay for new users */}
       <AnimatePresence>
@@ -1066,14 +1026,6 @@ const Chat = () => {
           
           {/* Messages */}
           <div className="flex-1 overflow-y-auto p-4 space-y-4">
-            {/* Learning Summary Nudge for returning users with debriefs */}
-            {user && hasDebriefs && showLearningSummary && activeIntros.length > 0 && (
-              <LearningSummaryNudge
-                userId={user.id}
-                hasDebriefs={hasDebriefs}
-                onDismiss={() => setShowLearningSummary(false)}
-              />
-            )}
 
             <AnimatePresence mode="popLayout">
               {activeMessages.map((msg, index) => (

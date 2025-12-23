@@ -5,6 +5,7 @@ import { Button } from "@/components/ui/button";
 import { Textarea } from "@/components/ui/textarea";
 import { supabase } from "@/integrations/supabase/client";
 import { useToast } from "@/hooks/use-toast";
+import { evaluateP2PChat } from "@/lib/undercurrents";
 
 interface ChatDebriefModalProps {
   isOpen: boolean;
@@ -68,6 +69,10 @@ const ChatDebriefModal = ({
           title: "Thanks for the feedback!",
           description: "This helps us make better connections",
         });
+        
+        // Trigger P2P reputation evaluation silently
+        evaluateP2PChat(introductionId, 'debrief');
+        
         onComplete();
       }
     } catch (e) {

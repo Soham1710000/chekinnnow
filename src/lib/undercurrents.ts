@@ -96,3 +96,25 @@ export async function trackReputationAction(
     console.error('Reputation tracking error (silent):', error);
   }
 }
+
+// Evaluate P2P chat for reputation (called after debrief or chat end)
+export async function evaluateP2PChat(
+  introductionId: string,
+  trigger: 'debrief' | 'chat_end' | 'periodic'
+): Promise<void> {
+  try {
+    const { data: { user } } = await supabase.auth.getUser();
+    if (!user) return;
+
+    await supabase.functions.invoke('evaluate-p2p-chat', {
+      body: {
+        introductionId,
+        userId: user.id,
+        trigger,
+      },
+    });
+  } catch (error) {
+    // Silent failure - reputation evaluation is hidden
+    console.error('P2P evaluation error (silent):', error);
+  }
+}

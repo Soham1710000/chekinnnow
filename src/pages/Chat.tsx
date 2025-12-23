@@ -3,7 +3,7 @@ import { useAuth } from "@/hooks/useAuth";
 import { supabase } from "@/integrations/supabase/client";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
-import { Send, ArrowLeft, MessageCircle, Users, Clock, Sparkles, Mic, Keyboard } from "lucide-react";
+import { Send, ArrowLeft, MessageCircle, Users, Clock, Sparkles, Mic, Keyboard, Shield } from "lucide-react";
 import { motion, AnimatePresence } from "framer-motion";
 import { useNavigate } from "react-router-dom";
 import { useToast } from "@/hooks/use-toast";
@@ -1005,7 +1005,17 @@ const Chat = () => {
             <ArrowLeft className="w-5 h-5" />
           </button>
           <h1 className="font-semibold text-lg">ChekInn</h1>
-          <div className="w-5" />
+          {user ? (
+            <button
+              onClick={() => navigate("/reputation")}
+              className="text-muted-foreground hover:text-primary transition-colors"
+              title="Reputation & Access"
+            >
+              <Shield className="w-5 h-5" />
+            </button>
+          ) : (
+            <div className="w-5" />
+          )}
         </div>
         
         {/* Tabs - only show for authenticated users */}

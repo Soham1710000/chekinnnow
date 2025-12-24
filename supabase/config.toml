@@ -7,10 +7,10 @@ verify_jwt = false
 verify_jwt = false
 
 [functions.admin-data]
-verify_jwt = false
+verify_jwt = true
 
 [functions.admin-create-intro]
-verify_jwt = false
+verify_jwt = true
 
 [functions.chat-nudge]
 verify_jwt = false

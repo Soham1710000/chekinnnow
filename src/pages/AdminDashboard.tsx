@@ -67,6 +67,8 @@ interface Introduction {
   intro_message: string;
   status: string;
   created_at: string;
+  user_a_accepted: boolean | null;
+  user_b_accepted: boolean | null;
   user_a?: Profile;
   user_b?: Profile;
   chats?: ChatMessage[];
@@ -1811,17 +1813,38 @@ const AdminDashboard = () => {
                     <div className="flex items-start justify-between">
                       <div className="flex items-center gap-4">
                         <div className="flex -space-x-2">
-                          <div className="w-10 h-10 rounded-full bg-primary/10 flex items-center justify-center text-primary font-semibold border-2 border-background">
-                            {intro.user_a?.full_name?.charAt(0) || "?"}
+                          <div className="relative">
+                            <div className="w-10 h-10 rounded-full bg-primary/10 flex items-center justify-center text-primary font-semibold border-2 border-background">
+                              {intro.user_a?.full_name?.charAt(0) || "?"}
+                            </div>
+                            {intro.user_a_accepted && (
+                              <div className="absolute -bottom-1 -right-1 w-4 h-4 bg-green-500 rounded-full flex items-center justify-center">
+                                <CheckCircle className="w-3 h-3 text-white" />
+                              </div>
+                            )}
                           </div>
-                          <div className="w-10 h-10 rounded-full bg-blue-500/10 flex items-center justify-center text-blue-500 font-semibold border-2 border-background">
-                            {intro.user_b?.full_name?.charAt(0) || "?"}
+                          <div className="relative">
+                            <div className="w-10 h-10 rounded-full bg-blue-500/10 flex items-center justify-center text-blue-500 font-semibold border-2 border-background">
+                              {intro.user_b?.full_name?.charAt(0) || "?"}
+                            </div>
+                            {intro.user_b_accepted && (
+                              <div className="absolute -bottom-1 -right-1 w-4 h-4 bg-green-500 rounded-full flex items-center justify-center">
+                                <CheckCircle className="w-3 h-3 text-white" />
+                              </div>
+                            )}
                           </div>
                         </div>
                         <div>
                           <h3 className="font-medium">
-                            {intro.user_a?.full_name || "User A"} ↔{" "}
-                            {intro.user_b?.full_name || "User B"}
+                            <span className={intro.user_a_accepted ? "text-green-600" : "text-muted-foreground"}>
+                              {intro.user_a?.full_name || "User A"}
+                              {intro.user_a_accepted && " ✓"}
+                            </span>
+                            {" ↔ "}
+                            <span className={intro.user_b_accepted ? "text-green-600" : "text-muted-foreground"}>
+                              {intro.user_b?.full_name || "User B"}
+                              {intro.user_b_accepted && " ✓"}
+                            </span>
                           </h3>
                           <p className="text-sm text-muted-foreground">
                             {intro.intro_message}

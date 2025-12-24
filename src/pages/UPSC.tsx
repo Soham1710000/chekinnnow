@@ -109,23 +109,12 @@ const UPSC = () => {
                 <button
                   key={point}
                   onClick={() => handlePainPointClick(point)}
-                  className="group px-4 py-2.5 rounded-full text-sm font-medium transition-all duration-150 
-                    bg-[#F5F2ED] border-2 border-[#E5E0D8] text-[#404040]
-                    hover:bg-[#2A3A52] hover:border-[#2A3A52] hover:text-white hover:shadow-lg hover:scale-[1.03]
-                    active:scale-[0.97] active:shadow-md
-                    cursor-pointer select-none
-                    flex items-center gap-1.5"
+                  className="px-4 py-2 rounded-full text-sm font-medium transition-colors duration-100 
+                    bg-[#F5F2ED] border border-[#E5E0D8] text-[#404040]
+                    hover:bg-[#2A3A52] hover:border-[#2A3A52] hover:text-white
+                    active:opacity-90"
                 >
-                  <span>{point}</span>
-                  <svg 
-                    className="w-3.5 h-3.5 opacity-0 -translate-x-1 group-hover:opacity-100 group-hover:translate-x-0 transition-all duration-150" 
-                    fill="none" 
-                    viewBox="0 0 24 24" 
-                    stroke="currentColor" 
-                    strokeWidth={2.5}
-                  >
-                    <path strokeLinecap="round" strokeLinejoin="round" d="M13 7l5 5m0 0l-5 5m5-5H6" />
-                  </svg>
+                  {point}
                 </button>
               ))}
             </div>

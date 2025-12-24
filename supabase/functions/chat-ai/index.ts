@@ -62,9 +62,11 @@ async function getDecision(
       ? earlierMessages.map((m: any) => `${m.role}: ${m.content.slice(0, 100)}...`).join("\n")
       : "No prior context.";
 
-    // Force transition after message threshold
+    // Force transition after message threshold (faster for exam prep users)
     const userMessageCount = messages.filter((m: any) => m.role === "user").length;
-    const shouldForceTransition = userMessageCount >= 6; // After 6 user messages (12 total), force transition
+    const isExamPrepUser = userContext.source === "upsc" || userContext.source === "cat";
+    const transitionThreshold = isExamPrepUser ? 3 : 5; // Faster for UPSC/CAT users
+    const shouldForceTransition = userMessageCount >= transitionThreshold;
 
     const decisionPrompt = `You are an internal decision engine for ChekInn.
 
@@ -222,6 +224,7 @@ function buildSystemPrompt(
   }
 
   // Source-specific context
+  const isExamPrepUser = source === "upsc" || source === "cat";
   let sourceContext = "";
   if (source === "upsc") {
     sourceContext = "\nThis user is a UPSC aspirant. Understand the prep journey, attempts, optionals, and the emotional weight of this path.";
@@ -229,16 +232,27 @@ function buildSystemPrompt(
     sourceContext = "\nThis user is a CAT/MBA aspirant. Understand the prep journey, mock scores, target schools, and career transitions.";
   }
 
+  // Dynamic threshold based on source
+  const transitionThreshold = isExamPrepUser ? 3 : 5;
+
   // Connection transition guidance
   const connectionGuidance = isAuthenticated 
     ? `Say: "I have a sense of where you're at. The ChekInn team will look for someone who's been through this and reach out within 12-24 hours via email."`
     : `Say: "I have a sense of where you're at. The ChekInn team will look for someone who's been through this — just drop your email so they can reach you within 12-24 hours."`;
 
   // Force transition after threshold
-  const shouldTransitionNow = messageCount >= 6;
+  const shouldTransitionNow = messageCount >= transitionThreshold;
   const transitionInstruction = shouldTransitionNow 
     ? `\n\n⚠️ CRITICAL: You have gathered enough context (${messageCount} messages). In THIS response, you MUST transition to connection. Do NOT ask more questions. ${connectionGuidance}`
     : "";
+
+  // Carrot/anticipation hooks based on message count
+  let progressHook = "";
+  if (isExamPrepUser && messageCount >= 2 && !shouldTransitionNow) {
+    progressHook = `\n\n💡 ANTICIPATION HOOK: After acknowledging their response, add a brief teaser like: "Starting to get a clearer picture — I think I know who might be helpful." This creates anticipation without making false promises.`;
+  } else if (messageCount >= 3 && !shouldTransitionNow) {
+    progressHook = `\n\n💡 ANTICIPATION HOOK: After your question, you can add: "Already thinking of a few people who've navigated something similar." Keep it natural and brief.`;
+  }
 
   return `You are ChekInn — a warm, focused companion who gathers context efficiently.
 
@@ -247,8 +261,9 @@ Your role is to understand the user quickly so you can connect them with the rig
 CURRENT MODE: ${mode}
 TONE: ${tone}
 MESSAGE COUNT: ${messageCount} user messages so far
+TRANSITION THRESHOLD: ${transitionThreshold} messages
 ${sourceContext}
-${personalContextSection}${transitionInstruction}
+${personalContextSection}${transitionInstruction}${progressHook}
 
 ––––– CORE BEHAVIOR –––––
 
@@ -256,7 +271,8 @@ ${personalContextSection}${transitionInstruction}
 2. Keep responses to 1-2 sentences max.
 3. Ask specific, concrete questions — not open-ended ones.
 4. Move the conversation forward, don't just reflect.
-5. ${shouldTransitionNow ? 'STOP ASKING QUESTIONS. Transition to connection NOW.' : 'After 2-3 key facts, transition to connection.'}
+5. ${shouldTransitionNow ? 'STOP ASKING QUESTIONS. Transition to connection NOW.' : `After ${transitionThreshold} messages or 2-3 key facts, transition to connection.`}
+${isExamPrepUser ? '6. Be efficient — UPSC/CAT users want quick connections, not long conversations.' : ''}
 
 GOOD examples:
 - "That sounds heavy — are you in Prelims prep or Mains right now?"
@@ -270,18 +286,17 @@ BAD examples (avoid these):
 
 ––––– KEY INFO TO GATHER –––––
 
-For UPSC/exam users, prioritize learning:
+For UPSC/exam users, prioritize learning (get 2 of these quickly):
 1. Exam stage (Prelims/Mains/Interview prep)
-2. Attempt number
-3. Optional subject (if relevant)
-4. What specific help they need
+2. Attempt number OR optional subject
+3. What specific help they need
 
 For general users:
 1. Current role/situation
 2. What they're trying to figure out
 3. What kind of person would help
 
-Once you have 2-3 key facts, you have enough context. ${shouldTransitionNow ? 'You definitely have enough now!' : ''}
+${isExamPrepUser ? 'For exam users: 2 key facts is enough. Move fast!' : 'Once you have 2-3 key facts, you have enough context.'} ${shouldTransitionNow ? 'You definitely have enough now!' : ''}
 
 ––––– CONTEXT USAGE –––––
 
@@ -299,7 +314,7 @@ Do not keep asking questions indefinitely. Move to connection once you understan
 - Never give long empathy-only responses.
 - Never ask vague questions like "what resonates?"
 - Never fabricate facts or claim capabilities you don't have.
-- Never claim you've already found someone.
+- Never claim you've already found someone specific.
 - Keep it conversational and concise.
 ${shouldTransitionNow ? '- DO NOT ASK MORE QUESTIONS. TRANSITION NOW.' : ''}
 

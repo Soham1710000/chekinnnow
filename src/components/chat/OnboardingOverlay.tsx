@@ -6,14 +6,38 @@ interface OnboardingOverlayProps {
   onStart: () => void;
 }
 
+// Get source for contextual content
+const getSource = () => sessionStorage.getItem("chekinn_source") || "";
+const isUPSCSource = () => getSource() === "upsc";
+const isCATSource = () => getSource() === "cat";
+
 const OnboardingOverlay = ({ onStart }: OnboardingOverlayProps) => {
-  const exampleConnections = [
-    "Product Manager at Google",
-    "Founder who just raised Series A", 
-    "UPSC topper from 2023",
-    "Engineer at Stripe",
-    "Someone who switched from consulting to tech"
-  ];
+  const source = getSource();
+  
+  // Source-specific example connections
+  const exampleConnections = source === "upsc" 
+    ? [
+        "UPSC topper from 2023",
+        "Serving IAS officer (LBSNAA alumni)",
+        "Someone who cleared on 3rd attempt",
+        "IIT graduate who switched to UPSC",
+        "Working professional who cleared while working"
+      ]
+    : source === "cat"
+    ? [
+        "IIM-A alumni now at McKinsey",
+        "Someone who got 99+ percentile",
+        "Career switcher who cracked CAT",
+        "Working professional at top B-school",
+        "Entrepreneur with MBA background"
+      ]
+    : [
+        "Product Manager at Google",
+        "Founder who just raised Series A", 
+        "UPSC topper from 2023",
+        "Engineer at Stripe",
+        "Someone who switched from consulting to tech"
+      ];
 
   return (
     <motion.div

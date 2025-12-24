@@ -2,14 +2,20 @@ import { Progress } from "@/components/ui/progress";
 import { Sparkles, Search } from "lucide-react";
 import { motion } from "framer-motion";
 
+// Get source for contextual thresholds
+const getSource = () => sessionStorage.getItem("chekinn_source") || "";
+const isExamPrepUser = () => getSource() === "upsc" || getSource() === "cat";
+
 interface LearningProgressProps {
   messageCount: number;
   maxMessages?: number;
   learningComplete: boolean;
 }
 
-const LearningProgress = ({ messageCount, maxMessages = 5, learningComplete }: LearningProgressProps) => {
-  const progress = Math.min((messageCount / maxMessages) * 100, 100);
+const LearningProgress = ({ messageCount, maxMessages, learningComplete }: LearningProgressProps) => {
+  // Use source-specific max or default
+  const effectiveMax = maxMessages ?? (isExamPrepUser() ? 3 : 5);
+  const progress = Math.min((messageCount / effectiveMax) * 100, 100);
   
   // Don't show if learning is complete
   if (learningComplete) return null;
@@ -42,7 +48,7 @@ const LearningProgress = ({ messageCount, maxMessages = 5, learningComplete }: L
       <p className="text-xs text-muted-foreground mt-1.5">
         {progress >= 100 
           ? "We'll match you with the right people soon" 
-          : `${Math.ceil(maxMessages - messageCount)} more question${maxMessages - messageCount !== 1 ? 's' : ''} to find your intros`
+          : `${Math.ceil(effectiveMax - messageCount)} more question${effectiveMax - messageCount !== 1 ? 's' : ''} to find your intros`
         }
       </p>
     </motion.div>

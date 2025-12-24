@@ -503,11 +503,13 @@ serve(async (req) => {
 
     const userMessages = messages.filter((m: any) => m.role === "user");
     const userMessageCount = userMessages.length;
-    console.log(`Chat: user=${userId}, source=${source}, msgCount=${userMessageCount}, returning=${isReturningUser}, firstMsg=${isFirstMessageOfSession}`);
+    const isExamPrepUser = source === "upsc" || source === "cat";
+    const transitionThreshold = isExamPrepUser ? 3 : 5;
+    console.log(`Chat: user=${userId}, source=${source}, msgCount=${userMessageCount}, returning=${isReturningUser}, firstMsg=${isFirstMessageOfSession}, threshold=${transitionThreshold}`);
 
     // STEP 1: Get decision (fast, non-streaming)
     const decision = await getDecision(messages, userContext, LOVABLE_API_KEY);
-    console.log(`Decision: mode=${decision.mode}, tone=${decision.tone}, social=${decision.consider_social}, forceTransition=${userMessageCount >= 6}`);
+    console.log(`Decision: mode=${decision.mode}, tone=${decision.tone}, social=${decision.consider_social}, forceTransition=${userMessageCount >= transitionThreshold}`);
 
     // STEP 2: Assemble context (profile data)
     const profileContext = await assembleContext(userId, LOVABLE_API_KEY);
@@ -555,9 +557,10 @@ serve(async (req) => {
       throw new Error(`AI gateway error: ${response.status}`);
     }
 
-    // STEP 5: Async profile extraction (5+ user messages)
-    if (userMessages.length >= 5 && userId) {
-      console.log(`Triggering profile extraction for user ${userId}`);
+    // STEP 5: Async profile extraction (earlier for UPSC/CAT users)
+    const extractionThreshold = isExamPrepUser ? 3 : 5;
+    if (userMessages.length >= extractionThreshold && userId) {
+      console.log(`Triggering profile extraction for user ${userId} (threshold: ${extractionThreshold})`);
       extractProfileFacts(messages, userId).catch(err => 
         console.error("Extraction error:", err)
       );

@@ -56,8 +56,10 @@ interface Introduction {
 }
 
 const CHAT_URL = `${import.meta.env.VITE_SUPABASE_URL}/functions/v1/chat-ai`;
-const LOGIN_NUDGE_THRESHOLD = 5;
-const SAVE_PROGRESS_THRESHOLD = 3; // Show save progress nudge after 3 messages
+
+// Nudge thresholds - adjusted for exam prep users who have faster AI transitions
+const getLoginNudgeThreshold = () => isUPSCSource() || isCATSource() ? 3 : 5;
+const getSaveProgressThreshold = () => isUPSCSource() || isCATSource() ? 2 : 3;
 
 // Generate or get session ID for anonymous users
 const getSessionId = () => {
@@ -334,21 +336,23 @@ const Chat = () => {
     prevActiveChat.current = activeChat;
   }, [activeChat, user, introductions]);
 
-  // Check if we should show save progress nudge (after 3 messages) or login nudge (after 5)
+  // Check if we should show save progress nudge or login nudge (thresholds adjust for UPSC/CAT)
   const variant = sessionStorage.getItem("ab_variant");
   useEffect(() => {
     if (!user && variant !== "C") {
       const userMsgCount = localMessages.filter(m => m.role === "user").length;
+      const saveThreshold = getSaveProgressThreshold();
+      const loginThreshold = getLoginNudgeThreshold();
       
-      // Show save progress nudge at 3 messages (mid-conversation)
-      if (userMsgCount >= SAVE_PROGRESS_THRESHOLD && !hasShownSaveProgress.current) {
+      // Show save progress nudge (mid-conversation)
+      if (userMsgCount >= saveThreshold && !hasShownSaveProgress.current) {
         hasShownSaveProgress.current = true;
         setShowSaveProgress(true);
         trackEvent("save_progress_shown" as any);
       }
       
-      // Show login nudge at 5 messages (blocks further input)
-      if (userMsgCount >= LOGIN_NUDGE_THRESHOLD) {
+      // Show login nudge (blocks further input)
+      if (userMsgCount >= loginThreshold) {
         setShowLoginNudge(true);
       }
     }

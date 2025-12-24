@@ -1,10 +1,25 @@
 import { motion, AnimatePresence } from "framer-motion";
-import { useState, useEffect, lazy, Suspense, memo, useCallback } from "react";
+import { useState, useEffect, lazy, Suspense, memo, useCallback, startTransition } from "react";
 import { useSearchParams, useNavigate } from "react-router-dom";
 import { Button } from "@/components/ui/button";
 import { ChevronDown, Users } from "lucide-react";
 import { supabase } from "@/integrations/supabase/client";
 import { useFunnelTracking } from "@/hooks/useFunnelTracking";
+
+// Prefetch critical routes on idle
+const prefetchRoutes = () => {
+  if ('requestIdleCallback' in window) {
+    (window as any).requestIdleCallback(() => {
+      import("@/pages/Auth");
+      import("@/pages/Chat");
+    });
+  } else {
+    setTimeout(() => {
+      import("@/pages/Auth");
+      import("@/pages/Chat");
+    }, 3000);
+  }
+};
 
 // Lazy load overlays - only needed on click
 const OnboardingOverlay = lazy(() => import("@/components/chat/OnboardingOverlay"));
@@ -276,6 +291,11 @@ const BASE_WAITLIST_COUNT = 7912; // Base offset for display
 export const NetworkHero = () => {
   // Preload all images on mount for instant switching
   usePreloadImages(allImages);
+  
+  // Prefetch likely next routes on mount
+  useEffect(() => {
+    prefetchRoutes();
+  }, []);
   
   const [searchParams] = useSearchParams();
   const navigate = useNavigate();

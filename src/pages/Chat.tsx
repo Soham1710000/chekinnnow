@@ -1,4 +1,4 @@
-import { useState, useEffect, useRef } from "react";
+import { useState, useEffect, useRef, lazy, Suspense, memo, useCallback } from "react";
 import { useAuth } from "@/hooks/useAuth";
 import { supabase } from "@/integrations/supabase/client";
 import { Button } from "@/components/ui/button";
@@ -7,16 +7,22 @@ import { Send, ArrowLeft, MessageCircle, Users, Clock, Sparkles, Mic, Keyboard, 
 import { motion, AnimatePresence } from "framer-motion";
 import { useNavigate } from "react-router-dom";
 import { useToast } from "@/hooks/use-toast";
+
+// Core components loaded eagerly for initial render
 import IntroCard from "@/components/chat/IntroCard";
-import UserChatView from "@/components/chat/UserChatView";
 import LearningProgress from "@/components/chat/LearningProgress";
-import OnboardingOverlay from "@/components/chat/OnboardingOverlay";
-import UserProfileCard from "@/components/chat/UserProfileCard";
 
+// Lazy load heavy components that aren't needed immediately
+const UserChatView = lazy(() => import("@/components/chat/UserChatView"));
+const OnboardingOverlay = lazy(() => import("@/components/chat/OnboardingOverlay"));
+const UserProfileCard = lazy(() => import("@/components/chat/UserProfileCard"));
+const SaveProgressNudge = lazy(() => import("@/components/chat/SaveProgressNudge"));
+const VoiceInput = lazy(() => import("@/components/chat/VoiceInput"));
 
-import SaveProgressNudge from "@/components/chat/SaveProgressNudge";
-import VoiceInput from "@/components/chat/VoiceInput";
-import { UndercurrentCard, UndercurrentsFirstAccess, UndercurrentsIndicator } from "@/components/undercurrents/UndercurrentCard";
+// Lazy load undercurrents - only needed for authenticated users with access
+const UndercurrentCard = lazy(() => import("@/components/undercurrents/UndercurrentCard").then(m => ({ default: m.UndercurrentCard })));
+const UndercurrentsFirstAccess = lazy(() => import("@/components/undercurrents/UndercurrentCard").then(m => ({ default: m.UndercurrentsFirstAccess })));
+const UndercurrentsIndicator = lazy(() => import("@/components/undercurrents/UndercurrentCard").then(m => ({ default: m.UndercurrentsIndicator })));
 
 import { useFunnelTracking } from "@/hooks/useFunnelTracking";
 import { useVoiceInput, InputMode } from "@/hooks/useVoiceExperiment";
@@ -890,51 +896,57 @@ const Chat = () => {
 
   if (activeChat) {
     return (
-      <UserChatView 
-        introduction={activeChat} 
-        onBack={() => setActiveChat(null)} 
-      />
+      <Suspense fallback={<div className="min-h-screen bg-background" />}>
+        <UserChatView 
+          introduction={activeChat} 
+          onBack={() => setActiveChat(null)} 
+        />
+      </Suspense>
     );
   }
 
 
   return (
     <div className="min-h-screen bg-background flex flex-col relative">
-      {/* Undercurrents - Reputation-gated feature */}
-      <AnimatePresence>
-        {undercurrents.isFirstAccess && (
-          <UndercurrentsFirstAccess onDismiss={undercurrents.dismissFirstAccess} />
-        )}
-      </AnimatePresence>
-      
-      <AnimatePresence>
-        {showUndercurrent && undercurrents.currentUndercurrent && (
-          <UndercurrentCard
-            undercurrent={undercurrents.currentUndercurrent}
-            prompt={undercurrents.currentPrompt}
-            onSubmitResponse={undercurrents.submitResponse}
-            onDismiss={() => setShowUndercurrent(false)}
+      {/* Undercurrents - Reputation-gated feature (lazy loaded) */}
+      <Suspense fallback={null}>
+        <AnimatePresence>
+          {undercurrents.isFirstAccess && (
+            <UndercurrentsFirstAccess onDismiss={undercurrents.dismissFirstAccess} />
+          )}
+        </AnimatePresence>
+        
+        <AnimatePresence>
+          {showUndercurrent && undercurrents.currentUndercurrent && (
+            <UndercurrentCard
+              undercurrent={undercurrents.currentUndercurrent}
+              prompt={undercurrents.currentPrompt}
+              onSubmitResponse={undercurrents.submitResponse}
+              onDismiss={() => setShowUndercurrent(false)}
+            />
+          )}
+        </AnimatePresence>
+        
+        {undercurrents.hasAccess && undercurrents.canReceiveNew && !showUndercurrent && (
+          <UndercurrentsIndicator
+            canReceiveNew={undercurrents.canReceiveNew}
+            onClick={() => {
+              undercurrents.fetchNewUndercurrent();
+              setShowUndercurrent(true);
+            }}
           />
         )}
-      </AnimatePresence>
-      
-      {undercurrents.hasAccess && undercurrents.canReceiveNew && !showUndercurrent && (
-        <UndercurrentsIndicator
-          canReceiveNew={undercurrents.canReceiveNew}
-          onClick={() => {
-            undercurrents.fetchNewUndercurrent();
-            setShowUndercurrent(true);
-          }}
-        />
-      )}
+      </Suspense>
 
 
-      {/* Onboarding overlay for new users */}
-      <AnimatePresence>
-        {showOnboarding && (
-          <OnboardingOverlay onStart={handleOnboardingComplete} />
-        )}
-      </AnimatePresence>
+      {/* Onboarding overlay for new users (lazy loaded) */}
+      <Suspense fallback={null}>
+        <AnimatePresence>
+          {showOnboarding && (
+            <OnboardingOverlay onStart={handleOnboardingComplete} />
+          )}
+        </AnimatePresence>
+      </Suspense>
 
       {/* Login nudge banner for non-authenticated users */}
       {!user && (
@@ -1033,7 +1045,9 @@ const Chat = () => {
         <>
           {/* Learning Progress or Profile Card */}
           {learningComplete && userProfile ? (
-            <UserProfileCard profile={userProfile} />
+            <Suspense fallback={<div className="h-20" />}>
+              <UserProfileCard profile={userProfile} />
+            </Suspense>
           ) : (
             <LearningProgress 
               messageCount={activeMessages.filter(m => m.role === "user").length}
@@ -1198,20 +1212,22 @@ const Chat = () => {
 
           {/* Input - Voice or Text based on experiment variant */}
           {voiceExperiment.currentInputMode === "voice" || voiceExperiment.isRecording ? (
-            <VoiceInput
-              isRecording={voiceExperiment.isRecording}
-              recordingDuration={voiceExperiment.recordingDuration}
-              audioLevel={voiceExperiment.audioLevel}
-              onStartRecording={voiceExperiment.startRecording}
-              onStopRecording={voiceExperiment.stopRecording}
-              onCancelRecording={voiceExperiment.cancelRecording}
-              onSwitchToText={() => voiceExperiment.switchInputMode("text")}
-              onTranscriptReady={(text) => {
-                voiceExperiment.trackMessageSent("voice", voiceExperiment.recordingDuration);
-                handleSend(text);
-              }}
-              disabled={sending || (showLoginNudge && !user)}
-            />
+            <Suspense fallback={<div className="border-t border-border p-4 h-20" />}>
+              <VoiceInput
+                isRecording={voiceExperiment.isRecording}
+                recordingDuration={voiceExperiment.recordingDuration}
+                audioLevel={voiceExperiment.audioLevel}
+                onStartRecording={voiceExperiment.startRecording}
+                onStopRecording={voiceExperiment.stopRecording}
+                onCancelRecording={voiceExperiment.cancelRecording}
+                onSwitchToText={() => voiceExperiment.switchInputMode("text")}
+                onTranscriptReady={(text) => {
+                  voiceExperiment.trackMessageSent("voice", voiceExperiment.recordingDuration);
+                  handleSend(text);
+                }}
+                disabled={sending || (showLoginNudge && !user)}
+              />
+            </Suspense>
           ) : (
             <div className="border-t border-border p-4 bg-background">
               <div className="flex gap-2">

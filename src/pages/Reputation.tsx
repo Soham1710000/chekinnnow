@@ -1,8 +1,8 @@
+import { memo, useEffect } from "react";
 import { motion } from "framer-motion";
 import { ArrowLeft, Shield, Lock, Eye, Zap, Network, Crown } from "lucide-react";
 import { useNavigate } from "react-router-dom";
 import { useAuth } from "@/hooks/useAuth";
-import { useEffect } from "react";
 
 const Reputation = () => {
   const navigate = useNavigate();

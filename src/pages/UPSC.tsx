@@ -1,6 +1,7 @@
 import { useEffect, useCallback, memo } from "react";
 import { useNavigate } from "react-router-dom";
 import { useFunnelTracking } from "@/hooks/useFunnelTracking";
+import { usePageMeta } from "@/hooks/usePageMeta";
 
 // Static data outside component to avoid recreating
 const painPoints = [
@@ -43,6 +44,13 @@ ArrowIcon.displayName = "ArrowIcon";
 const UPSC = () => {
   const { trackPageView, trackEvent } = useFunnelTracking();
   const navigate = useNavigate();
+
+  // Set UPSC-specific meta tags for social sharing
+  usePageMeta({
+    title: "UPSC is lonely. It doesn't have to be. — ChekInn",
+    description: "Connect with IAS officers, top rankers, and aspirants who've been through your exact struggles. Get guidance on answer writing, optionals, and more.",
+    url: "https://chekinn.app/upsc",
+  });
 
   useEffect(() => {
     const ric = (window as any).requestIdleCallback as undefined | ((cb: () => void) => number);

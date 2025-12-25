@@ -157,7 +157,24 @@ const Chat = () => {
   const hasTrackedPageLoad = useRef(false);
   const hasSentInitialMessage = useRef(false);
   const hasShownSaveProgress = useRef(false);
+  const hasShownLoginNudge = useRef(false);
   const chatMessageCounts = useRef<Record<string, number>>({}); // Track message counts per intro
+
+  // Memoized handlers to prevent re-renders
+  const handleSaveProgressDismiss = useCallback(() => {
+    setShowSaveProgress(false);
+    // Show WA community nudge after dismissing save progress (for UPSC/CAT users)
+    if (isUPSC || isCAT) {
+      setTimeout(() => setShowWACommunity(true), 500);
+    }
+  }, [isUPSC, isCAT]);
+
+  const handleWACommunityDismiss = useCallback(() => {
+    setShowWACommunity(false);
+  }, []);
+
+  // Stable no-op handler for compact WA nudge that can't be dismissed
+  const noopHandler = useCallback(() => {}, []);
 
   const handleOnboardingComplete = () => {
     sessionStorage.setItem("chekinn_onboarding_seen", "true");
@@ -346,19 +363,20 @@ const Chat = () => {
       const saveThreshold = getSaveProgressThreshold();
       const loginThreshold = getLoginNudgeThreshold();
       
-      // Show save progress nudge (mid-conversation)
-      if (userMsgCount >= saveThreshold && !hasShownSaveProgress.current) {
+      // Show save progress nudge (mid-conversation) - only once
+      if (userMsgCount >= saveThreshold && !hasShownSaveProgress.current && !showSaveProgress) {
         hasShownSaveProgress.current = true;
         setShowSaveProgress(true);
         trackEvent("save_progress_shown" as any);
       }
       
-      // Show login nudge (blocks further input)
-      if (userMsgCount >= loginThreshold) {
+      // Show login nudge (blocks further input) - only once
+      if (userMsgCount >= loginThreshold && !hasShownLoginNudge.current && !showLoginNudge) {
+        hasShownLoginNudge.current = true;
         setShowLoginNudge(true);
       }
     }
-  }, [localMessages, user, variant, trackEvent]);
+  }, [localMessages.length, user, variant]); // Only depend on message length, not full array
 
   // Save anonymous chat to leads table
   const saveLeadToDb = async (msgs: Message[]) => {
@@ -1120,30 +1138,33 @@ const Chat = () => {
               ))}
 
               {/* Progress Indicator - DISABLED for now */}
+            </AnimatePresence>
 
+            {/* Nudges OUTSIDE of AnimatePresence to prevent layout/refresh issues */}
+            <AnimatePresence mode="wait">
               {/* Save Progress Nudge - shown after 3 messages (mid-conversation) */}
               {showSaveProgress && !user && !showLoginNudge && (
-                <SaveProgressNudge
-                  onDismiss={() => {
-                    setShowSaveProgress(false);
-                    // Show WA community nudge after dismissing save progress (for UPSC/CAT users)
-                    if (isUPSC || isCAT) {
-                      setTimeout(() => setShowWACommunity(true), 500);
-                    }
-                  }}
-                />
+                <motion.div key="save-progress-nudge" layout={false}>
+                  <Suspense fallback={null}>
+                    <SaveProgressNudge onDismiss={handleSaveProgressDismiss} />
+                  </Suspense>
+                </motion.div>
               )}
 
               {/* WhatsApp Community Nudge - shown after save progress is dismissed */}
               {showWACommunity && !user && !showLoginNudge && (isUPSC || isCAT) && (
-                <WhatsAppCommunityNudge
-                  onDismiss={() => setShowWACommunity(false)}
-                />
+                <motion.div key="wa-community-nudge" layout={false}>
+                  <Suspense fallback={null}>
+                    <WhatsAppCommunityNudge onDismiss={handleWACommunityDismiss} />
+                  </Suspense>
+                </motion.div>
               )}
 
               {/* Login Nudge for Anonymous Users - shown after 5 messages */}
               {showLoginNudge && !user && (
                 <motion.div
+                  key="login-nudge"
+                  layout={false}
                   initial={{ opacity: 0, scale: 0.95, y: 20 }}
                   animate={{ opacity: 1, scale: 1, y: 0 }}
                   className="bg-gradient-to-br from-primary/10 to-primary/20 border border-primary/30 rounded-2xl p-5"
@@ -1170,44 +1191,46 @@ const Chat = () => {
                   </p>
                 </motion.div>
               )}
+            </AnimatePresence>
 
-              {/* Pending Intro Cards - only for authenticated users */}
-              {user && pendingIntros.map((intro) => (
-                <IntroCard
-                  key={intro.id}
-                  introduction={intro}
-                  onAccept={() => handleAcceptIntro(intro)}
-                  onDecline={() => handleDeclineIntro(intro)}
-                />
-              ))}
+            {/* Pending Intro Cards - only for authenticated users */}
+            {user && pendingIntros.map((intro) => (
+              <IntroCard
+                key={intro.id}
+                introduction={intro}
+                onAccept={() => handleAcceptIntro(intro)}
+                onDecline={() => handleDeclineIntro(intro)}
+              />
+            ))}
 
-              {/* Nudge when learning is complete but no intros yet */}
-              {user && learningComplete && pendingIntros.length === 0 && activeIntros.length === 0 && (
-                <motion.div
-                  initial={{ opacity: 0, y: 10 }}
-                  animate={{ opacity: 1, y: 0 }}
-                  className="bg-primary/10 border border-primary/20 rounded-xl p-4"
-                >
-                  <div className="flex items-center gap-2 mb-2">
-                    <Clock className="w-4 h-4 text-primary" />
-                    <p className="text-sm text-foreground font-medium">
-                      Finding your match...
-                    </p>
-                  </div>
-                  <p className="text-xs text-muted-foreground">
-                    We're working on finding the right person for you. You'll get an email + it'll show up right here — usually within 12 hours!
+            {/* Nudge when learning is complete but no intros yet */}
+            {user && learningComplete && pendingIntros.length === 0 && activeIntros.length === 0 && (
+              <motion.div
+                initial={{ opacity: 0, y: 10 }}
+                animate={{ opacity: 1, y: 0 }}
+                className="bg-primary/10 border border-primary/20 rounded-xl p-4"
+              >
+                <div className="flex items-center gap-2 mb-2">
+                  <Clock className="w-4 h-4 text-primary" />
+                  <p className="text-sm text-foreground font-medium">
+                    Finding your match...
                   </p>
-                  
-                  {/* WA Community nudge for UPSC/CAT users waiting for match */}
-                  {(isUPSC || isCAT) && (
+                </div>
+                <p className="text-xs text-muted-foreground">
+                  We're working on finding the right person for you. You'll get an email + it'll show up right here — usually within 12 hours!
+                </p>
+                
+                {/* WA Community nudge for UPSC/CAT users waiting for match */}
+                {(isUPSC || isCAT) && (
+                  <Suspense fallback={null}>
                     <WhatsAppCommunityNudge
                       variant="compact"
-                      onDismiss={() => {}}
+                      onDismiss={noopHandler}
                     />
-                  )}
-                </motion.div>
-              )}
-            </AnimatePresence>
+                  </Suspense>
+                )}
+              </motion.div>
+            )}
             
             {sending && (
               <motion.div

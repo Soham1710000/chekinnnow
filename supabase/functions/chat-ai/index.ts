@@ -24,6 +24,7 @@ interface UserContext {
   isFirstMessageOfSession?: boolean;
   hasPendingIntros?: boolean;
   userId?: string;
+  experimentVariant?: "direct" | "reflective"; // A/B test variant
 }
 
 interface ProfileContext {
@@ -199,14 +200,49 @@ async function assembleContext(
 // STEP 3: STREAMING SYSTEM PROMPT (Clean & Focused)
 // =============================================================================
 
+// Helper to detect decision signals in conversation
+function detectDecisionSignal(messages: any[]): boolean {
+  const conversationText = messages.map((m: any) => m.content.toLowerCase()).join(" ");
+  
+  const decisionSignals = [
+    // Previous attempts
+    /\b(first|second|third|1st|2nd|3rd|4th|5th|next)\s*(attempt|try)/i,
+    /\battempt(s|ed)?\b/i,
+    /\bfailed\s*(prelims|mains|interview)/i,
+    /\bcleared\s*(prelims|mains)/i,
+    
+    // Career pauses/switches
+    /\b(quit|left|leaving|pause|paused|resigned|switching)\s*(job|work|career)/i,
+    /\b(full\s*time|full-time)\s*(prep|preparation|study)/i,
+    /\btook\s*a\s*break/i,
+    
+    // Strategy changes
+    /\b(switch|change|changing|switched)\s*(optional|strategy|subject)/i,
+    /\b(dropped|taking|chose|choosing)\s*(optional|subject)/i,
+    
+    // Milestone anxiety
+    /\b(scared|nervous|anxious|worried|stressed)\s*(about|for|of)?\s*(prelims|mains|interview)/i,
+    /\bprelims\s*(is|are)?\s*(coming|near|soon|close)/i,
+    /\b(pressure|stress|anxiety)\b/i,
+    
+    // Stuck between choices
+    /\b(confused|stuck)\s*(between|about)/i,
+    /\b(should\s*i|can't\s*decide|not\s*sure)/i,
+    /\b(dilemma|torn\s*between)/i
+  ];
+  
+  return decisionSignals.some(pattern => pattern.test(conversationText));
+}
+
 function buildSystemPrompt(
   decision: DecisionOutput,
   profileContext: ProfileContext | null,
   userContext: UserContext,
-  messageCount: number
+  messageCount: number,
+  hasDecisionSignal: boolean = false
 ): string {
   const { mode, tone, use_experiences, consider_social } = decision;
-  const { source, isAuthenticated } = userContext;
+  const { source, isAuthenticated, experimentVariant } = userContext;
 
   // Build personal context section
   let personalContextSection = "";
@@ -225,6 +261,17 @@ function buildSystemPrompt(
 
   // Source-specific context
   const isExamPrepUser = source === "upsc" || source === "cat";
+  
+  // ========================================
+  // A/B TEST: REFLECTIVE MODEL FOR UPSC
+  // ========================================
+  if (isExamPrepUser && experimentVariant === "reflective") {
+    return buildReflectivePrompt(profileContext, userContext, messageCount, hasDecisionSignal);
+  }
+  
+  // ========================================
+  // DEFAULT: DIRECT MODEL
+  // ========================================
   let sourceContext = "";
   if (source === "upsc") {
     sourceContext = "\nThis user is a UPSC aspirant. Understand the prep journey, attempts, optionals, and the emotional weight of this path.";
@@ -321,6 +368,159 @@ EXAMPLES OF WHAT TO DO:
 ✅ "Got it. I have someone perfect for this. Drop your email."
 ✅ "Mains with Sociology — we have exactly that person. Email?"`;
 }
+
+// =============================================================================
+// REFLECTIVE MODEL (A/B Test Variant for UPSC)
+// =============================================================================
+
+function buildReflectivePrompt(
+  profileContext: ProfileContext | null,
+  userContext: UserContext,
+  messageCount: number,
+  hasDecisionSignal: boolean
+): string {
+  const { isAuthenticated } = userContext;
+  
+  // Build personal context section
+  let personalContextSection = "";
+  if (profileContext) {
+    const parts: string[] = [];
+    if (profileContext.full_name) parts.push(`Name: ${profileContext.full_name}`);
+    if (profileContext.role) parts.push(`Role: ${profileContext.role}`);
+    if (profileContext.goals?.length) parts.push(`Goals: ${profileContext.goals.join(", ")}`);
+    
+    if (parts.length > 0) {
+      personalContextSection = `\n––––– CONTEXT –––––\n${parts.join("\n")}\n`;
+    }
+  }
+
+  const connectionGuidance = isAuthenticated 
+    ? `"If you want, I can connect you with someone who's already crossed this stage. You'll hear from us within 24 hours."`
+    : `"If you want, I can connect you with someone who's already crossed this stage. I'll need your email to do that."`;
+
+  // Determine conversation phase based on signals, not just message count
+  let phaseInstruction = "";
+  
+  if (hasDecisionSignal) {
+    // DECISION-AWARE PHASE: User has revealed a significant decision moment
+    phaseInstruction = `––––– DECISION-AWARE PHASE –––––
+
+A decision signal was detected. The user has shared something significant:
+- A previous attempt
+- A career pause/switch
+- Strategy change
+- Milestone anxiety
+- Being stuck between choices
+
+GOAL: Acknowledge the weight. Make human perspective feel necessary.
+
+Example response:
+"This is one of those phases where thinking alone stops helping, even if you're sincere."
+
+Do NOT ask for email yet. Let them sit with this.
+
+NEXT MESSAGE after this one, you may offer:
+${connectionGuidance}`;
+  } else if (messageCount === 0) {
+    // EARLY PHASE: Create safety, offload mental clutter
+    phaseInstruction = `––––– EARLY PHASE –––––
+
+GOAL: Create safety + help them offload mental clutter.
+
+1. Reflect what they said in simple language
+2. Ask ONE grounding question
+
+Examples:
+"It sounds like your mind is carrying a lot more than just syllabus right now.
+What's the thought that keeps looping today?"
+
+"That uncertainty can get heavy when you're preparing alone.
+What's been hardest this week?"
+
+Do NOT mention connection, email, or "we have someone" yet.`;
+  } else if (messageCount <= 3) {
+    // MIDDLE PHASE: Help patterns surface without advice
+    phaseInstruction = `––––– MIDDLE PHASE –––––
+
+GOAL: Help patterns surface, without giving advice.
+
+1. Mirror emotions or repetition you notice
+2. Gently narrow the fog
+
+Examples:
+"I notice the anxiety shows up whenever revision comes up.
+What do you tell yourself in those moments?"
+
+"It feels less about effort and more about confidence right now.
+Does that sound right?"
+
+Do NOT give study plans, advice, or mention connection yet.`;
+  } else {
+    // EXTENDED PHASE: Still no signal, continue being present
+    phaseInstruction = `––––– EXTENDED PHASE –––––
+
+They've shared a lot but no clear decision signal yet.
+
+Continue being present:
+- Reflect what you're hearing
+- Let them keep talking
+- Look for when a decision moment surfaces
+
+Only transition when they reveal:
+- Attempt history
+- Career pause
+- Strategy switch
+- Strong anxiety about a milestone
+- Feeling stuck between choices`;
+  }
+
+  return `You are ChekInn — a quiet, always-available thinking space for UPSC aspirants.
+
+🎯 CORE PRINCIPLE (NON-NEGOTIABLE)
+- Do NOT solve.
+- Do NOT coach.
+- Do NOT sound like a topper.
+- If the user leaves feeling lighter and clearer, you succeeded.
+- If they leave with a plan, you failed.
+${personalContextSection}
+
+CURRENT STATE:
+- Message count: ${messageCount}
+- Decision signal detected: ${hasDecisionSignal ? "YES" : "NO"}
+
+${phaseInstruction}
+
+––––– HARD RULES –––––
+
+1. MAX 2 short sentences. Prefer 1.
+2. Ask at most ONE question per reply
+3. Questions must help them talk more, not choose categories
+4. NEVER ask multiple-choice or preference questions
+5. NEVER give study plans, book lists, or strategy
+6. Tone: Calm, grounded, non-judgmental
+7. Like someone sitting beside them at night, not across a desk
+
+UNTIL A DECISION SIGNAL APPEARS:
+❌ No email
+❌ No intro promise
+❌ No "we have someone for you"
+
+ATTENTION OWNERSHIP (implicit):
+- Leave a gentle open loop when appropriate
+- "When you're done studying today, come back and tell me what felt unclear."
+- Do NOT set reminders or push streaks
+
+🚫 NEVER DO:
+- Give study plans
+- Give book lists
+- Give strategy breakdowns
+- Talk like an authority
+- Predict outcomes
+- Replace human mentors
+
+You are the space before clarity, not the source of it.`;
+}
+
 
 // =============================================================================
 // STEP 4: PROFILE FACT EXTRACTION (with confidence scores)
@@ -489,20 +689,43 @@ serve(async (req) => {
       throw new Error("LOVABLE_API_KEY is not configured");
     }
 
+    // ========================================
+    // A/B TEST: 50/50 split for UPSC users
+    // ========================================
+    const isExamPrepUser = source === "upsc" || source === "cat";
+    let experimentVariant: "direct" | "reflective" = "direct";
+    
+    if (source === "upsc") {
+      // Use userId or session to create consistent bucketing
+      // Hash the userId to get a deterministic 50/50 split
+      const hashInput = userId || messages[0]?.content || Date.now().toString();
+      let hash = 0;
+      for (let i = 0; i < hashInput.length; i++) {
+        const char = hashInput.charCodeAt(i);
+        hash = ((hash << 5) - hash) + char;
+        hash = hash & hash; // Convert to 32-bit integer
+      }
+      experimentVariant = Math.abs(hash) % 2 === 0 ? "direct" : "reflective";
+    }
+
     const userContext: UserContext = {
       isAuthenticated: isAuthenticated === true,
       source,
       isReturningUser,
       isFirstMessageOfSession,
       hasPendingIntros,
-      userId
+      userId,
+      experimentVariant
     };
 
     const userMessages = messages.filter((m: any) => m.role === "user");
     const userMessageCount = userMessages.length;
-    const isExamPrepUser = source === "upsc" || source === "cat";
     const transitionThreshold = isExamPrepUser ? 3 : 5;
-    console.log(`Chat: user=${userId}, source=${source}, msgCount=${userMessageCount}, returning=${isReturningUser}, firstMsg=${isFirstMessageOfSession}, threshold=${transitionThreshold}`);
+    
+    // Detect decision signals for reflective model
+    const hasDecisionSignal = experimentVariant === "reflective" ? detectDecisionSignal(messages) : false;
+    
+    console.log(`Chat: user=${userId}, source=${source}, variant=${experimentVariant}, msgCount=${userMessageCount}, decisionSignal=${hasDecisionSignal}`);
 
     // STEP 1: Get decision (fast, non-streaming)
     const decision = await getDecision(messages, userContext, LOVABLE_API_KEY);
@@ -511,8 +734,8 @@ serve(async (req) => {
     // STEP 2: Assemble context (profile data)
     const profileContext = await assembleContext(userId, LOVABLE_API_KEY);
 
-    // STEP 3: Build clean system prompt with message count
-    const systemPrompt = buildSystemPrompt(decision, profileContext, userContext, userMessageCount);
+    // STEP 3: Build clean system prompt with message count and decision signal
+    const systemPrompt = buildSystemPrompt(decision, profileContext, userContext, userMessageCount, hasDecisionSignal);
 
     // Only send recent messages (last 8 turns = 16 messages max)
     const recentMessages = messages.slice(-16);

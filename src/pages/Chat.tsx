@@ -17,6 +17,7 @@ const UserChatView = lazy(() => import("@/components/chat/UserChatView"));
 const OnboardingOverlay = lazy(() => import("@/components/chat/OnboardingOverlay"));
 const UserProfileCard = lazy(() => import("@/components/chat/UserProfileCard"));
 const SaveProgressNudge = lazy(() => import("@/components/chat/SaveProgressNudge"));
+const WhatsAppCommunityNudge = lazy(() => import("@/components/chat/WhatsAppCommunityNudge"));
 const VoiceInput = lazy(() => import("@/components/chat/VoiceInput"));
 
 // Lazy load undercurrents - only needed for authenticated users with access
@@ -149,6 +150,7 @@ const Chat = () => {
   const [showSaveProgress, setShowSaveProgress] = useState(false);
   const [sessionId] = useState(() => getSessionId());
   const [showOnboarding, setShowOnboarding] = useState(false);
+  const [showWACommunity, setShowWACommunity] = useState(false);
   const evaluatedIntros = useRef<Set<string>>(new Set());
   
   const messagesEndRef = useRef<HTMLDivElement>(null);
@@ -1122,7 +1124,20 @@ const Chat = () => {
               {/* Save Progress Nudge - shown after 3 messages (mid-conversation) */}
               {showSaveProgress && !user && !showLoginNudge && (
                 <SaveProgressNudge
-                  onDismiss={() => setShowSaveProgress(false)}
+                  onDismiss={() => {
+                    setShowSaveProgress(false);
+                    // Show WA community nudge after dismissing save progress (for UPSC/CAT users)
+                    if (isUPSC || isCAT) {
+                      setTimeout(() => setShowWACommunity(true), 500);
+                    }
+                  }}
+                />
+              )}
+
+              {/* WhatsApp Community Nudge - shown after save progress is dismissed */}
+              {showWACommunity && !user && !showLoginNudge && (isUPSC || isCAT) && (
+                <WhatsAppCommunityNudge
+                  onDismiss={() => setShowWACommunity(false)}
                 />
               )}
 
@@ -1182,6 +1197,14 @@ const Chat = () => {
                   <p className="text-xs text-muted-foreground">
                     We're working on finding the right person for you. You'll get an email + it'll show up right here — usually within 12 hours!
                   </p>
+                  
+                  {/* WA Community nudge for UPSC/CAT users waiting for match */}
+                  {(isUPSC || isCAT) && (
+                    <WhatsAppCommunityNudge
+                      variant="compact"
+                      onDismiss={() => {}}
+                    />
+                  )}
                 </motion.div>
               )}
             </AnimatePresence>
@@ -1211,7 +1234,6 @@ const Chat = () => {
                 </div>
               </motion.div>
             )}
-            <div ref={messagesEndRef} />
           </div>
 
           {/* Input - Voice or Text based on experiment variant */}

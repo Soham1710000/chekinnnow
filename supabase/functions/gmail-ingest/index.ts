@@ -18,11 +18,12 @@ const POTENTIAL_SIGNAL_KEYWORDS = [
   'course', 'enrolled', 'subscription', 'learning', 'certification'
 ];
 
-// Domains/senders to ignore
+// Domains/senders to ignore (but keep Twitter/X for profile extraction)
 const IGNORE_PATTERNS = [
   'noreply@youtube.com', 'notifications@', 'newsletter@', 'promo@', 
   'marketing@', 'deals@', 'offers@', 'unsubscribe', 'linkedin.com/comm/',
-  'facebook.com', 'twitter.com', 'instagram.com', 'pinterest.com'
+  'facebook.com', 'instagram.com', 'pinterest.com'
+  // Note: twitter.com and x.com are NOT ignored - we need them for profile extraction
 ];
 
 interface EmailForExtraction {

@@ -101,6 +101,7 @@ export type Database = {
           email: string
           google_id: string | null
           id: string
+          processed_email_ids: string[] | null
           status: string
           updated_at: string
         }
@@ -110,6 +111,7 @@ export type Database = {
           email: string
           google_id?: string | null
           id?: string
+          processed_email_ids?: string[] | null
           status?: string
           updated_at?: string
         }
@@ -119,6 +121,7 @@ export type Database = {
           email?: string
           google_id?: string | null
           id?: string
+          processed_email_ids?: string[] | null
           status?: string
           updated_at?: string
         }
@@ -251,6 +254,59 @@ export type Database = {
           user_id?: string | null
         }
         Relationships: []
+      }
+      inferred_social_profiles: {
+        Row: {
+          confidence: number
+          created_at: string
+          id: string
+          platform: string
+          profile_handle: string | null
+          profile_url: string
+          scrape_status: string | null
+          scraped_at: string | null
+          source_email_id: string | null
+          source_type: string
+          updated_at: string
+          user_id: string
+        }
+        Insert: {
+          confidence?: number
+          created_at?: string
+          id?: string
+          platform: string
+          profile_handle?: string | null
+          profile_url: string
+          scrape_status?: string | null
+          scraped_at?: string | null
+          source_email_id?: string | null
+          source_type: string
+          updated_at?: string
+          user_id: string
+        }
+        Update: {
+          confidence?: number
+          created_at?: string
+          id?: string
+          platform?: string
+          profile_handle?: string | null
+          profile_url?: string
+          scrape_status?: string | null
+          scraped_at?: string | null
+          source_email_id?: string | null
+          source_type?: string
+          updated_at?: string
+          user_id?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "inferred_social_profiles_user_id_fkey"
+            columns: ["user_id"]
+            isOneToOne: false
+            referencedRelation: "chekinn_users"
+            referencedColumns: ["id"]
+          },
+        ]
       }
       ingestion_jobs: {
         Row: {
@@ -480,6 +536,60 @@ export type Database = {
           updated_at?: string | null
         }
         Relationships: []
+      }
+      social_signals: {
+        Row: {
+          confidence: number
+          created_at: string
+          evidence: string | null
+          expires_at: string | null
+          id: string
+          processed: boolean | null
+          profile_id: string | null
+          signal_type: string
+          signal_value: string
+          user_id: string
+        }
+        Insert: {
+          confidence?: number
+          created_at?: string
+          evidence?: string | null
+          expires_at?: string | null
+          id?: string
+          processed?: boolean | null
+          profile_id?: string | null
+          signal_type: string
+          signal_value: string
+          user_id: string
+        }
+        Update: {
+          confidence?: number
+          created_at?: string
+          evidence?: string | null
+          expires_at?: string | null
+          id?: string
+          processed?: boolean | null
+          profile_id?: string | null
+          signal_type?: string
+          signal_value?: string
+          user_id?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "social_signals_profile_id_fkey"
+            columns: ["profile_id"]
+            isOneToOne: false
+            referencedRelation: "inferred_social_profiles"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "social_signals_user_id_fkey"
+            columns: ["user_id"]
+            isOneToOne: false
+            referencedRelation: "chekinn_users"
+            referencedColumns: ["id"]
+          },
+        ]
       }
       undercurrents: {
         Row: {

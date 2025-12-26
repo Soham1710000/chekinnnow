@@ -44,7 +44,18 @@ async function getAccessToken(supabase: any, userId: string): Promise<string | n
   });
 
   if (!response.ok) {
-    console.error('[gmail-ingest] Failed to get access token for user:', userId);
+    const errorText = await response.text();
+    console.error('[gmail-ingest] Failed to get access token for user:', userId, errorText);
+    
+    // If token refresh fails, pause the user
+    if (errorText.includes('invalid_grant') || errorText.includes('Token has been expired or revoked')) {
+      console.log('[gmail-ingest] Gmail access revoked, pausing user:', userId);
+      await supabase
+        .from('chekinn_users')
+        .update({ status: 'paused' })
+        .eq('id', userId);
+    }
+    
     return null;
   }
 
@@ -62,19 +73,43 @@ function mightContainSignal(subject: string, snippet: string): boolean {
   return POTENTIAL_SIGNAL_KEYWORDS.some(keyword => combined.includes(keyword.toLowerCase()));
 }
 
-async function processUserEmails(supabase: any, userId: string, accessToken: string): Promise<{ processed: number; signals: number }> {
+async function processUserEmails(supabase: any, userId: string, accessToken: string): Promise<{ processed: number; signals: number; profiles: number }> {
   console.log('[gmail-ingest] Processing emails for user:', userId);
   
-  const thirtyDaysAgo = new Date();
-  thirtyDaysAgo.setDate(thirtyDaysAgo.getDate() - 30);
-  const afterTimestamp = Math.floor(thirtyDaysAgo.getTime() / 1000);
+  // Get last processed timestamp
+  const { data: lastJob } = await supabase
+    .from('ingestion_jobs')
+    .select('completed_at')
+    .eq('user_id', userId)
+    .eq('status', 'completed')
+    .order('completed_at', { ascending: false })
+    .limit(1)
+    .maybeSingle();
 
+  const afterDate = lastJob?.completed_at 
+    ? new Date(lastJob.completed_at)
+    : new Date(Date.now() - 30 * 24 * 60 * 60 * 1000); // Default 30 days
+  
+  const afterTimestamp = Math.floor(afterDate.getTime() / 1000);
   const query = `after:${afterTimestamp} -category:promotions -category:social`;
   
   let processed = 0;
   let signalsFound = 0;
+  let profilesFound = 0;
   let pageToken: string | null = null;
   const emailsForExtraction: EmailForExtraction[] = [];
+  const emailsForSocialInference: EmailForExtraction[] = [];
+  const processedMessageIds = new Set<string>();
+
+  // Get already processed message IDs to ensure idempotency
+  const { data: existingSignals } = await supabase
+    .from('email_signals')
+    .select('gmail_message_id')
+    .eq('user_id', userId);
+  
+  if (existingSignals) {
+    existingSignals.forEach((s: any) => processedMessageIds.add(s.gmail_message_id));
+  }
 
   do {
     const listUrl = new URL('https://gmail.googleapis.com/gmail/v1/users/me/messages');
@@ -98,8 +133,12 @@ async function processUserEmails(supabase: any, userId: string, accessToken: str
     console.log(`[gmail-ingest] Found ${messages.length} messages to check`);
 
     for (const msg of messages) {
+      // Skip already processed emails (idempotency)
+      if (processedMessageIds.has(msg.id)) {
+        continue;
+      }
+
       try {
-        // Get message with snippet for pre-filtering
         const msgResponse = await fetch(
           `https://gmail.googleapis.com/gmail/v1/users/me/messages/${msg.id}?format=full`,
           { headers: { Authorization: `Bearer ${accessToken}` } }
@@ -119,10 +158,7 @@ async function processUserEmails(supabase: any, userId: string, accessToken: str
         // Skip ignored emails
         if (shouldIgnoreEmail(from, subject)) continue;
 
-        // Pre-filter: only send potentially relevant emails to LLM
-        if (!mightContainSignal(subject, snippet)) continue;
-
-        // Extract body text (simplified - just get text/plain or decoded text/html)
+        // Extract body text
         let body = snippet;
         const parts = msgData.payload?.parts || [];
         for (const part of parts) {
@@ -131,21 +167,27 @@ async function processUserEmails(supabase: any, userId: string, accessToken: str
             break;
           }
         }
-        // Fallback to payload body if no parts
         if (body === snippet && msgData.payload?.body?.data) {
           body = atob(msgData.payload.body.data.replace(/-/g, '+').replace(/_/g, '/'));
         }
 
-        // Limit body length to save tokens
         body = body.slice(0, 2000);
 
-        emailsForExtraction.push({
+        const emailData: EmailForExtraction = {
           messageId: msg.id,
           subject,
           from,
           date: dateStr || new Date(parseInt(msgData.internalDate || Date.now())).toISOString(),
           body,
-        });
+        };
+
+        // All emails go to social inference (for LinkedIn/Twitter detection)
+        emailsForSocialInference.push(emailData);
+
+        // Only potentially relevant emails go to signal extraction
+        if (mightContainSignal(subject, snippet)) {
+          emailsForExtraction.push(emailData);
+        }
 
       } catch (err) {
         console.error('[gmail-ingest] Error processing message:', err);
@@ -153,11 +195,12 @@ async function processUserEmails(supabase: any, userId: string, accessToken: str
     }
 
     await new Promise(resolve => setTimeout(resolve, 100));
-  } while (pageToken && emailsForExtraction.length < 100); // Limit to 100 emails per run
+  } while (pageToken && emailsForExtraction.length < 100);
 
   console.log(`[gmail-ingest] Sending ${emailsForExtraction.length} emails to signal extraction`);
+  console.log(`[gmail-ingest] Sending ${emailsForSocialInference.length} emails to social inference`);
 
-  // Send to signal extraction in batches of 10
+  // Step 2: Extract signals from relevant emails
   const batchSize = 10;
   for (let i = 0; i < emailsForExtraction.length; i += batchSize) {
     const batch = emailsForExtraction.slice(i, i + batchSize);
@@ -182,11 +225,56 @@ async function processUserEmails(supabase: any, userId: string, accessToken: str
       console.error('[gmail-ingest] Error calling signal-extract:', err);
     }
 
-    // Small delay between batches
     await new Promise(resolve => setTimeout(resolve, 500));
   }
 
-  // After signal extraction, run decision engine
+  // Step 3: Infer social profiles from all emails
+  for (let i = 0; i < emailsForSocialInference.length; i += batchSize) {
+    const batch = emailsForSocialInference.slice(i, i + batchSize);
+    
+    try {
+      const inferResponse = await fetch(`${SUPABASE_URL}/functions/v1/infer-social`, {
+        method: 'POST',
+        headers: {
+          'Authorization': `Bearer ${SUPABASE_SERVICE_ROLE_KEY}`,
+          'Content-Type': 'application/json',
+        },
+        body: JSON.stringify({ emails: batch, userId }),
+      });
+
+      if (inferResponse.ok) {
+        const result = await inferResponse.json();
+        profilesFound += result.profilesInserted || 0;
+      } else {
+        console.error('[gmail-ingest] Social inference failed:', await inferResponse.text());
+      }
+    } catch (err) {
+      console.error('[gmail-ingest] Error calling infer-social:', err);
+    }
+
+    await new Promise(resolve => setTimeout(resolve, 500));
+  }
+
+  // Step 4: Scrape high-confidence social profiles
+  try {
+    const scrapeResponse = await fetch(`${SUPABASE_URL}/functions/v1/scrape-social`, {
+      method: 'POST',
+      headers: {
+        'Authorization': `Bearer ${SUPABASE_SERVICE_ROLE_KEY}`,
+        'Content-Type': 'application/json',
+      },
+      body: JSON.stringify({ userId }),
+    });
+
+    if (scrapeResponse.ok) {
+      const result = await scrapeResponse.json();
+      console.log(`[gmail-ingest] Scraped ${result.scraped} profiles, ${result.signalsCreated} signals`);
+    }
+  } catch (err) {
+    console.error('[gmail-ingest] Error calling scrape-social:', err);
+  }
+
+  // Step 5: Run decision engine (considers both email and social signals)
   try {
     const decisionResponse = await fetch(`${SUPABASE_URL}/functions/v1/decision-engine`, {
       method: 'POST',
@@ -205,7 +293,7 @@ async function processUserEmails(supabase: any, userId: string, accessToken: str
     console.error('[gmail-ingest] Error calling decision-engine:', err);
   }
 
-  return { processed, signals: signalsFound };
+  return { processed, signals: signalsFound, profiles: profilesFound };
 }
 
 Deno.serve(async (req) => {
@@ -228,6 +316,7 @@ Deno.serve(async (req) => {
     if (userIds.length === 0) {
       console.log('[gmail-ingest] Running batch job for all active users');
       
+      // Only process active users (not paused due to revoked access)
       const { data: users, error } = await supabase
         .from('chekinn_users')
         .select('id')
@@ -264,14 +353,14 @@ Deno.serve(async (req) => {
             .update({
               status: 'failed',
               completed_at: new Date().toISOString(),
-              error_message: 'Failed to get access token',
+              error_message: 'Failed to get access token - Gmail access may be revoked',
             })
             .eq('id', job.id);
-          results[userId] = { error: 'Failed to get access token' };
+          results[userId] = { error: 'Gmail access revoked or expired' };
           continue;
         }
 
-        const { processed, signals } = await processUserEmails(supabase, userId, accessToken);
+        const { processed, signals, profiles } = await processUserEmails(supabase, userId, accessToken);
 
         await supabase
           .from('ingestion_jobs')
@@ -283,8 +372,8 @@ Deno.serve(async (req) => {
           })
           .eq('id', job.id);
 
-        results[userId] = { processed, signals };
-        console.log(`[gmail-ingest] Completed for user ${userId}: ${processed} emails, ${signals} signals`);
+        results[userId] = { processed, signals, profiles };
+        console.log(`[gmail-ingest] Completed for user ${userId}: ${processed} emails, ${signals} signals, ${profiles} profiles`);
 
       } catch (err) {
         const errorMessage = err instanceof Error ? err.message : 'Unknown error';

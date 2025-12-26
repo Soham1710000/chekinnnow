@@ -24,7 +24,7 @@ interface UserContext {
   isFirstMessageOfSession?: boolean;
   hasPendingIntros?: boolean;
   userId?: string;
-  experimentVariant?: "direct" | "reflective"; // A/B test variant
+  experimentVariant?: "direct" | "reflective";
 }
 
 interface ProfileContext {
@@ -44,7 +44,6 @@ async function getDecision(
   userContext: UserContext,
   apiKey: string
 ): Promise<DecisionOutput> {
-  // Default fallback if decision fails
   const defaultDecision: DecisionOutput = {
     mode: "reflect",
     tone: "soft",
@@ -53,21 +52,18 @@ async function getDecision(
   };
 
   try {
-    // Build conversation summary (last 5 messages only)
     const recentMessages = messages.slice(-10);
     const lastMessages = recentMessages.map((m: any) => `${m.role}: ${m.content}`).join("\n");
     
-    // Summarize earlier context if exists
     const earlierMessages = messages.slice(0, -10);
     const conversationSummary = earlierMessages.length > 0 
       ? earlierMessages.map((m: any) => `${m.role}: ${m.content.slice(0, 100)}...`).join("\n")
       : "No prior context.";
 
-  // Force transition after message threshold (VERY fast for exam prep users)
-  const userMessageCount = messages.filter((m: any) => m.role === "user").length;
-  const isExamPrepUser = userContext.source === "upsc" || userContext.source === "cat";
-  const transitionThreshold = isExamPrepUser ? 2 : 4; // Much faster - 2 messages max for UPSC/CAT
-  const shouldForceTransition = userMessageCount >= transitionThreshold;
+    const userMessageCount = messages.filter((m: any) => m.role === "user").length;
+    const isExamPrepUser = userContext.source === "upsc" || userContext.source === "cat";
+    const transitionThreshold = isExamPrepUser ? 2 : 4;
+    const shouldForceTransition = userMessageCount >= transitionThreshold;
 
     const decisionPrompt = `You are an internal decision engine for ChekInn.
 
@@ -121,7 +117,7 @@ Return JSON with:
         "Content-Type": "application/json",
       },
       body: JSON.stringify({
-        model: "google/gemini-2.5-flash-lite", // Fast & cheap for classification
+        model: "google/gemini-2.5-flash-lite",
         messages: [
           { role: "system", content: decisionPrompt },
           { role: "user", content: userPrompt }
@@ -139,7 +135,6 @@ Return JSON with:
     
     if (!content) return defaultDecision;
 
-    // Parse JSON response
     const jsonMatch = content.match(/```json\s*([\s\S]*?)\s*```/) || 
                       content.match(/```\s*([\s\S]*?)\s*```/) ||
                       content.match(/\{[\s\S]*\}/);
@@ -148,7 +143,6 @@ Return JSON with:
     const decision = JSON.parse(jsonString.trim());
     console.log("Decision layer output:", JSON.stringify(decision));
     
-    // Force consider_social if threshold reached
     const parsedConsiderSocial = shouldForceTransition ? true : (decision.consider_social || false);
     
     return {
@@ -197,35 +191,25 @@ async function assembleContext(
 }
 
 // =============================================================================
-// STEP 3: STREAMING SYSTEM PROMPT (Clean & Focused)
+// STEP 3: SYSTEM PROMPTS
 // =============================================================================
 
-// Helper to detect decision signals in conversation
 function detectDecisionSignal(messages: any[]): boolean {
   const conversationText = messages.map((m: any) => m.content.toLowerCase()).join(" ");
   
   const decisionSignals = [
-    // Previous attempts
     /\b(first|second|third|1st|2nd|3rd|4th|5th|next)\s*(attempt|try)/i,
     /\battempt(s|ed)?\b/i,
     /\bfailed\s*(prelims|mains|interview)/i,
     /\bcleared\s*(prelims|mains)/i,
-    
-    // Career pauses/switches
     /\b(quit|left|leaving|pause|paused|resigned|switching)\s*(job|work|career)/i,
     /\b(full\s*time|full-time)\s*(prep|preparation|study)/i,
     /\btook\s*a\s*break/i,
-    
-    // Strategy changes
     /\b(switch|change|changing|switched)\s*(optional|strategy|subject)/i,
     /\b(dropped|taking|chose|choosing)\s*(optional|subject)/i,
-    
-    // Milestone anxiety
     /\b(scared|nervous|anxious|worried|stressed)\s*(about|for|of)?\s*(prelims|mains|interview)/i,
     /\bprelims\s*(is|are)?\s*(coming|near|soon|close)/i,
     /\b(pressure|stress|anxiety)\b/i,
-    
-    // Stuck between choices
     /\b(confused|stuck)\s*(between|about)/i,
     /\b(should\s*i|can't\s*decide|not\s*sure)/i,
     /\b(dilemma|torn\s*between)/i
@@ -234,17 +218,12 @@ function detectDecisionSignal(messages: any[]): boolean {
   return decisionSignals.some(pattern => pattern.test(conversationText));
 }
 
-function buildSystemPrompt(
-  decision: DecisionOutput,
+function buildReflectivePrompt(
   profileContext: ProfileContext | null,
   userContext: UserContext,
   messageCount: number,
-  hasDecisionSignal: boolean = false
+  hasDecisionSignal: boolean
 ): string {
-  const { mode, tone, use_experiences, consider_social } = decision;
-  const { source, isAuthenticated, experimentVariant } = userContext;
-
-  // Build personal context section
   let personalContextSection = "";
   if (profileContext) {
     const parts: string[] = [];
@@ -259,19 +238,65 @@ function buildSystemPrompt(
     }
   }
 
-  // Source-specific context
+  return `You are ChekInn — a thoughtful companion for people navigating important decisions.
+
+Your role is to:
+- Listen deeply and reflect patterns you notice
+- Help users clarify what they already feel
+- Sound like a smart, calm friend
+
+${personalContextSection}
+
+––––– RESPONSE STYLE –––––
+- 1-3 short messages (like texting)
+- Each message: 1-2 sentences max
+- Casual, calm, human
+- Mix empathy + observation
+
+You MAY say things like:
+- "This hasn't come out of nowhere."
+- "Feels more like timing than frustration."
+- "You've been circling this."
+
+You MUST NOT:
+- Ask multiple questions
+- Give step-by-step plans
+- Sound clinical or therapeutic
+- Push actions or capture emails
+
+Leave the user feeling understood and slightly clearer.`;
+}
+
+function buildSystemPrompt(
+  decision: DecisionOutput,
+  profileContext: ProfileContext | null,
+  userContext: UserContext,
+  messageCount: number,
+  hasDecisionSignal: boolean = false
+): string {
+  const { mode, tone, use_experiences, consider_social } = decision;
+  const { source, isAuthenticated, experimentVariant } = userContext;
+
+  let personalContextSection = "";
+  if (profileContext) {
+    const parts: string[] = [];
+    if (profileContext.full_name) parts.push(`Name: ${profileContext.full_name}`);
+    if (profileContext.role) parts.push(`Role: ${profileContext.role}`);
+    if (profileContext.industry) parts.push(`Industry: ${profileContext.industry}`);
+    if (profileContext.goals?.length) parts.push(`Goals: ${profileContext.goals.join(", ")}`);
+    if (profileContext.interests?.length) parts.push(`Interests: ${profileContext.interests.join(", ")}`);
+    
+    if (parts.length > 0) {
+      personalContextSection = `\n––––– PERSONAL CONTEXT –––––\n${parts.join("\n")}\n`;
+    }
+  }
+
   const isExamPrepUser = source === "upsc" || source === "cat";
   
-  // ========================================
-  // A/B TEST: REFLECTIVE MODEL FOR UPSC
-  // ========================================
   if (isExamPrepUser && experimentVariant === "reflective") {
     return buildReflectivePrompt(profileContext, userContext, messageCount, hasDecisionSignal);
   }
   
-  // ========================================
-  // DEFAULT: DIRECT MODEL
-  // ========================================
   let sourceContext = "";
   if (source === "upsc") {
     sourceContext = "\nThis user is a UPSC aspirant. Understand the prep journey, attempts, optionals, and the emotional weight of this path.";
@@ -279,21 +304,16 @@ function buildSystemPrompt(
     sourceContext = "\nThis user is a CAT/MBA aspirant. Understand the prep journey, mock scores, target schools, and career transitions.";
   }
 
-  // Dynamic threshold based on source - much faster for exam users
   const transitionThreshold = isExamPrepUser ? 2 : 4;
-
-  // Connection transition guidance
   const connectionGuidance = isAuthenticated 
     ? `Say: "Got it — I'll find someone who's been through this. You'll hear from us within 12-24 hours via email."`
     : `Say: "Got it — just drop your email and we'll connect you with someone who's been through this within 12-24 hours."`;
 
-  // Force transition after threshold
   const shouldTransitionNow = messageCount >= transitionThreshold;
   const transitionInstruction = shouldTransitionNow 
     ? `\n\n⚠️ CRITICAL: STOP. You have enough info (${messageCount} messages). DO NOT ask another question. Transition to connection NOW. ${connectionGuidance}`
     : "";
 
-  // Carrot messaging - earlier and stronger
   let carrotMessage = "";
   if (isExamPrepUser) {
     if (messageCount === 0) {
@@ -332,25 +352,25 @@ ${personalContextSection}
 ––––– HOW TO THINK –––––
 
 Assume:
-- Big thoughts don’t appear suddenly
-- If the user mentions a decision, it’s been brewing
+- Big thoughts don't appear suddenly
+- If the user mentions a decision, it's been brewing
 - Repetition = importance
 - Hesitation = missing clarity, not laziness
 
 You MAY:
 - Say things like:
-  • “This hasn’t come out of nowhere.”
-  • “Feels more like timing than frustration.”
-  • “You’ve been circling this.”
+  • "This hasn't come out of nowhere."
+  • "Feels more like timing than frustration."
+  • "You've been circling this."
 
 You MAY offer:
 - ONE small, reversible, optional action
 - Framed as a suggestion, not a plan
 
 Examples:
-- “Might help to write what you’d miss if you stayed.”
-- “You could sanity-check this by listing tradeoffs.”
-- “Sometimes naming the worst-case helps.”
+- "Might help to write what you'd miss if you stayed."
+- "You could sanity-check this by listing tradeoffs."
+- "Sometimes naming the worst-case helps."
 
 You MUST NOT:
 - Ask multiple questions
@@ -368,4 +388,257 @@ If unsure, say less — not more.
 Your goal:
 Leave the user feeling understood and slightly clearer,
 not decided, not pushed, not sold to.
-`;
+${transitionInstruction}${carrotMessage}`;
+}
+
+// =============================================================================
+// PROFILE EXTRACTION
+// =============================================================================
+
+async function extractProfileFromConversation(
+  messages: any[],
+  userId: string,
+  apiKey: string
+): Promise<void> {
+  try {
+    console.log(`Starting profile extraction for user ${userId}`);
+    
+    const conversationText = messages
+      .map((m: any) => `${m.role}: ${m.content}`)
+      .join("\n");
+
+    const extractionPrompt = `Analyze this conversation and extract factual information about the user.
+
+CONVERSATION:
+${conversationText}
+
+Extract ONLY what is explicitly stated or strongly implied. Return JSON:
+{
+  "full_name": { "value": "string or null", "confidence": 0.0-1.0 },
+  "role": { "value": "string or null", "confidence": 0.0-1.0 },
+  "industry": { "value": "string or null", "confidence": 0.0-1.0 },
+  "exam": { "value": "UPSC|CAT|null", "confidence": 0.0-1.0 },
+  "exam_stage": { "value": "string or null", "confidence": 0.0-1.0 },
+  "goals": ["list of stated goals"],
+  "interests": ["list of stated interests"],
+  "communication_style": { "value": "analytical|emotional|practical|null", "confidence": 0.0-1.0 },
+  "looking_for": ["what they're seeking - mentors, connections, advice, etc."]
+}
+
+Only include fields with confidence >= 0.7. Return valid JSON only.`;
+
+    const response = await fetch("https://ai.gateway.lovable.dev/v1/chat/completions", {
+      method: "POST",
+      headers: {
+        Authorization: `Bearer ${apiKey}`,
+        "Content-Type": "application/json",
+      },
+      body: JSON.stringify({
+        model: "google/gemini-2.5-flash",
+        messages: [
+          { role: "system", content: "You are a precise information extraction engine. Return only valid JSON." },
+          { role: "user", content: extractionPrompt }
+        ],
+      }),
+    });
+
+    if (!response.ok) {
+      console.error("Profile extraction API failed:", response.status);
+      return;
+    }
+
+    const data = await response.json();
+    const content = data.choices?.[0]?.message?.content;
+    
+    if (!content) return;
+
+    let cleanContent = content.trim();
+    if (cleanContent.startsWith('```')) {
+      cleanContent = cleanContent.replace(/^```(?:json)?\n?/, '').replace(/\n?```$/, '');
+    }
+    
+    const extracted = JSON.parse(cleanContent);
+
+    const profileUpdates: Record<string, any> = {
+      learning_complete: true,
+      ai_insights: {
+        summary: buildProfileSummary(extracted),
+        extracted_at: new Date().toISOString(),
+        raw_facts: extracted
+      }
+    };
+
+    if (extracted.full_name?.confidence >= 0.8) {
+      profileUpdates.full_name = extracted.full_name.value;
+    }
+    if (extracted.role?.confidence >= 0.8) {
+      profileUpdates.role = extracted.role.value;
+    }
+    if (extracted.industry?.confidence >= 0.8) {
+      profileUpdates.industry = extracted.industry.value;
+    }
+    if (extracted.goals?.length > 0) {
+      profileUpdates.goals = extracted.goals;
+    }
+    if (extracted.interests?.length > 0) {
+      profileUpdates.interests = extracted.interests;
+    }
+    if (extracted.communication_style?.confidence >= 0.8) {
+      profileUpdates.communication_style = extracted.communication_style.value;
+    }
+    if (extracted.looking_for?.length > 0) {
+      profileUpdates.looking_for = extracted.looking_for.join(", ");
+    }
+
+    console.log("Updating profile with high-confidence facts:", JSON.stringify(profileUpdates));
+
+    const SUPABASE_URL = Deno.env.get("SUPABASE_URL")!;
+    const SUPABASE_SERVICE_ROLE_KEY = Deno.env.get("SUPABASE_SERVICE_ROLE_KEY")!;
+    const supabase = createClient(SUPABASE_URL, SUPABASE_SERVICE_ROLE_KEY);
+
+    const { error } = await supabase
+      .from("profiles")
+      .update(profileUpdates)
+      .eq("id", userId);
+
+    if (error) {
+      console.error("Failed to update profile:", error);
+    } else {
+      console.log(`Profile updated successfully for user: ${userId}`);
+    }
+  } catch (error) {
+    console.error("Profile extraction error:", error);
+  }
+}
+
+function buildProfileSummary(extracted: any): string {
+  const parts: string[] = [];
+  
+  if (extracted.full_name?.value) {
+    parts.push(`${extracted.full_name.value}`);
+  }
+  if (extracted.role?.value) {
+    parts.push(`is a ${extracted.role.value}`);
+  }
+  if (extracted.industry?.value) {
+    parts.push(`in the ${extracted.industry.value} industry`);
+  }
+  if (extracted.goals?.length > 0) {
+    parts.push(`Goals: ${extracted.goals.join(", ")}`);
+  }
+  if (extracted.looking_for?.length > 0) {
+    parts.push(`Looking for: ${extracted.looking_for.join(", ")}`);
+  }
+  
+  return parts.join(". ") + ".";
+}
+
+// =============================================================================
+// MAIN SERVE HANDLER
+// =============================================================================
+
+serve(async (req) => {
+  if (req.method === "OPTIONS") {
+    return new Response(null, { headers: corsHeaders });
+  }
+
+  try {
+    const { messages, userContext, hasDecisionSignal: clientDecisionSignal } = await req.json();
+
+    if (!messages || !Array.isArray(messages)) {
+      return new Response(
+        JSON.stringify({ error: "Invalid messages format" }),
+        { status: 400, headers: { ...corsHeaders, "Content-Type": "application/json" } }
+      );
+    }
+
+    const LOVABLE_API_KEY = Deno.env.get("LOVABLE_API_KEY");
+    if (!LOVABLE_API_KEY) {
+      throw new Error("LOVABLE_API_KEY is not configured");
+    }
+
+    const context: UserContext = userContext || { isAuthenticated: false };
+    const userId = context.userId;
+    const messageCount = messages.filter((m: any) => m.role === "user").length;
+    const hasDecisionSignal = clientDecisionSignal || detectDecisionSignal(messages);
+
+    console.log(`Chat: user=${userId}, source=${context.source}, variant=${context.experimentVariant}, msgCount=${messageCount}, decisionSignal=${hasDecisionSignal}`);
+
+    // Run decision layer and context assembly in parallel
+    const [decision, profileContext] = await Promise.all([
+      getDecision(messages, context, LOVABLE_API_KEY),
+      assembleContext(userId, LOVABLE_API_KEY)
+    ]);
+
+    // Force consider_social after threshold
+    const isExamPrepUser = context.source === "upsc" || context.source === "cat";
+    const transitionThreshold = isExamPrepUser ? 2 : 4;
+    const forceTransition = messageCount >= transitionThreshold;
+
+    console.log(`Decision: mode=${decision.mode}, tone=${decision.tone}, social=${decision.consider_social}, forceTransition=${forceTransition}`);
+
+    const systemPrompt = buildSystemPrompt(
+      decision,
+      profileContext,
+      context,
+      messageCount,
+      hasDecisionSignal
+    );
+
+    // Stream the response
+    const response = await fetch("https://ai.gateway.lovable.dev/v1/chat/completions", {
+      method: "POST",
+      headers: {
+        Authorization: `Bearer ${LOVABLE_API_KEY}`,
+        "Content-Type": "application/json",
+      },
+      body: JSON.stringify({
+        model: "google/gemini-2.5-flash",
+        messages: [
+          { role: "system", content: systemPrompt },
+          ...messages
+        ],
+        stream: true,
+      }),
+    });
+
+    if (!response.ok) {
+      if (response.status === 429) {
+        return new Response(
+          JSON.stringify({ error: "Rate limit exceeded. Please try again later." }),
+          { status: 429, headers: { ...corsHeaders, "Content-Type": "application/json" } }
+        );
+      }
+      if (response.status === 402) {
+        return new Response(
+          JSON.stringify({ error: "Payment required. Please add credits." }),
+          { status: 402, headers: { ...corsHeaders, "Content-Type": "application/json" } }
+        );
+      }
+      const errorText = await response.text();
+      console.error("AI gateway error:", response.status, errorText);
+      throw new Error(`AI gateway error: ${response.status}`);
+    }
+
+    // Trigger profile extraction after 5+ user messages (run in background)
+    const extractionThreshold = 5;
+    if (userId && messageCount >= extractionThreshold) {
+      console.log(`Triggering profile extraction for user ${userId} (threshold: ${extractionThreshold})`);
+      // Run profile extraction in background (fire-and-forget)
+      extractProfileFromConversation(messages, userId, LOVABLE_API_KEY).catch(err => 
+        console.error("Background profile extraction failed:", err)
+      );
+    }
+
+    return new Response(response.body, {
+      headers: { ...corsHeaders, "Content-Type": "text/event-stream" },
+    });
+
+  } catch (error) {
+    console.error("Chat AI error:", error);
+    return new Response(
+      JSON.stringify({ error: error instanceof Error ? error.message : "Unknown error" }),
+      { status: 500, headers: { ...corsHeaders, "Content-Type": "application/json" } }
+    );
+  }
+});

@@ -6,7 +6,7 @@ const corsHeaders = {
   "Access-Control-Allow-Headers": "authorization, x-client-info, apikey, content-type",
 };
 
-type InterventionAction = "none" | "reflect" | "intro";
+type InterventionAction = "none" | "intro";
 
 serve(async (req) => {
   if (req.method === "OPTIONS") {
@@ -20,75 +20,28 @@ serve(async (req) => {
       return json({ action: "none", reason: "Missing userId" });
     }
 
-    const supabase = createClient(Deno.env.get("SUPABASE_URL")!, Deno.env.get("SUPABASE_SERVICE_ROLE_KEY")!);
+    const supabase = createClient(
+      Deno.env.get("SUPABASE_URL")!,
+      Deno.env.get("SUPABASE_SERVICE_ROLE_KEY")!
+    );
 
-    /**
-     * 1. Load the most recent active decision thread
-     */
-    const { data: thread } = await supabase
-      .from("decision_threads")
+    // 1. Get user's profile
+    const { data: profile } = await supabase
+      .from("profiles")
       .select("*")
-      .eq("user_id", userId)
-      .order("last_active_at", { ascending: false })
-      .limit(1)
+      .eq("id", userId)
       .single();
 
-    if (!thread) {
-      return json({ action: "none", reason: "No active decision thread" });
+    if (!profile) {
+      return json({ action: "none", reason: "No profile found" });
     }
 
-    /**
-     * 2. Hard gates — most users exit here
-     */
-    if (thread.message_count < 3) {
-      return json({ action: "none", reason: "Insufficient context" });
+    // 2. Check if user has completed learning phase
+    if (!profile.learning_complete) {
+      return json({ action: "none", reason: "Learning not complete" });
     }
 
-    if (thread.return_count < 1) {
-      return json({ action: "none", reason: "No temporal recurrence yet" });
-    }
-
-    /**
-     * 3. Reflection phase (before ANY intros)
-     */
-    if (thread.clarity_score < 0.6) {
-      // Avoid repeating reflections too often
-      if (
-        thread.last_reflection_at &&
-        Date.now() - new Date(thread.last_reflection_at).getTime() < 48 * 60 * 60 * 1000
-      ) {
-        return json({ action: "none", reason: "Reflection recently sent" });
-      }
-
-      const reflection = generateReflection(thread);
-
-      // Persist reflection timestamp
-      await supabase
-        .from("decision_threads")
-        .update({ last_reflection_at: new Date().toISOString() })
-        .eq("id", thread.id);
-
-      return json({
-        action: "reflect",
-        message: reflection,
-        threadId: thread.id,
-      });
-    }
-
-    /**
-     * 4. Safety gates before intros
-     */
-    if (thread.emotional_volatility > 0.6) {
-      return json({ action: "none", reason: "Emotional volatility high" });
-    }
-
-    if (thread.intro_readiness < 0.7) {
-      return json({ action: "none", reason: "Intro readiness low" });
-    }
-
-    /**
-     * 5. Check active intros cap (max 2–3)
-     */
+    // 3. Check active intros cap (max 3)
     const { count: activeIntros } = await supabase
       .from("introductions")
       .select("*", { count: "exact", head: true })
@@ -99,67 +52,139 @@ serve(async (req) => {
       return json({ action: "none", reason: "Active intro limit reached" });
     }
 
-    /**
-     * 6. Find intro candidate by DECISION SIMILARITY
-     *    (not interests / skills)
-     */
+    // 4. Find potential matches based on overlapping interests/goals/industry
+    const userInterests = profile.interests || [];
+    const userGoals = profile.goals || [];
+    const userIndustry = profile.industry;
+
+    // Get other profiles who have completed learning
     const { data: candidates } = await supabase
-      .from("decision_threads")
-      .select("id, user_id, topic")
-      .eq("topic", thread.topic)
-      .neq("user_id", userId)
-      .order("first_seen_at", { ascending: true })
-      .limit(5);
+      .from("profiles")
+      .select("id, full_name, role, industry, interests, goals, looking_for")
+      .eq("learning_complete", true)
+      .neq("id", userId)
+      .limit(20);
 
     if (!candidates || candidates.length === 0) {
-      return json({ action: "none", reason: "No relevant decision peers" });
+      return json({ action: "none", reason: "No candidates available" });
     }
 
-    const match = candidates[0];
+    // Score candidates based on overlap
+    const scoredCandidates = candidates.map((c: any) => {
+      let score = 0;
+      
+      // Industry match
+      if (c.industry && userIndustry && c.industry.toLowerCase() === userIndustry.toLowerCase()) {
+        score += 3;
+      }
+      
+      // Interest overlap
+      const candidateInterests = c.interests || [];
+      const interestOverlap = userInterests.filter((i: string) => 
+        candidateInterests.some((ci: string) => ci.toLowerCase().includes(i.toLowerCase()) || i.toLowerCase().includes(ci.toLowerCase()))
+      ).length;
+      score += interestOverlap * 2;
+      
+      // Goals overlap
+      const candidateGoals = c.goals || [];
+      const goalsOverlap = userGoals.filter((g: string) =>
+        candidateGoals.some((cg: string) => cg.toLowerCase().includes(g.toLowerCase()) || g.toLowerCase().includes(cg.toLowerCase()))
+      ).length;
+      score += goalsOverlap;
+      
+      return { ...c, score };
+    });
 
-    /**
-     * 7. Create intro with heavy context
-     */
-    const introMessage = generateIntroMessage(thread.topic);
+    // Filter to candidates with reasonable match
+    const viableCandidates = scoredCandidates
+      .filter((c: any) => c.score >= 2)
+      .sort((a: any, b: any) => b.score - a.score);
 
-    const { data: intro } = await supabase
+    if (viableCandidates.length === 0) {
+      return json({ action: "none", reason: "No suitable matches found" });
+    }
+
+    // Check if already have pending/active intro with top candidate
+    const topCandidate = viableCandidates[0];
+    
+    const { data: existingIntro } = await supabase
+      .from("introductions")
+      .select("id")
+      .or(`and(user_a_id.eq.${userId},user_b_id.eq.${topCandidate.id}),and(user_a_id.eq.${topCandidate.id},user_b_id.eq.${userId})`)
+      .in("status", ["pending", "active"])
+      .single();
+
+    if (existingIntro) {
+      // Try next candidate
+      const nextCandidate = viableCandidates[1];
+      if (!nextCandidate) {
+        return json({ action: "none", reason: "Already connected with best match" });
+      }
+    }
+
+    const matchCandidate = existingIntro ? viableCandidates[1] : topCandidate;
+    if (!matchCandidate) {
+      return json({ action: "none", reason: "No available matches" });
+    }
+
+    // 5. Generate intro message
+    const introMessage = generateIntroMessage(profile, matchCandidate);
+
+    // 6. Create the introduction
+    const { data: intro, error: introError } = await supabase
       .from("introductions")
       .insert({
         user_a_id: userId,
-        user_b_id: match.user_id,
+        user_b_id: matchCandidate.id,
         status: "pending",
         intro_message: introMessage,
-        decision_thread_id: thread.id,
       })
       .select()
       .single();
 
+    if (introError) {
+      console.error("Failed to create intro:", introError);
+      return json({ action: "none", reason: "Failed to create intro" });
+    }
+
+    console.log(`Created intro ${intro.id} between ${userId} and ${matchCandidate.id}`);
+
     return json({
       action: "intro",
       introId: intro.id,
-      threadId: thread.id,
+      matchedWith: matchCandidate.id,
+      matchScore: matchCandidate.score,
     });
+
   } catch (error) {
-    console.error("[intervention-engine]", error);
+    console.error("[decision-engine]", error);
     return json({ error: error instanceof Error ? error.message : "Unknown error" }, 500);
   }
 });
 
-/* ---------------- helpers ---------------- */
+function generateIntroMessage(userA: any, userB: any): string {
+  const sharedInterests = (userA.interests || []).filter((i: string) =>
+    (userB.interests || []).some((bi: string) => 
+      bi.toLowerCase().includes(i.toLowerCase()) || i.toLowerCase().includes(bi.toLowerCase())
+    )
+  );
 
-function generateReflection(thread: any): string {
-  return `You’ve been circling this decision for a while.
-The options haven’t changed — just time.
+  const sameIndustry = userA.industry && userB.industry && 
+    userA.industry.toLowerCase() === userB.industry.toLowerCase();
 
-That usually means the tradeoff matters more than the choice.`;
-}
-
-function generateIntroMessage(topic: string): string {
-  return `You’re both dealing with the same decision — ${topic} — at different points in time.
-
-One of you has already walked this path.
-
-No advice expected. Just shared context.`;
+  let message = `You're both navigating similar paths`;
+  
+  if (sameIndustry) {
+    message += ` in ${userA.industry}`;
+  }
+  
+  if (sharedInterests.length > 0) {
+    message += ` with shared interest in ${sharedInterests.slice(0, 2).join(" and ")}`;
+  }
+  
+  message += `.\n\nNo pressure to have answers — just shared context.`;
+  
+  return message;
 }
 
 function json(body: any, status = 200) {

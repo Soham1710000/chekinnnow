@@ -121,7 +121,7 @@ Deno.serve(async (req) => {
     const supabase = createClient(SUPABASE_URL, SUPABASE_SERVICE_ROLE_KEY);
 
     let query = supabase
-      .from("inferred_email_profiles")
+      .from("inferred_social_profiles")
       .select("*")
       .eq("scrape_status", "pending")
       .gte("confidence", MIN_CONFIDENCE)
@@ -147,7 +147,7 @@ Deno.serve(async (req) => {
 
       if (!content) {
         await supabase
-          .from("inferred_email_profiles")
+          .from("inferred_social_profiles")
           .update({
             scrape_status: "failed",
             scraped_at: new Date().toISOString(),
@@ -169,7 +169,7 @@ Deno.serve(async (req) => {
       for (const { type, values, weight } of signalTypes) {
         for (const value of values) {
           const { data: existing } = await supabase
-            .from("email_signals")
+            .from("social_signals")
             .select("id")
             .eq("user_id", profile.user_id)
             .eq("signal_type", type)
@@ -178,22 +178,22 @@ Deno.serve(async (req) => {
 
           if (existing?.length) continue;
 
-          await supabase.from("email_signals").insert({
+          const { error } = await supabase.from("social_signals").insert({
             user_id: profile.user_id,
             profile_id: profile.id,
             signal_type: type,
             signal_value: value,
             confidence: Math.min(profile.confidence * weight, 1),
-            evidence: "Inferred from email content",
+            evidence: `Inferred from ${profile.platform} profile`,
             expires_at: new Date(Date.now() + 21 * 24 * 60 * 60 * 1000).toISOString(),
           });
 
-          signalsCreated++;
+          if (!error) signalsCreated++;
         }
       }
 
       await supabase
-        .from("inferred_email_profiles")
+        .from("inferred_social_profiles")
         .update({
           scrape_status: "scraped",
           scraped_at: new Date().toISOString(),

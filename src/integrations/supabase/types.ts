@@ -94,6 +94,74 @@ export type Database = {
         }
         Relationships: []
       }
+      chekinn_users: {
+        Row: {
+          consented_at: string | null
+          created_at: string
+          email: string
+          google_id: string | null
+          id: string
+          status: string
+          updated_at: string
+        }
+        Insert: {
+          consented_at?: string | null
+          created_at?: string
+          email: string
+          google_id?: string | null
+          id?: string
+          status?: string
+          updated_at?: string
+        }
+        Update: {
+          consented_at?: string | null
+          created_at?: string
+          email?: string
+          google_id?: string | null
+          id?: string
+          status?: string
+          updated_at?: string
+        }
+        Relationships: []
+      }
+      email_signals: {
+        Row: {
+          email_date: string
+          extracted_at: string
+          gmail_message_id: string
+          id: string
+          signal_data: Json
+          signal_type: string
+          user_id: string
+        }
+        Insert: {
+          email_date: string
+          extracted_at?: string
+          gmail_message_id: string
+          id?: string
+          signal_data?: Json
+          signal_type: string
+          user_id: string
+        }
+        Update: {
+          email_date?: string
+          extracted_at?: string
+          gmail_message_id?: string
+          id?: string
+          signal_data?: Json
+          signal_type?: string
+          user_id?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "email_signals_user_id_fkey"
+            columns: ["user_id"]
+            isOneToOne: false
+            referencedRelation: "chekinn_users"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
       funnel_events: {
         Row: {
           created_at: string
@@ -129,6 +197,50 @@ export type Database = {
           user_id?: string | null
         }
         Relationships: []
+      }
+      ingestion_jobs: {
+        Row: {
+          completed_at: string | null
+          emails_processed: number | null
+          error_message: string | null
+          id: string
+          last_history_id: string | null
+          signals_found: number | null
+          started_at: string
+          status: string
+          user_id: string
+        }
+        Insert: {
+          completed_at?: string | null
+          emails_processed?: number | null
+          error_message?: string | null
+          id?: string
+          last_history_id?: string | null
+          signals_found?: number | null
+          started_at?: string
+          status?: string
+          user_id: string
+        }
+        Update: {
+          completed_at?: string | null
+          emails_processed?: number | null
+          error_message?: string | null
+          id?: string
+          last_history_id?: string | null
+          signals_found?: number | null
+          started_at?: string
+          status?: string
+          user_id?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "ingestion_jobs_user_id_fkey"
+            columns: ["user_id"]
+            isOneToOne: false
+            referencedRelation: "chekinn_users"
+            referencedColumns: ["id"]
+          },
+        ]
       }
       introductions: {
         Row: {
@@ -207,6 +319,47 @@ export type Database = {
           user_id?: string | null
         }
         Relationships: []
+      }
+      oauth_tokens: {
+        Row: {
+          access_token_encrypted: string
+          created_at: string
+          id: string
+          refresh_token_encrypted: string
+          scopes: string[]
+          token_expiry: string
+          updated_at: string
+          user_id: string
+        }
+        Insert: {
+          access_token_encrypted: string
+          created_at?: string
+          id?: string
+          refresh_token_encrypted: string
+          scopes?: string[]
+          token_expiry: string
+          updated_at?: string
+          user_id: string
+        }
+        Update: {
+          access_token_encrypted?: string
+          created_at?: string
+          id?: string
+          refresh_token_encrypted?: string
+          scopes?: string[]
+          token_expiry?: string
+          updated_at?: string
+          user_id?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "oauth_tokens_user_id_fkey"
+            columns: ["user_id"]
+            isOneToOne: true
+            referencedRelation: "chekinn_users"
+            referencedColumns: ["id"]
+          },
+        ]
       }
       profiles: {
         Row: {

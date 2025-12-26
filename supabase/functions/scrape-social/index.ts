@@ -1,121 +1,116 @@
 import { createClient } from "https://esm.sh/@supabase/supabase-js@2";
 
 const corsHeaders = {
-  'Access-Control-Allow-Origin': '*',
-  'Access-Control-Allow-Headers': 'authorization, x-client-info, apikey, content-type',
+  "Access-Control-Allow-Origin": "*",
+  "Access-Control-Allow-Headers": "authorization, x-client-info, apikey, content-type",
 };
 
-const SUPABASE_URL = Deno.env.get('SUPABASE_URL')!;
-const SUPABASE_SERVICE_ROLE_KEY = Deno.env.get('SUPABASE_SERVICE_ROLE_KEY')!;
-const FIRECRAWL_API_KEY = Deno.env.get('FIRECRAWL_API_KEY');
+const SUPABASE_URL = Deno.env.get("SUPABASE_URL")!;
+const SUPABASE_SERVICE_ROLE_KEY = Deno.env.get("SUPABASE_SERVICE_ROLE_KEY")!;
+const FIRECRAWL_API_KEY = Deno.env.get("FIRECRAWL_API_KEY");
 
-// Minimum confidence to scrape
+// Minimum confidence and scrape limits
 const MIN_CONFIDENCE = 0.7;
-// Max profiles to scrape per run
 const MAX_SCRAPES_PER_RUN = 5;
 
-interface ScrapedContent {
-  topics: string[];
-  themes: string[];
-  obsessions: string[];
-  transitions: string[];
+interface EmailSignals {
+  intents: string[];
+  urgency: string[];
+  loops: string[];
+  opportunities: string[];
+  entities: string[];
 }
 
 async function scrapeWithFirecrawl(url: string): Promise<string | null> {
   if (!FIRECRAWL_API_KEY) {
-    console.error('[scrape-social] FIRECRAWL_API_KEY not set');
+    console.error("[scrape-gmail] FIRECRAWL_API_KEY not set");
     return null;
   }
-
   try {
-    const response = await fetch('https://api.firecrawl.dev/v1/scrape', {
-      method: 'POST',
+    const response = await fetch("https://api.firecrawl.dev/v1/scrape", {
+      method: "POST",
       headers: {
-        'Authorization': `Bearer ${FIRECRAWL_API_KEY}`,
-        'Content-Type': 'application/json',
+        Authorization: `Bearer ${FIRECRAWL_API_KEY}`,
+        "Content-Type": "application/json",
       },
       body: JSON.stringify({
         url,
-        formats: ['markdown'],
+        formats: ["markdown"],
         onlyMainContent: true,
       }),
     });
 
     if (!response.ok) {
-      console.error('[scrape-social] Firecrawl error:', await response.text());
+      console.error("[scrape-gmail] Firecrawl error:", await response.text());
       return null;
     }
-
     const data = await response.json();
     return data.data?.markdown || null;
   } catch (error) {
-    console.error('[scrape-social] Scrape error:', error);
+    console.error("[scrape-gmail] scrape error:", error);
     return null;
   }
 }
 
-async function extractSignalsFromContent(content: string, platform: string): Promise<ScrapedContent> {
-  // Use LLM to extract structured signals from scraped content
-  const response = await fetch('https://ai.gateway.lovable.dev/v1/chat/completions', {
-    method: 'POST',
-    headers: {
-      'Content-Type': 'application/json',
-    },
+async function extractSignalsFromContent(content: string): Promise<EmailSignals> {
+  const response = await fetch("https://ai.gateway.lovable.dev/v1/chat/completions", {
+    method: "POST",
+    headers: { "Content-Type": "application/json" },
     body: JSON.stringify({
-      model: 'google/gemini-2.5-flash',
+      model: "google/gemini-2.5-flash",
       messages: [
         {
-          role: 'system',
-          content: `You are an expert at analyzing social media profiles to understand a person's interests, obsessions, and career transitions.
+          role: "system",
+          content: `
+You analyze EMAIL content to infer high-level life signals used for personalized conversational context.
 
-Extract ONLY the following from this ${platform} profile content:
-1. Topics: Subjects they discuss frequently (max 5)
-2. Themes: Recurring patterns in their posts/activity (max 3)
-3. Obsessions: Things they seem deeply passionate about (max 3)
-4. Transitions: Any career/life changes mentioned (max 2)
+Extract ONLY the following:
+1. Intents — actions the user may be considering (quitting, switching roles, moving cities, career pivot)
+2. Urgency — deadlines, schedule constraints, expiring events
+3. Loops — signs the same topic is repeating or revisited
+4. Opportunities — job reach-outs, events, invitations
+5. Entities — companies, roles, cities (generic, no personal names)
 
-Be concise. Each item should be 2-5 words max.
-Do NOT include personal information, names, or private details.
-Focus on professional interests and publicly expressed passions.
+Rules:
+- Do NOT include personal names or identify specific private details.
+- Do NOT quote emails.
+- Use concise 1–4 word phrases.
+- If unsure, return empty lists.
 
-Respond in JSON format:
+Respond in strict JSON:
 {
-  "topics": ["topic1", "topic2"],
-  "themes": ["theme1"],
-  "obsessions": ["obsession1"],
-  "transitions": ["transition1"]
-}`
+  "intents": [],
+  "urgency": [],
+  "loops": [],
+  "opportunities": [],
+  "entities": []
+}
+`,
         },
         {
-          role: 'user',
-          content: content.slice(0, 4000) // Limit content to save tokens
-        }
+          role: "user",
+          content: content.slice(0, 4000),
+        },
       ],
-      response_format: { type: 'json_object' },
+      response_format: { type: "json_object" },
     }),
   });
 
   if (!response.ok) {
-    console.error('[scrape-social] LLM extraction failed');
-    return { topics: [], themes: [], obsessions: [], transitions: [] };
+    console.error("[scrape-gmail] signal extraction failed");
+    return { intents: [], urgency: [], loops: [], opportunities: [], entities: [] };
   }
 
   const data = await response.json();
   try {
-    const parsed = JSON.parse(data.choices[0].message.content);
-    return {
-      topics: parsed.topics || [],
-      themes: parsed.themes || [],
-      obsessions: parsed.obsessions || [],
-      transitions: parsed.transitions || [],
-    };
+    return JSON.parse(data.choices[0].message.content);
   } catch {
-    return { topics: [], themes: [], obsessions: [], transitions: [] };
+    return { intents: [], urgency: [], loops: [], opportunities: [], entities: [] };
   }
 }
 
 Deno.serve(async (req) => {
-  if (req.method === 'OPTIONS') {
+  if (req.method === "OPTIONS") {
     return new Response(null, { headers: corsHeaders });
   }
 
@@ -125,116 +120,96 @@ Deno.serve(async (req) => {
 
     const supabase = createClient(SUPABASE_URL, SUPABASE_SERVICE_ROLE_KEY);
 
-    // Build query for pending profiles
     let query = supabase
-      .from('inferred_social_profiles')
-      .select('*')
-      .eq('scrape_status', 'pending')
-      .gte('confidence', MIN_CONFIDENCE)
-      .order('confidence', { ascending: false })
+      .from("inferred_email_profiles")
+      .select("*")
+      .eq("scrape_status", "pending")
+      .gte("confidence", MIN_CONFIDENCE)
+      .order("confidence", { ascending: false })
       .limit(MAX_SCRAPES_PER_RUN);
 
     if (userId) {
-      query = query.eq('user_id', userId);
+      query = query.eq("user_id", userId);
     }
 
     const { data: profiles, error } = await query;
-
-    if (error) {
-      throw error;
-    }
-
-    if (!profiles || profiles.length === 0) {
-      console.log('[scrape-social] No profiles to scrape');
+    if (error || !profiles || profiles.length === 0) {
       return new Response(JSON.stringify({ success: true, scraped: 0 }), {
-        headers: { ...corsHeaders, 'Content-Type': 'application/json' }
+        headers: { ...corsHeaders, "Content-Type": "application/json" },
       });
     }
-
-    console.log(`[scrape-social] Scraping ${profiles.length} profiles`);
 
     let scrapedCount = 0;
     let signalsCreated = 0;
 
     for (const profile of profiles) {
-      console.log(`[scrape-social] Scraping ${profile.platform}: ${profile.profile_url}`);
-
       const content = await scrapeWithFirecrawl(profile.profile_url);
 
       if (!content) {
-        // Mark as failed
         await supabase
-          .from('inferred_social_profiles')
-          .update({ 
-            scrape_status: 'failed',
-            scraped_at: new Date().toISOString()
+          .from("inferred_email_profiles")
+          .update({
+            scrape_status: "failed",
+            scraped_at: new Date().toISOString(),
           })
-          .eq('id', profile.id);
+          .eq("id", profile.id);
         continue;
       }
 
-      // Extract signals from content
-      const signals = await extractSignalsFromContent(content, profile.platform);
+      const signals = await extractSignalsFromContent(content);
 
-      // Store signals
       const signalTypes = [
-        { type: 'topic', values: signals.topics },
-        { type: 'theme', values: signals.themes },
-        { type: 'obsession', values: signals.obsessions },
-        { type: 'transition', values: signals.transitions },
+        { type: "intent", values: signals.intents, weight: 1.0 },
+        { type: "urgency", values: signals.urgency, weight: 1.2 },
+        { type: "loop", values: signals.loops, weight: 1.3 },
+        { type: "opportunity", values: signals.opportunities, weight: 1.1 },
+        { type: "entity", values: signals.entities, weight: 0.6 },
       ];
 
-      for (const { type, values } of signalTypes) {
+      for (const { type, values, weight } of signalTypes) {
         for (const value of values) {
-          const { error: insertError } = await supabase
-            .from('social_signals')
-            .insert({
-              user_id: profile.user_id,
-              profile_id: profile.id,
-              signal_type: type,
-              signal_value: value,
-              confidence: profile.confidence * 0.9, // Slightly reduce confidence for derived signals
-              evidence: `Extracted from ${profile.platform} profile`,
-              expires_at: new Date(Date.now() + 30 * 24 * 60 * 60 * 1000).toISOString(), // 30 days
-            });
+          const { data: existing } = await supabase
+            .from("email_signals")
+            .select("id")
+            .eq("user_id", profile.user_id)
+            .eq("signal_type", type)
+            .eq("signal_value", value)
+            .gte("created_at", new Date(Date.now() - 14 * 86400000).toISOString());
 
-          if (!insertError) {
-            signalsCreated++;
-          }
+          if (existing?.length) continue;
+
+          await supabase.from("email_signals").insert({
+            user_id: profile.user_id,
+            profile_id: profile.id,
+            signal_type: type,
+            signal_value: value,
+            confidence: Math.min(profile.confidence * weight, 1),
+            evidence: "Inferred from email content",
+            expires_at: new Date(Date.now() + 21 * 24 * 60 * 60 * 1000).toISOString(),
+          });
+
+          signalsCreated++;
         }
       }
 
-      // Update profile status
       await supabase
-        .from('inferred_social_profiles')
-        .update({ 
-          scrape_status: 'scraped',
-          scraped_at: new Date().toISOString()
+        .from("inferred_email_profiles")
+        .update({
+          scrape_status: "scraped",
+          scraped_at: new Date().toISOString(),
         })
-        .eq('id', profile.id);
+        .eq("id", profile.id);
 
       scrapedCount++;
-
-      // Small delay between scrapes to be respectful
-      await new Promise(resolve => setTimeout(resolve, 1000));
     }
 
-    console.log(`[scrape-social] Scraped ${scrapedCount} profiles, created ${signalsCreated} signals`);
-
-    return new Response(JSON.stringify({ 
-      success: true,
-      scraped: scrapedCount,
-      signalsCreated,
-    }), {
-      headers: { ...corsHeaders, 'Content-Type': 'application/json' }
+    return new Response(JSON.stringify({ success: true, scraped: scrapedCount, signalsCreated }), {
+      headers: { ...corsHeaders, "Content-Type": "application/json" },
     });
-
   } catch (error) {
-    const errorMessage = error instanceof Error ? error.message : 'Unknown error';
-    console.error('[scrape-social] Error:', error);
-    return new Response(JSON.stringify({ error: errorMessage }), {
+    return new Response(JSON.stringify({ error: "signal extraction error" }), {
       status: 500,
-      headers: { ...corsHeaders, 'Content-Type': 'application/json' }
+      headers: { ...corsHeaders, "Content-Type": "application/json" },
     });
   }
 });

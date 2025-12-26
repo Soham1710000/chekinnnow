@@ -76,13 +76,25 @@ function mightContainSignal(subject: string, snippet: string): boolean {
 async function processUserEmails(supabase: any, userId: string, accessToken: string): Promise<{ processed: number; signals: number; profiles: number }> {
   console.log('[gmail-ingest] Processing emails for user:', userId);
   
-  // Always fetch last 2 years of emails
-  const twoYearsAgo = new Date();
-  twoYearsAgo.setFullYear(twoYearsAgo.getFullYear() - 2);
-  const afterTimestamp = Math.floor(twoYearsAgo.getTime() / 1000);
-  const query = `after:${afterTimestamp} -category:promotions -category:social`;
+  // Get last processed timestamp
+  const { data: lastJob } = await supabase
+    .from('ingestion_jobs')
+    .select('completed_at')
+    .eq('user_id', userId)
+    .eq('status', 'completed')
+    .order('completed_at', { ascending: false })
+    .limit(1)
+    .maybeSingle();
+
+  const afterDate = lastJob?.completed_at 
+    ? new Date(lastJob.completed_at)
+    : new Date(Date.now() - 30 * 24 * 60 * 60 * 1000); // Default 30 days
   
-  console.log(`[gmail-ingest] Fetching emails from last 2 years (after: ${twoYearsAgo.toISOString()})`);
+  const afterTimestamp = Math.floor(afterDate.getTime() / 1000);
+  // Include emails from Twitter/X by using OR query
+  const query = `after:${afterTimestamp} ((-category:promotions -category:social) OR from:twitter.com OR from:x.com)`;
+  
+  console.log(`[gmail-ingest] Fetching emails after: ${afterDate.toISOString()}`);
   
   let processed = 0;
   let signalsFound = 0;

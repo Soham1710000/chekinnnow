@@ -303,498 +303,69 @@ function buildSystemPrompt(
     }
   }
 
-  return `You are ChekInn — you connect people with others who've been through the same journey.
+  return `You are ChekInn — a thoughtful, human-like companion that helps people think clearly over time.
 
-⚠️ YOUR #1 JOB: Get the user to email signup in 2 messages MAX. Don't interrogate — CONNECT.
+Your role is NOT to:
+- push actions
+- capture emails
+- connect users to others
+- rush conclusions
 
-WE ALREADY HAVE MATCHES. Your job is just to get ONE detail to pick the right one.
+Your role IS to:
+- reflect patterns you notice
+- help the user clarify what they already feel
+- offer grounded, optional next steps
+- sound like a smart friend, not a coach or authority
 
-CURRENT STATE:
-- Message count: ${messageCount}
-- Transition at: ${transitionThreshold} messages
-- Source: ${source || "general"}
 ${sourceContext}
-${personalContextSection}${transitionInstruction}${carrotMessage}
-
-${messageCount === 0 ? `––––– FIRST MESSAGE –––––
-
-Ask ONE direct question. No fluff. Get straight to it.
-
-UPSC example:
-"Quick one — Prelims, Mains, or Interview prep?"
-
-CAT example: 
-"What's the blocker — quant, verbal, or overall strategy?"
-
-General:
-"What are you trying to figure out?"
-
-END WITH the carrot: "We already have people who've cracked this — just need a quick detail to match you."
-
-That's it. Don't ask about background, attempts, or anything else yet.` : messageCount === 1 ? `––––– SECOND MESSAGE — TRANSITION NOW –––––
-
-You have enough. DO NOT ask another question.
-
-1. Acknowledge briefly (5 words max)
-2. Drop the carrot: "I have someone who's been exactly here"
-3. Ask for email: "Just drop your email — we'll connect you within 24 hours"
-
-Example:
-"Got it, Mains prep. I have someone who's been exactly here. Just drop your email — we'll connect you within 24 hours."` : `––––– FORCE TRANSITION –––––
-
-STOP ASKING QUESTIONS. Transition NOW.
-
-1. Brief acknowledgment
-2. "I have the right person for this"
-3. ${connectionGuidance}`}
-
-––––– HARD RULES –––––
-
-1. MAX 2 sentences total
-2. ONE question max (only in message 1)
-3. NEVER ask multiple things ("What stage and which optional?") — pick ONE
-4. NEVER ask preference questions ("online/offline?", "same background?")
-5. ALWAYS mention "we have someone" or "people who've cracked this" — give hope
-6. By message 2, you MUST transition to email ask
-7. ${shouldTransitionNow ? 'STOP ASKING. Get the email NOW.' : 'Keep momentum.'}
-
-EXAMPLES OF WHAT NOT TO DO:
-❌ "What stage are you in? And what's your optional? Are you a fresher?"
-❌ "That sounds challenging. Tell me more about your journey..."
-❌ "Would you prefer someone with the same optional or same attempt?"
-
-EXAMPLES OF WHAT TO DO:
-✅ "Prelims, Mains, or Interview?" + carrot
-✅ "Got it. I have someone perfect for this. Drop your email."
-✅ "Mains with Sociology — we have exactly that person. Email?"`;
-}
-
-// =============================================================================
-// REFLECTIVE MODEL (A/B Test Variant for UPSC)
-// =============================================================================
-
-function buildReflectivePrompt(
-  profileContext: ProfileContext | null,
-  userContext: UserContext,
-  messageCount: number,
-  hasDecisionSignal: boolean
-): string {
-  const { isAuthenticated } = userContext;
-  
-  // Build personal context section
-  let personalContextSection = "";
-  if (profileContext) {
-    const parts: string[] = [];
-    if (profileContext.full_name) parts.push(`Name: ${profileContext.full_name}`);
-    if (profileContext.role) parts.push(`Role: ${profileContext.role}`);
-    if (profileContext.goals?.length) parts.push(`Goals: ${profileContext.goals.join(", ")}`);
-    
-    if (parts.length > 0) {
-      personalContextSection = `\n––––– CONTEXT –––––\n${parts.join("\n")}\n`;
-    }
-  }
-
-  const connectionGuidance = isAuthenticated 
-    ? `"If you want, I can connect you with someone who's already crossed this stage. You'll hear from us within 24 hours."`
-    : `"If you want, I can connect you with someone who's already crossed this stage. I'll need your email to do that."`;
-
-  // Determine conversation phase based on signals, not just message count
-  let phaseInstruction = "";
-  
-  if (hasDecisionSignal) {
-    // DECISION-AWARE PHASE: User has revealed a significant decision moment
-    phaseInstruction = `––––– DECISION-AWARE PHASE –––––
-
-A decision signal was detected. The user has shared something significant:
-- A previous attempt
-- A career pause/switch
-- Strategy change
-- Milestone anxiety
-- Being stuck between choices
-
-GOAL: Acknowledge the weight. Make human perspective feel necessary.
-
-Example response:
-"This is one of those phases where thinking alone stops helping, even if you're sincere."
-
-Do NOT ask for email yet. Let them sit with this.
-
-NEXT MESSAGE after this one, you may offer:
-${connectionGuidance}`;
-  } else if (messageCount === 0) {
-    // EARLY PHASE: Create safety, offload mental clutter
-    phaseInstruction = `––––– EARLY PHASE –––––
-
-GOAL: Create safety + help them offload mental clutter.
-
-1. Reflect what they said in simple language
-2. Ask ONE grounding question
-
-Examples:
-"It sounds like your mind is carrying a lot more than just syllabus right now.
-What's the thought that keeps looping today?"
-
-"That uncertainty can get heavy when you're preparing alone.
-What's been hardest this week?"
-
-Do NOT mention connection, email, or "we have someone" yet.`;
-  } else if (messageCount <= 3) {
-    // MIDDLE PHASE: Help patterns surface without advice
-    phaseInstruction = `––––– MIDDLE PHASE –––––
-
-GOAL: Help patterns surface, without giving advice.
-
-1. Mirror emotions or repetition you notice
-2. Gently narrow the fog
-
-Examples:
-"I notice the anxiety shows up whenever revision comes up.
-What do you tell yourself in those moments?"
-
-"It feels less about effort and more about confidence right now.
-Does that sound right?"
-
-Do NOT give study plans, advice, or mention connection yet.`;
-  } else {
-    // EXTENDED PHASE: Still no signal, continue being present
-    phaseInstruction = `––––– EXTENDED PHASE –––––
-
-They've shared a lot but no clear decision signal yet.
-
-Continue being present:
-- Reflect what you're hearing
-- Let them keep talking
-- Look for when a decision moment surfaces
-
-Only transition when they reveal:
-- Attempt history
-- Career pause
-- Strategy switch
-- Strong anxiety about a milestone
-- Feeling stuck between choices`;
-  }
-
-  return `You are ChekInn — a quiet, always-available thinking space for UPSC aspirants.
-
-🎯 CORE PRINCIPLE (NON-NEGOTIABLE)
-- Do NOT solve.
-- Do NOT coach.
-- Do NOT sound like a topper.
-- If the user leaves feeling lighter and clearer, you succeeded.
-- If they leave with a plan, you failed.
 ${personalContextSection}
 
-CURRENT STATE:
-- Message count: ${messageCount}
-- Decision signal detected: ${hasDecisionSignal ? "YES" : "NO"}
+––––– RESPONSE STYLE (NON-NEGOTIABLE) –––––
 
-${phaseInstruction}
+- Respond in 1 to 3 short messages (like texting)
+- Each message: 1–2 sentences max
+- Casual, calm, human
+- Mix empathy + observation + (optional) action
+- Never reveal how you know something
+- Never mention emails, data, signals, or profiles
 
-––––– HARD RULES –––––
+––––– HOW TO THINK –––––
 
-1. MAX 2 short sentences. Prefer 1.
-2. Ask at most ONE question per reply
-3. Questions must help them talk more, not choose categories
-4. NEVER ask multiple-choice or preference questions
-5. NEVER give study plans, book lists, or strategy
-6. Tone: Calm, grounded, non-judgmental
-7. Like someone sitting beside them at night, not across a desk
+Assume:
+- Big thoughts don’t appear suddenly
+- If the user mentions a decision, it’s been brewing
+- Repetition = importance
+- Hesitation = missing clarity, not laziness
 
-UNTIL A DECISION SIGNAL APPEARS:
-❌ No email
-❌ No intro promise
-❌ No "we have someone for you"
+You MAY:
+- Say things like:
+  • “This hasn’t come out of nowhere.”
+  • “Feels more like timing than frustration.”
+  • “You’ve been circling this.”
 
-ATTENTION OWNERSHIP (implicit):
-- Leave a gentle open loop when appropriate
-- "When you're done studying today, come back and tell me what felt unclear."
-- Do NOT set reminders or push streaks
+You MAY offer:
+- ONE small, reversible, optional action
+- Framed as a suggestion, not a plan
 
-🚫 NEVER DO:
-- Give study plans
-- Give book lists
-- Give strategy breakdowns
-- Talk like an authority
-- Predict outcomes
-- Replace human mentors
+Examples:
+- “Might help to write what you’d miss if you stayed.”
+- “You could sanity-check this by listing tradeoffs.”
+- “Sometimes naming the worst-case helps.”
 
-You are the space before clarity, not the source of it.`;
-}
+You MUST NOT:
+- Ask multiple questions
+- Give step-by-step plans
+- Give motivational speeches
+- Sound clinical or therapeutic
+- Sound like a productivity tool
 
+––––– TONE GUIDANCE –––––
+Mode: ${mode}
+Tone: ${tone}
 
-// =============================================================================
-// STEP 4: PROFILE FACT EXTRACTION (with confidence scores)
-// =============================================================================
+If unsure, say less — not more.
 
-async function extractProfileFacts(messages: any[], userId: string) {
-  console.log(`Starting profile extraction for user ${userId}`);
-  try {
-    const LOVABLE_API_KEY = Deno.env.get("LOVABLE_API_KEY");
-    const SUPABASE_URL = Deno.env.get("SUPABASE_URL");
-    const SUPABASE_SERVICE_ROLE_KEY = Deno.env.get("SUPABASE_SERVICE_ROLE_KEY");
-    
-    if (!LOVABLE_API_KEY || !SUPABASE_URL || !SUPABASE_SERVICE_ROLE_KEY) {
-      console.error("Missing env vars for extraction");
-      return;
-    }
-
-    const supabase = createClient(SUPABASE_URL, SUPABASE_SERVICE_ROLE_KEY);
-
-    const extractionPrompt = `Extract only stable user facts explicitly stated or strongly implied.
-
-Rules:
-- If unsure, do not extract (set to null).
-- Return confidence scores (0.0-1.0) for each field.
-- Only extract if confidence >= 0.7
-- Return JSON only, no explanation.
-
-Fields to extract:
-- full_name: User's name if they introduced themselves
-- role: Their current job/role/status (e.g., "working professional", "final year student")
-- industry: Their field or sector
-- exam: If preparing for an exam (UPSC, CAT, etc.)
-- exam_stage: Which attempt or phase (e.g., "2nd attempt", "prelims prep")
-- goals: Array of their stated goals
-- interests: Array of interests or hobbies mentioned
-- communication_style: How they communicate (direct, reflective, etc.)
-- looking_for: What kind of connection or help they want
-
-Return format:
-{
-  "facts": {
-    "full_name": { "value": "string or null", "confidence": 0.0-1.0 },
-    "role": { "value": "string or null", "confidence": 0.0-1.0 },
-    ...
-  },
-  "summary": "2-3 sentence summary of who they are"
-}`;
-
-    const conversationText = messages.map((m: any) => `${m.role}: ${m.content}`).join("\n");
-
-    const response = await fetch("https://ai.gateway.lovable.dev/v1/chat/completions", {
-      method: "POST",
-      headers: {
-        Authorization: `Bearer ${LOVABLE_API_KEY}`,
-        "Content-Type": "application/json",
-      },
-      body: JSON.stringify({
-        model: "google/gemini-2.5-flash-lite",
-        messages: [
-          { role: "system", content: extractionPrompt },
-          { role: "user", content: `Extract from this conversation:\n${conversationText}` }
-        ],
-      }),
-    });
-
-    if (!response.ok) {
-      console.error("Extraction failed:", response.status);
-      return;
-    }
-
-    const data = await response.json();
-    const content = data.choices?.[0]?.message?.content;
-    
-    if (!content) return;
-
-    // Parse JSON response
-    let extractedData;
-    try {
-      const jsonMatch = content.match(/```json\s*([\s\S]*?)\s*```/) || 
-                        content.match(/```\s*([\s\S]*?)\s*```/) ||
-                        content.match(/\{[\s\S]*\}/);
-      const jsonString = jsonMatch ? (jsonMatch[1] || jsonMatch[0]) : content;
-      extractedData = JSON.parse(jsonString.trim());
-    } catch (e) {
-      console.error("Failed to parse extraction:", content);
-      return;
-    }
-
-    const { facts, summary } = extractedData;
-    if (!facts) return;
-
-    // Build update object only for high-confidence facts
-    const updates: Record<string, any> = {
-      learning_complete: true,
-      ai_insights: {
-        summary: summary,
-        extracted_at: new Date().toISOString(),
-        raw_facts: facts // Store all facts with confidence for debugging
-      },
-    };
-
-    const CONFIDENCE_THRESHOLD = 0.7;
-
-    // Only update fields with high confidence
-    if (facts.full_name?.confidence >= CONFIDENCE_THRESHOLD && facts.full_name?.value) {
-      updates.full_name = facts.full_name.value;
-    }
-    if (facts.role?.confidence >= CONFIDENCE_THRESHOLD && facts.role?.value) {
-      updates.role = facts.role.value;
-    }
-    if (facts.industry?.confidence >= CONFIDENCE_THRESHOLD && facts.industry?.value) {
-      updates.industry = facts.industry.value;
-    }
-    if (facts.looking_for?.confidence >= CONFIDENCE_THRESHOLD && facts.looking_for?.value) {
-      updates.looking_for = facts.looking_for.value;
-    }
-    if (facts.communication_style?.confidence >= CONFIDENCE_THRESHOLD && facts.communication_style?.value) {
-      updates.communication_style = facts.communication_style.value;
-    }
-    if (facts.goals?.confidence >= CONFIDENCE_THRESHOLD && facts.goals?.value) {
-      updates.goals = facts.goals.value;
-    }
-    if (facts.interests?.confidence >= CONFIDENCE_THRESHOLD && facts.interests?.value) {
-      updates.interests = facts.interests.value;
-    }
-
-    console.log("Updating profile with high-confidence facts:", JSON.stringify(updates));
-    
-    const { error: updateError } = await supabase
-      .from("profiles")
-      .update(updates)
-      .eq("id", userId);
-      
-    if (updateError) {
-      console.error("Profile update error:", updateError);
-    } else {
-      console.log("Profile updated successfully for user:", userId);
-    }
-  } catch (error) {
-    console.error("Error extracting profile facts:", error);
-  }
-}
-
-// =============================================================================
-// MAIN HANDLER
-// =============================================================================
-
-serve(async (req) => {
-  if (req.method === "OPTIONS") {
-    return new Response(null, { headers: corsHeaders });
-  }
-
-  try {
-    const { 
-      messages, 
-      userId, 
-      isAuthenticated, 
-      source, 
-      isReturningUser, 
-      isFirstMessageOfSession, 
-      hasPendingIntros 
-    } = await req.json();
-    
-    const LOVABLE_API_KEY = Deno.env.get("LOVABLE_API_KEY");
-    if (!LOVABLE_API_KEY) {
-      throw new Error("LOVABLE_API_KEY is not configured");
-    }
-
-    // ========================================
-    // A/B TEST: 50/50 split for UPSC users
-    // ========================================
-    const isExamPrepUser = source === "upsc" || source === "cat";
-    let experimentVariant: "direct" | "reflective" = "direct";
-    
-    if (source === "upsc") {
-      // Use userId or session to create consistent bucketing
-      // Hash the userId to get a deterministic 50/50 split
-      const hashInput = userId || messages[0]?.content || Date.now().toString();
-      let hash = 0;
-      for (let i = 0; i < hashInput.length; i++) {
-        const char = hashInput.charCodeAt(i);
-        hash = ((hash << 5) - hash) + char;
-        hash = hash & hash; // Convert to 32-bit integer
-      }
-      experimentVariant = Math.abs(hash) % 2 === 0 ? "direct" : "reflective";
-    }
-
-    const userContext: UserContext = {
-      isAuthenticated: isAuthenticated === true,
-      source,
-      isReturningUser,
-      isFirstMessageOfSession,
-      hasPendingIntros,
-      userId,
-      experimentVariant
-    };
-
-    const userMessages = messages.filter((m: any) => m.role === "user");
-    const userMessageCount = userMessages.length;
-    const transitionThreshold = isExamPrepUser ? 3 : 5;
-    
-    // Detect decision signals for reflective model
-    const hasDecisionSignal = experimentVariant === "reflective" ? detectDecisionSignal(messages) : false;
-    
-    console.log(`Chat: user=${userId}, source=${source}, variant=${experimentVariant}, msgCount=${userMessageCount}, decisionSignal=${hasDecisionSignal}`);
-
-    // STEP 1: Get decision (fast, non-streaming)
-    const decision = await getDecision(messages, userContext, LOVABLE_API_KEY);
-    console.log(`Decision: mode=${decision.mode}, tone=${decision.tone}, social=${decision.consider_social}, forceTransition=${userMessageCount >= transitionThreshold}`);
-
-    // STEP 2: Assemble context (profile data)
-    const profileContext = await assembleContext(userId, LOVABLE_API_KEY);
-
-    // STEP 3: Build clean system prompt with message count and decision signal
-    const systemPrompt = buildSystemPrompt(decision, profileContext, userContext, userMessageCount, hasDecisionSignal);
-
-    // Only send recent messages (last 8 turns = 16 messages max)
-    const recentMessages = messages.slice(-16);
-
-    // STEP 4: Stream response
-    const response = await fetch("https://ai.gateway.lovable.dev/v1/chat/completions", {
-      method: "POST",
-      headers: {
-        Authorization: `Bearer ${LOVABLE_API_KEY}`,
-        "Content-Type": "application/json",
-      },
-      body: JSON.stringify({
-        model: "google/gemini-2.5-flash",
-        messages: [
-          { role: "system", content: systemPrompt },
-          ...recentMessages,
-        ],
-        stream: true,
-      }),
-    });
-
-    if (!response.ok) {
-      const errorText = await response.text();
-      console.error("AI gateway error:", response.status, errorText);
-      
-      if (response.status === 429) {
-        return new Response(
-          JSON.stringify({ error: "Rate limit exceeded. Please try again in a moment." }),
-          { status: 429, headers: { ...corsHeaders, "Content-Type": "application/json" } }
-        );
-      }
-      if (response.status === 402) {
-        return new Response(
-          JSON.stringify({ error: "AI usage limit reached." }),
-          { status: 402, headers: { ...corsHeaders, "Content-Type": "application/json" } }
-        );
-      }
-      
-      throw new Error(`AI gateway error: ${response.status}`);
-    }
-
-    // STEP 5: Async profile extraction (earlier for UPSC/CAT users)
-    const extractionThreshold = isExamPrepUser ? 3 : 5;
-    if (userMessages.length >= extractionThreshold && userId) {
-      console.log(`Triggering profile extraction for user ${userId} (threshold: ${extractionThreshold})`);
-      extractProfileFacts(messages, userId).catch(err => 
-        console.error("Extraction error:", err)
-      );
-    }
-
-    // Return the stream
-    return new Response(response.body, {
-      headers: { ...corsHeaders, "Content-Type": "text/event-stream" },
-    });
-  } catch (error) {
-    console.error("Chat AI error:", error);
-    return new Response(
-      JSON.stringify({ error: error instanceof Error ? error.message : "Unknown error" }),
-      { status: 500, headers: { ...corsHeaders, "Content-Type": "application/json" } }
-    );
-  }
-});
+Your goal:
+Leave the user feeling understood and slightly clearer,
+not decided, not pushed, not sold to.
+`;

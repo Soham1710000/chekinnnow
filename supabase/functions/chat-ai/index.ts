@@ -37,15 +37,47 @@ interface ProfileContext {
 }
 
 // =============================================================================
+// GET CHEKINN USER ID FROM AUTH USER
+// =============================================================================
+
+async function getChekinnUserId(authUserId: string, supabase: any): Promise<string | null> {
+  // First get the email from auth user's profile
+  const { data: profile } = await supabase
+    .from("profiles")
+    .select("email")
+    .eq("id", authUserId)
+    .maybeSingle();
+
+  if (!profile?.email) {
+    // Try auth.users directly
+    const { data: authUser } = await supabase.auth.admin.getUserById(authUserId);
+    if (!authUser?.user?.email) return null;
+    
+    // Look up chekinn_users by email
+    const { data: chekinnUser } = await supabase
+      .from("chekinn_users")
+      .select("id")
+      .eq("email", authUser.user.email)
+      .maybeSingle();
+    
+    return chekinnUser?.id || null;
+  }
+
+  // Look up chekinn_users by email
+  const { data: chekinnUser } = await supabase
+    .from("chekinn_users")
+    .select("id")
+    .eq("email", profile.email)
+    .maybeSingle();
+
+  return chekinnUser?.id || null;
+}
+
+// =============================================================================
 // FETCH EMAIL SIGNALS FOR USER
 // =============================================================================
 
-async function fetchUserSignals(userId: string): Promise<EmailSignal[]> {
-  const supabase = createClient(
-    Deno.env.get("SUPABASE_URL")!,
-    Deno.env.get("SUPABASE_SERVICE_ROLE_KEY")!
-  );
-
+async function fetchUserSignals(chekinnUserId: string, supabase: any): Promise<EmailSignal[]> {
   // Get signals from last 30 days that haven't expired
   const thirtyDaysAgo = new Date();
   thirtyDaysAgo.setDate(thirtyDaysAgo.getDate() - 30);
@@ -53,7 +85,7 @@ async function fetchUserSignals(userId: string): Promise<EmailSignal[]> {
   const { data, error } = await supabase
     .from("email_signals")
     .select("type, domain, confidence, evidence, email_date, expires_at")
-    .eq("user_id", userId)
+    .eq("user_id", chekinnUserId)
     .gte("email_date", thirtyDaysAgo.toISOString())
     .gte("confidence", 0.6)
     .order("email_date", { ascending: false })
@@ -66,24 +98,19 @@ async function fetchUserSignals(userId: string): Promise<EmailSignal[]> {
 
   // Filter out expired signals
   const now = new Date();
-  return (data || []).filter(s => !s.expires_at || new Date(s.expires_at) > now);
+  return (data || []).filter((s: EmailSignal) => !s.expires_at || new Date(s.expires_at) > now);
 }
 
 // =============================================================================
 // FETCH USER PROFILE
 // =============================================================================
 
-async function fetchUserProfile(userId: string): Promise<ProfileContext | null> {
-  const supabase = createClient(
-    Deno.env.get("SUPABASE_URL")!,
-    Deno.env.get("SUPABASE_SERVICE_ROLE_KEY")!
-  );
-
+async function fetchUserProfile(authUserId: string, supabase: any): Promise<ProfileContext | null> {
   const { data, error } = await supabase
     .from("profiles")
     .select("full_name, role, industry, goals, interests, looking_for")
-    .eq("id", userId)
-    .single();
+    .eq("id", authUserId)
+    .maybeSingle();
 
   if (error) {
     console.error("Error fetching profile:", error);
@@ -222,21 +249,30 @@ serve(async (req) => {
       });
     }
 
-    console.log(`Chat: userId=${userId}, authenticated=${isAuthenticated}, returning=${isReturningUser}, msgCount=${messages.length}`);
+    console.log(`Chat: authUserId=${userId}, authenticated=${isAuthenticated}, returning=${isReturningUser}, msgCount=${messages.length}`);
 
     const LOVABLE_API_KEY = Deno.env.get("LOVABLE_API_KEY");
     if (!LOVABLE_API_KEY) {
       throw new Error("LOVABLE_API_KEY not configured");
     }
 
+    const supabase = createClient(
+      Deno.env.get("SUPABASE_URL")!,
+      Deno.env.get("SUPABASE_SERVICE_ROLE_KEY")!
+    );
+
     // Fetch signals and profile if authenticated
     let signals: EmailSignal[] = [];
     let profile: ProfileContext | null = null;
 
     if (userId && isAuthenticated) {
+      // Get chekinn_user_id to look up signals
+      const chekinnUserId = await getChekinnUserId(userId, supabase);
+      console.log(`Mapped auth user ${userId} to chekinn user ${chekinnUserId}`);
+
       const [fetchedSignals, fetchedProfile] = await Promise.all([
-        fetchUserSignals(userId),
-        fetchUserProfile(userId),
+        chekinnUserId ? fetchUserSignals(chekinnUserId, supabase) : Promise.resolve([]),
+        fetchUserProfile(userId, supabase),
       ]);
       signals = fetchedSignals;
       profile = fetchedProfile;

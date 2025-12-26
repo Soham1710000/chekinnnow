@@ -3,10 +3,9 @@ import { useNavigate, useSearchParams } from "react-router-dom";
 import { useAuth } from "@/hooks/useAuth";
 import { supabase } from "@/integrations/supabase/client";
 import { Button } from "@/components/ui/button";
-import { Input } from "@/components/ui/input";
 import { useToast } from "@/hooks/use-toast";
 import { motion } from "framer-motion";
-import { Loader2, ArrowLeft, Mail, Shield, Lock, User } from "lucide-react";
+import { Loader2, ArrowLeft, Mail, Shield, Lock } from "lucide-react";
 import { useFunnelTracking } from "@/hooks/useFunnelTracking";
 
 const Auth = () => {
@@ -19,11 +18,6 @@ const Auth = () => {
   
   const [loading, setLoading] = useState(false);
   const [processingCallback, setProcessingCallback] = useState(false);
-  const [mode, setMode] = useState<"choose" | "email">("choose");
-  const [isSignUp, setIsSignUp] = useState(true);
-  const [email, setEmail] = useState("");
-  const [password, setPassword] = useState("");
-  const [fullName, setFullName] = useState("");
 
   // Track page view once
   useEffect(() => {
@@ -42,7 +36,7 @@ const Auth = () => {
       toast({
         title: "Authentication failed",
         description: error === 'access_denied' 
-          ? "Gmail access is required for email signals. You can still use email/password."
+          ? "Gmail access is required to use ChekInn."
           : "Something went wrong. Please try again.",
         variant: "destructive",
       });
@@ -68,6 +62,7 @@ const Auth = () => {
     try {
       const redirectUri = `${window.location.origin}/auth`;
 
+      // Exchange code for tokens and create/update chekinn_user
       const { data, error } = await supabase.functions.invoke('gmail-oauth', {
         body: {
           action: 'callback',
@@ -76,113 +71,62 @@ const Auth = () => {
         },
       });
 
-      if (error) {
-        throw error;
+      if (error) throw error;
+
+      const { userId: chekinnUserId, email } = data as { userId: string; email: string };
+
+      // Sign in to Supabase Auth with a temp password (auto-generated)
+      // First try to sign in, if fails, sign up
+      let authError = null;
+      const tempPassword = `ChekInn_${chekinnUserId.slice(0, 8)}!`;
+      
+      const { error: signInError } = await supabase.auth.signInWithPassword({
+        email,
+        password: tempPassword,
+      });
+
+      if (signInError) {
+        // User doesn't exist, create them
+        const { error: signUpError } = await supabase.auth.signUp({
+          email,
+          password: tempPassword,
+          options: {
+            emailRedirectTo: `${window.location.origin}/chat`,
+            data: { chekinn_user_id: chekinnUserId }
+          }
+        });
+        authError = signUpError;
       }
 
-      const { email } = data as { userId: string; email: string };
+      if (authError) {
+        console.error('[Auth] Auth error:', authError);
+      }
 
-      // Sign in with OTP (magic link)
-      await supabase.auth.signInWithOtp({
-        email,
-        options: {
-          shouldCreateUser: true,
-          emailRedirectTo: `${window.location.origin}/chat`,
-        }
-      });
+      // Trigger email ingestion in background
+      supabase.functions.invoke('gmail-ingest', {
+        body: { userId: chekinnUserId }
+      }).catch(err => console.error('[Auth] Ingestion error:', err));
 
       trackEvent("auth_complete", { mode: "gmail_oauth", email });
       
       toast({
-        title: "Check your email",
-        description: "Click the link in your email to complete sign in.",
+        title: "Connected!",
+        description: "Scanning your emails for signals...",
       });
 
       window.history.replaceState({}, document.title, '/auth');
+      navigate("/chat");
 
     } catch (error: any) {
       console.error('[Auth] OAuth callback error:', error);
       toast({
         title: "Connection failed",
-        description: error.message || "Failed to connect Gmail. Try email/password instead.",
+        description: error.message || "Failed to connect Gmail. Please try again.",
         variant: "destructive",
       });
     } finally {
       setLoading(false);
       setProcessingCallback(false);
-    }
-  };
-
-  const handleEmailAuth = async (e: React.FormEvent) => {
-    e.preventDefault();
-    setLoading(true);
-
-    try {
-      if (isSignUp) {
-        const { error } = await supabase.auth.signUp({
-          email,
-          password,
-          options: {
-            emailRedirectTo: `${window.location.origin}/chat`,
-            data: {
-              full_name: fullName,
-            }
-          }
-        });
-
-        if (error) {
-          if (error.message.includes("already registered")) {
-            toast({
-              title: "Account exists",
-              description: "This email is already registered. Try signing in instead.",
-              variant: "destructive",
-            });
-            setIsSignUp(false);
-          } else {
-            throw error;
-          }
-          return;
-        }
-
-        trackEvent("auth_complete", { mode: "email_signup", email });
-        toast({
-          title: "Account created!",
-          description: "You're now signed in.",
-        });
-        navigate("/chat");
-
-      } else {
-        const { error } = await supabase.auth.signInWithPassword({
-          email,
-          password,
-        });
-
-        if (error) {
-          if (error.message.includes("Invalid login")) {
-            toast({
-              title: "Invalid credentials",
-              description: "Email or password is incorrect.",
-              variant: "destructive",
-            });
-          } else {
-            throw error;
-          }
-          return;
-        }
-
-        trackEvent("auth_complete", { mode: "email_signin", email });
-        navigate("/chat");
-      }
-
-    } catch (error: any) {
-      console.error('[Auth] Email auth error:', error);
-      toast({
-        title: "Something went wrong",
-        description: error.message || "Please try again.",
-        variant: "destructive",
-      });
-    } finally {
-      setLoading(false);
     }
   };
 
@@ -238,7 +182,7 @@ const Auth = () => {
     <div className="min-h-screen bg-background flex flex-col">
       <header className="p-4">
         <button 
-          onClick={() => mode === "email" ? setMode("choose") : navigate("/")} 
+          onClick={() => navigate("/")} 
           className="flex items-center gap-2 text-muted-foreground hover:text-foreground transition-colors"
         >
           <ArrowLeft className="w-5 h-5" />
@@ -256,149 +200,44 @@ const Auth = () => {
           <div className="text-center mb-8">
             <h1 className="text-3xl font-bold mb-3">ChekInn</h1>
             <p className="text-muted-foreground text-sm leading-relaxed">
-              {mode === "choose" ? (
-                <>
-                  We quietly watch for signals—<br />
-                  flights, interviews, events, transitions—<br />
-                  and nudge you when something matters.
-                </>
-              ) : isSignUp ? (
-                "Create your account to get started"
-              ) : (
-                "Welcome back!"
-              )}
+              We quietly watch your Gmail for signals—<br />
+              flights, interviews, events, transitions—<br />
+              and nudge you when something matters.
             </p>
           </div>
 
-          {mode === "choose" ? (
-            <>
-              {/* Gmail Sign-In Button */}
-              <Button 
-                onClick={handleGmailSignIn}
-                className="w-full h-14 text-base font-semibold rounded-xl gap-3 mb-4"
-                disabled={loading}
-              >
-                {loading ? (
-                  <Loader2 className="w-5 h-5 animate-spin" />
-                ) : (
-                  <>
-                    <Mail className="w-5 h-5" />
-                    Continue with Gmail
-                  </>
-                )}
-              </Button>
+          {/* Gmail Sign-In Button */}
+          <Button 
+            onClick={handleGmailSignIn}
+            className="w-full h-14 text-base font-semibold rounded-xl gap-3"
+            disabled={loading}
+          >
+            {loading ? (
+              <Loader2 className="w-5 h-5 animate-spin" />
+            ) : (
+              <>
+                <Mail className="w-5 h-5" />
+                Continue with Gmail
+              </>
+            )}
+          </Button>
 
-              <div className="relative my-6">
-                <div className="absolute inset-0 flex items-center">
-                  <span className="w-full border-t" />
-                </div>
-                <div className="relative flex justify-center text-xs uppercase">
-                  <span className="bg-background px-2 text-muted-foreground">or</span>
-                </div>
-              </div>
-
-              {/* Email Sign-In Button */}
-              <Button 
-                onClick={() => setMode("email")}
-                variant="outline"
-                className="w-full h-14 text-base font-semibold rounded-xl gap-3"
-                disabled={loading}
-              >
-                <User className="w-5 h-5" />
-                Continue with Email
-              </Button>
-
-              {/* Trust indicators */}
-              <div className="mt-8 space-y-4">
-                <div className="flex items-start gap-3 text-sm text-muted-foreground">
-                  <Shield className="w-4 h-4 mt-0.5 text-primary flex-shrink-0" />
-                  <p>Read-only access. We never send emails or modify anything.</p>
-                </div>
-                <div className="flex items-start gap-3 text-sm text-muted-foreground">
-                  <Lock className="w-4 h-4 mt-0.5 text-primary flex-shrink-0" />
-                  <p>Encrypted storage. Your tokens are secure and never exposed.</p>
-                </div>
-              </div>
-            </>
-          ) : (
-            <>
-              {/* Email/Password Form */}
-              <form onSubmit={handleEmailAuth} className="space-y-4">
-                {isSignUp && (
-                  <Input
-                    type="text"
-                    placeholder="Full name"
-                    value={fullName}
-                    onChange={(e) => setFullName(e.target.value)}
-                    className="h-12 rounded-xl"
-                    required
-                  />
-                )}
-                <Input
-                  type="email"
-                  placeholder="Email"
-                  value={email}
-                  onChange={(e) => setEmail(e.target.value)}
-                  className="h-12 rounded-xl"
-                  required
-                />
-                <Input
-                  type="password"
-                  placeholder="Password"
-                  value={password}
-                  onChange={(e) => setPassword(e.target.value)}
-                  className="h-12 rounded-xl"
-                  minLength={6}
-                  required
-                />
-                <Button 
-                  type="submit"
-                  className="w-full h-14 text-base font-semibold rounded-xl"
-                  disabled={loading}
-                >
-                  {loading ? (
-                    <Loader2 className="w-5 h-5 animate-spin" />
-                  ) : isSignUp ? (
-                    "Create Account"
-                  ) : (
-                    "Sign In"
-                  )}
-                </Button>
-              </form>
-
-              <p className="mt-6 text-center text-sm text-muted-foreground">
-                {isSignUp ? (
-                  <>
-                    Already have an account?{" "}
-                    <button 
-                      onClick={() => setIsSignUp(false)}
-                      className="text-primary hover:underline font-medium"
-                    >
-                      Sign in
-                    </button>
-                  </>
-                ) : (
-                  <>
-                    Don't have an account?{" "}
-                    <button 
-                      onClick={() => setIsSignUp(true)}
-                      className="text-primary hover:underline font-medium"
-                    >
-                      Sign up
-                    </button>
-                  </>
-                )}
-              </p>
-            </>
-          )}
+          {/* Trust indicators */}
+          <div className="mt-8 space-y-4">
+            <div className="flex items-start gap-3 text-sm text-muted-foreground">
+              <Shield className="w-4 h-4 mt-0.5 text-primary flex-shrink-0" />
+              <p>Read-only access. We never send emails or modify anything.</p>
+            </div>
+            <div className="flex items-start gap-3 text-sm text-muted-foreground">
+              <Lock className="w-4 h-4 mt-0.5 text-primary flex-shrink-0" />
+              <p>Encrypted storage. Your tokens are secure and never exposed.</p>
+            </div>
+          </div>
 
           {/* Fine print */}
           <p className="mt-8 text-xs text-center text-muted-foreground/70 leading-relaxed">
-            {mode === "choose" ? (
-              <>Gmail gives us context for smarter intros.<br />Email works too—just without signal extraction.</>
-            ) : (
-              <>By continuing, you agree to our terms of service.</>
-            )}
+            Gmail is the only way in.<br />
+            We use it to understand your context—not to spam you.
           </p>
         </motion.div>
       </div>

@@ -34,13 +34,13 @@ interface EmailForExtraction {
 }
 
 async function getAccessToken(supabase: any, userId: string): Promise<string | null> {
-  const response = await fetch(`${SUPABASE_URL}/functions/v1/gmail-oauth?action=refresh`, {
+  const response = await fetch(`${SUPABASE_URL}/functions/v1/gmail-oauth`, {
     method: 'POST',
     headers: {
       'Authorization': `Bearer ${SUPABASE_SERVICE_ROLE_KEY}`,
       'Content-Type': 'application/json',
     },
-    body: JSON.stringify({ userId }),
+    body: JSON.stringify({ action: 'refresh', userId }),
   });
 
   if (!response.ok) {

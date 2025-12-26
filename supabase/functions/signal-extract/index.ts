@@ -17,6 +17,21 @@ interface Signal {
   email_date: string;
 }
 
+// Parse RFC 2822 date format to ISO 8601
+function parseEmailDate(dateStr: string): string {
+  try {
+    // Try parsing as-is first (might be ISO already)
+    const date = new Date(dateStr);
+    if (!isNaN(date.getTime())) {
+      return date.toISOString();
+    }
+    // Return current time as fallback
+    return new Date().toISOString();
+  } catch {
+    return new Date().toISOString();
+  }
+}
+
 serve(async (req) => {
   if (req.method === 'OPTIONS') {
     return new Response(null, { headers: corsHeaders });
@@ -123,9 +138,9 @@ Return ONLY valid JSON, no other text.`;
               domain: signal.domain || 'unknown',
               confidence: signal.confidence,
               evidence: signal.evidence || '',
-              expires_at: signal.expires_at,
+              expires_at: signal.expires_at ? parseEmailDate(signal.expires_at) : null,
               gmail_message_id: email.messageId,
-              email_date: email.date,
+              email_date: parseEmailDate(email.date),
             });
           }
         }

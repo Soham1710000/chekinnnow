@@ -19,6 +19,14 @@ interface EmailSignal {
   expires_at: string | null;
 }
 
+interface SocialProfile {
+  platform: string;
+  profile_handle: string | null;
+  profile_url: string;
+  confidence: number;
+  source_type: string;
+}
+
 interface UserContext {
   isAuthenticated: boolean;
   userId?: string;
@@ -102,6 +110,31 @@ async function fetchUserSignals(chekinnUserId: string, supabase: any): Promise<E
 }
 
 // =============================================================================
+// FETCH SOCIAL PROFILES FOR USER
+// =============================================================================
+
+async function fetchUserSocialProfiles(chekinnUserId: string, supabase: any): Promise<SocialProfile[]> {
+  const { data, error } = await supabase
+    .from("inferred_social_profiles")
+    .select("platform, profile_handle, profile_url, confidence, source_type")
+    .eq("user_id", chekinnUserId)
+    .gte("confidence", 0.7)
+    .order("confidence", { ascending: false })
+    .limit(5);
+
+  if (error) {
+    console.error("Error fetching social profiles:", error);
+    return [];
+  }
+
+  // Filter out obvious false positives
+  const falsePositives = ['email', 'font', 'mail', 'digest', 'notifications', 'import', 'culture', '100', 'invest', 'daily', 'engage', 'media', 'snacks'];
+  return (data || []).filter((p: SocialProfile) => 
+    p.profile_handle && !falsePositives.includes(p.profile_handle.toLowerCase())
+  );
+}
+
+// =============================================================================
 // FETCH USER PROFILE
 // =============================================================================
 
@@ -126,6 +159,7 @@ async function fetchUserProfile(authUserId: string, supabase: any): Promise<Prof
 
 function buildSystemPrompt(
   signals: EmailSignal[],
+  socialProfiles: SocialProfile[],
   profile: ProfileContext | null,
   context: UserContext
 ): string {
@@ -158,6 +192,16 @@ ${signalDescriptions.map(s => `• ${s}`).join("\n")}
     }
   }
 
+  // Build social profile context
+  let socialContext = "";
+  if (socialProfiles.length > 0) {
+    // Find user's own Twitter handle if present
+    const userTwitter = socialProfiles.find(p => p.platform === 'twitter' && p.source_type === 'email_signature');
+    if (userTwitter?.profile_handle) {
+      socialContext += `\nUser's Twitter: @${userTwitter.profile_handle}`;
+    }
+  }
+
   // Build profile context
   let profileContext = "";
   if (profile) {
@@ -172,7 +216,7 @@ ${signalDescriptions.map(s => `• ${s}`).join("\n")}
     if (parts.length > 0) {
       profileContext = `
 USER PROFILE:
-${parts.join("\n")}
+${parts.join("\n")}${socialContext}
 `;
     }
   }
@@ -261,8 +305,9 @@ serve(async (req) => {
       Deno.env.get("SUPABASE_SERVICE_ROLE_KEY")!
     );
 
-    // Fetch signals and profile if authenticated
+    // Fetch signals, social profiles, and profile if authenticated
     let signals: EmailSignal[] = [];
+    let socialProfiles: SocialProfile[] = [];
     let profile: ProfileContext | null = null;
 
     if (userId && isAuthenticated) {
@@ -270,13 +315,15 @@ serve(async (req) => {
       const chekinnUserId = await getChekinnUserId(userId, supabase);
       console.log(`Mapped auth user ${userId} to chekinn user ${chekinnUserId}`);
 
-      const [fetchedSignals, fetchedProfile] = await Promise.all([
+      const [fetchedSignals, fetchedSocialProfiles, fetchedProfile] = await Promise.all([
         chekinnUserId ? fetchUserSignals(chekinnUserId, supabase) : Promise.resolve([]),
+        chekinnUserId ? fetchUserSocialProfiles(chekinnUserId, supabase) : Promise.resolve([]),
         fetchUserProfile(userId, supabase),
       ]);
       signals = fetchedSignals;
+      socialProfiles = fetchedSocialProfiles;
       profile = fetchedProfile;
-      console.log(`Fetched ${signals.length} signals, profile: ${profile?.full_name || "none"}`);
+      console.log(`Fetched ${signals.length} signals, ${socialProfiles.length} social profiles, profile: ${profile?.full_name || "none"}`);
     }
 
     const context: UserContext = {
@@ -287,7 +334,7 @@ serve(async (req) => {
       hasPendingIntros,
     };
 
-    const systemPrompt = buildSystemPrompt(signals, profile, context);
+    const systemPrompt = buildSystemPrompt(signals, socialProfiles, profile, context);
 
     const response = await fetch("https://ai.gateway.lovable.dev/v1/chat/completions", {
       method: "POST",

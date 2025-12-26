@@ -198,8 +198,10 @@ async function processUserEmails(supabase: any, userId: string, accessToken: str
       }
     }
 
-    await new Promise(resolve => setTimeout(resolve, 100));
-  } while (pageToken && emailsForExtraction.length < 100);
+    await new Promise(resolve => setTimeout(resolve, 50));
+    
+    // Break early to avoid timeout - process max 300 emails per run
+  } while (pageToken && processed < 300);
 
   console.log(`[gmail-ingest] Sending ${emailsForExtraction.length} emails to signal extraction`);
   console.log(`[gmail-ingest] Sending ${emailsForSocialInference.length} emails to social inference`);

@@ -124,32 +124,86 @@ export type Database = {
         }
         Relationships: []
       }
-      email_signals: {
+      decision_log: {
         Row: {
-          email_date: string
-          extracted_at: string
-          gmail_message_id: string
+          created_at: string
+          decision_state: Database["public"]["Enums"]["decision_state"]
           id: string
-          signal_data: Json
-          signal_type: string
+          reason: string
+          signal_id: string | null
+          signal_type: Database["public"]["Enums"]["signal_type"] | null
           user_id: string
         }
         Insert: {
-          email_date: string
-          extracted_at?: string
-          gmail_message_id: string
+          created_at?: string
+          decision_state: Database["public"]["Enums"]["decision_state"]
           id?: string
-          signal_data?: Json
-          signal_type: string
+          reason: string
+          signal_id?: string | null
+          signal_type?: Database["public"]["Enums"]["signal_type"] | null
           user_id: string
         }
         Update: {
+          created_at?: string
+          decision_state?: Database["public"]["Enums"]["decision_state"]
+          id?: string
+          reason?: string
+          signal_id?: string | null
+          signal_type?: Database["public"]["Enums"]["signal_type"] | null
+          user_id?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "decision_log_signal_id_fkey"
+            columns: ["signal_id"]
+            isOneToOne: false
+            referencedRelation: "email_signals"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "decision_log_user_id_fkey"
+            columns: ["user_id"]
+            isOneToOne: false
+            referencedRelation: "chekinn_users"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      email_signals: {
+        Row: {
+          confidence: number
+          domain: string | null
+          email_date: string
+          evidence: string | null
+          expires_at: string | null
+          extracted_at: string
+          gmail_message_id: string
+          id: string
+          type: Database["public"]["Enums"]["signal_type"]
+          user_id: string
+        }
+        Insert: {
+          confidence?: number
+          domain?: string | null
+          email_date: string
+          evidence?: string | null
+          expires_at?: string | null
+          extracted_at?: string
+          gmail_message_id: string
+          id?: string
+          type: Database["public"]["Enums"]["signal_type"]
+          user_id: string
+        }
+        Update: {
+          confidence?: number
+          domain?: string | null
           email_date?: string
+          evidence?: string | null
+          expires_at?: string | null
           extracted_at?: string
           gmail_message_id?: string
           id?: string
-          signal_data?: Json
-          signal_type?: string
+          type?: Database["public"]["Enums"]["signal_type"]
           user_id?: string
         }
         Relationships: [
@@ -492,6 +546,54 @@ export type Database = {
           },
         ]
       }
+      user_messages: {
+        Row: {
+          created_at: string
+          decision_state: Database["public"]["Enums"]["decision_state"]
+          id: string
+          message_content: string
+          responded_at: string | null
+          sent_at: string
+          signal_id: string | null
+          user_id: string
+        }
+        Insert: {
+          created_at?: string
+          decision_state: Database["public"]["Enums"]["decision_state"]
+          id?: string
+          message_content: string
+          responded_at?: string | null
+          sent_at?: string
+          signal_id?: string | null
+          user_id: string
+        }
+        Update: {
+          created_at?: string
+          decision_state?: Database["public"]["Enums"]["decision_state"]
+          id?: string
+          message_content?: string
+          responded_at?: string | null
+          sent_at?: string
+          signal_id?: string | null
+          user_id?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "user_messages_signal_id_fkey"
+            columns: ["signal_id"]
+            isOneToOne: false
+            referencedRelation: "email_signals"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "user_messages_user_id_fkey"
+            columns: ["user_id"]
+            isOneToOne: false
+            referencedRelation: "chekinn_users"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
       user_reputation: {
         Row: {
           created_at: string
@@ -666,6 +768,8 @@ export type Database = {
     }
     Enums: {
       app_role: "admin" | "user"
+      decision_state: "SILENT" | "NUDGE" | "CHAT_INVITE"
+      signal_type: "FLIGHT" | "INTERVIEW" | "EVENT" | "TRANSITION" | "OBSESSION"
     }
     CompositeTypes: {
       [_ in never]: never
@@ -794,6 +898,8 @@ export const Constants = {
   public: {
     Enums: {
       app_role: ["admin", "user"],
+      decision_state: ["SILENT", "NUDGE", "CHAT_INVITE"],
+      signal_type: ["FLIGHT", "INTERVIEW", "EVENT", "TRANSITION", "OBSESSION"],
     },
   },
 } as const

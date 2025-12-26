@@ -3,9 +3,10 @@ import { useNavigate, useSearchParams } from "react-router-dom";
 import { useAuth } from "@/hooks/useAuth";
 import { supabase } from "@/integrations/supabase/client";
 import { Button } from "@/components/ui/button";
+import { Input } from "@/components/ui/input";
 import { useToast } from "@/hooks/use-toast";
 import { motion } from "framer-motion";
-import { Loader2, ArrowLeft, Mail, Shield, Lock } from "lucide-react";
+import { Loader2, ArrowLeft, Mail, Shield, Lock, User } from "lucide-react";
 import { useFunnelTracking } from "@/hooks/useFunnelTracking";
 
 const Auth = () => {
@@ -18,6 +19,11 @@ const Auth = () => {
   
   const [loading, setLoading] = useState(false);
   const [processingCallback, setProcessingCallback] = useState(false);
+  const [mode, setMode] = useState<"choose" | "email">("choose");
+  const [isSignUp, setIsSignUp] = useState(true);
+  const [email, setEmail] = useState("");
+  const [password, setPassword] = useState("");
+  const [fullName, setFullName] = useState("");
 
   // Track page view once
   useEffect(() => {
@@ -30,14 +36,13 @@ const Auth = () => {
   // Handle OAuth callback
   useEffect(() => {
     const code = searchParams.get('code');
-    const state = searchParams.get('state');
     const error = searchParams.get('error');
 
     if (error) {
       toast({
         title: "Authentication failed",
         description: error === 'access_denied' 
-          ? "Gmail access is required to use ChekInn. We only read emails in the background to find opportunities for you."
+          ? "Gmail access is required for email signals. You can still use email/password."
           : "Something went wrong. Please try again.",
         variant: "destructive",
       });
@@ -63,7 +68,6 @@ const Auth = () => {
     try {
       const redirectUri = `${window.location.origin}/auth`;
 
-      // Exchange code for tokens and create user
       const { data, error } = await supabase.functions.invoke('gmail-oauth', {
         body: {
           action: 'callback',
@@ -76,11 +80,10 @@ const Auth = () => {
         throw error;
       }
 
-      const { userId, email } = data as { userId: string; email: string };
+      const { email } = data as { userId: string; email: string };
 
-      // Sign in to Supabase Auth with a magic link flow using the email
-      // Since we've verified via Google OAuth, create a passwordless session
-      const { error: signInError } = await supabase.auth.signInWithOtp({
+      // Sign in with OTP (magic link)
+      await supabase.auth.signInWithOtp({
         email,
         options: {
           shouldCreateUser: true,
@@ -88,34 +91,98 @@ const Auth = () => {
         }
       });
 
-      if (signInError) {
-        // If OTP fails, try to sign in with the email directly using a session token
-        console.log('[Auth] OTP sign-in initiated, check email or auto-redirect');
-      }
-
       trackEvent("auth_complete", { mode: "gmail_oauth", email });
       
       toast({
-        title: "Gmail connected!",
-        description: "We'll quietly watch for opportunities. Check your email if you need to confirm.",
+        title: "Check your email",
+        description: "Click the link in your email to complete sign in.",
       });
 
-      // Clear URL params and redirect
       window.history.replaceState({}, document.title, '/auth');
-      
-      // Navigate to chat (user will see email verification prompt if needed)
-      navigate("/chat");
 
     } catch (error: any) {
       console.error('[Auth] OAuth callback error:', error);
       toast({
         title: "Connection failed",
-        description: error.message || "Failed to connect Gmail. Please try again.",
+        description: error.message || "Failed to connect Gmail. Try email/password instead.",
         variant: "destructive",
       });
     } finally {
       setLoading(false);
       setProcessingCallback(false);
+    }
+  };
+
+  const handleEmailAuth = async (e: React.FormEvent) => {
+    e.preventDefault();
+    setLoading(true);
+
+    try {
+      if (isSignUp) {
+        const { error } = await supabase.auth.signUp({
+          email,
+          password,
+          options: {
+            emailRedirectTo: `${window.location.origin}/chat`,
+            data: {
+              full_name: fullName,
+            }
+          }
+        });
+
+        if (error) {
+          if (error.message.includes("already registered")) {
+            toast({
+              title: "Account exists",
+              description: "This email is already registered. Try signing in instead.",
+              variant: "destructive",
+            });
+            setIsSignUp(false);
+          } else {
+            throw error;
+          }
+          return;
+        }
+
+        trackEvent("auth_complete", { mode: "email_signup", email });
+        toast({
+          title: "Account created!",
+          description: "You're now signed in.",
+        });
+        navigate("/chat");
+
+      } else {
+        const { error } = await supabase.auth.signInWithPassword({
+          email,
+          password,
+        });
+
+        if (error) {
+          if (error.message.includes("Invalid login")) {
+            toast({
+              title: "Invalid credentials",
+              description: "Email or password is incorrect.",
+              variant: "destructive",
+            });
+          } else {
+            throw error;
+          }
+          return;
+        }
+
+        trackEvent("auth_complete", { mode: "email_signin", email });
+        navigate("/chat");
+      }
+
+    } catch (error: any) {
+      console.error('[Auth] Email auth error:', error);
+      toast({
+        title: "Something went wrong",
+        description: error.message || "Please try again.",
+        variant: "destructive",
+      });
+    } finally {
+      setLoading(false);
     }
   };
 
@@ -126,15 +193,6 @@ const Auth = () => {
     try {
       const redirectUri = `${window.location.origin}/auth`;
       
-      // Get OAuth URL from our edge function
-      const response = await supabase.functions.invoke('gmail-oauth', {
-        body: {},
-        headers: {
-          'Content-Type': 'application/json'
-        }
-      });
-
-      // The function returns authUrl when called with action=authorize
       const authUrl = new URL(`${import.meta.env.VITE_SUPABASE_URL}/functions/v1/gmail-oauth`);
       authUrl.searchParams.set('action', 'authorize');
       authUrl.searchParams.set('redirect_uri', redirectUri);
@@ -152,7 +210,6 @@ const Auth = () => {
         throw new Error(authData.error);
       }
 
-      // Redirect to Google OAuth
       window.location.href = authData.authUrl;
 
     } catch (error: any) {
@@ -181,7 +238,7 @@ const Auth = () => {
     <div className="min-h-screen bg-background flex flex-col">
       <header className="p-4">
         <button 
-          onClick={() => navigate("/")} 
+          onClick={() => mode === "email" ? setMode("choose") : navigate("/")} 
           className="flex items-center gap-2 text-muted-foreground hover:text-foreground transition-colors"
         >
           <ArrowLeft className="w-5 h-5" />
@@ -199,44 +256,149 @@ const Auth = () => {
           <div className="text-center mb-8">
             <h1 className="text-3xl font-bold mb-3">ChekInn</h1>
             <p className="text-muted-foreground text-sm leading-relaxed">
-              We quietly watch your Gmail for signals—<br />
-              flights, interviews, events, transitions—<br />
-              and nudge you when something matters.
+              {mode === "choose" ? (
+                <>
+                  We quietly watch for signals—<br />
+                  flights, interviews, events, transitions—<br />
+                  and nudge you when something matters.
+                </>
+              ) : isSignUp ? (
+                "Create your account to get started"
+              ) : (
+                "Welcome back!"
+              )}
             </p>
           </div>
 
-          {/* Gmail Sign-In Button */}
-          <Button 
-            onClick={handleGmailSignIn}
-            className="w-full h-14 text-base font-semibold rounded-xl gap-3"
-            disabled={loading}
-          >
-            {loading ? (
-              <Loader2 className="w-5 h-5 animate-spin" />
-            ) : (
-              <>
-                <Mail className="w-5 h-5" />
-                Continue with Gmail
-              </>
-            )}
-          </Button>
+          {mode === "choose" ? (
+            <>
+              {/* Gmail Sign-In Button */}
+              <Button 
+                onClick={handleGmailSignIn}
+                className="w-full h-14 text-base font-semibold rounded-xl gap-3 mb-4"
+                disabled={loading}
+              >
+                {loading ? (
+                  <Loader2 className="w-5 h-5 animate-spin" />
+                ) : (
+                  <>
+                    <Mail className="w-5 h-5" />
+                    Continue with Gmail
+                  </>
+                )}
+              </Button>
 
-          {/* Trust indicators */}
-          <div className="mt-8 space-y-4">
-            <div className="flex items-start gap-3 text-sm text-muted-foreground">
-              <Shield className="w-4 h-4 mt-0.5 text-primary flex-shrink-0" />
-              <p>Read-only access. We never send emails or modify anything.</p>
-            </div>
-            <div className="flex items-start gap-3 text-sm text-muted-foreground">
-              <Lock className="w-4 h-4 mt-0.5 text-primary flex-shrink-0" />
-              <p>Encrypted storage. Your tokens are secure and never exposed.</p>
-            </div>
-          </div>
+              <div className="relative my-6">
+                <div className="absolute inset-0 flex items-center">
+                  <span className="w-full border-t" />
+                </div>
+                <div className="relative flex justify-center text-xs uppercase">
+                  <span className="bg-background px-2 text-muted-foreground">or</span>
+                </div>
+              </div>
+
+              {/* Email Sign-In Button */}
+              <Button 
+                onClick={() => setMode("email")}
+                variant="outline"
+                className="w-full h-14 text-base font-semibold rounded-xl gap-3"
+                disabled={loading}
+              >
+                <User className="w-5 h-5" />
+                Continue with Email
+              </Button>
+
+              {/* Trust indicators */}
+              <div className="mt-8 space-y-4">
+                <div className="flex items-start gap-3 text-sm text-muted-foreground">
+                  <Shield className="w-4 h-4 mt-0.5 text-primary flex-shrink-0" />
+                  <p>Read-only access. We never send emails or modify anything.</p>
+                </div>
+                <div className="flex items-start gap-3 text-sm text-muted-foreground">
+                  <Lock className="w-4 h-4 mt-0.5 text-primary flex-shrink-0" />
+                  <p>Encrypted storage. Your tokens are secure and never exposed.</p>
+                </div>
+              </div>
+            </>
+          ) : (
+            <>
+              {/* Email/Password Form */}
+              <form onSubmit={handleEmailAuth} className="space-y-4">
+                {isSignUp && (
+                  <Input
+                    type="text"
+                    placeholder="Full name"
+                    value={fullName}
+                    onChange={(e) => setFullName(e.target.value)}
+                    className="h-12 rounded-xl"
+                    required
+                  />
+                )}
+                <Input
+                  type="email"
+                  placeholder="Email"
+                  value={email}
+                  onChange={(e) => setEmail(e.target.value)}
+                  className="h-12 rounded-xl"
+                  required
+                />
+                <Input
+                  type="password"
+                  placeholder="Password"
+                  value={password}
+                  onChange={(e) => setPassword(e.target.value)}
+                  className="h-12 rounded-xl"
+                  minLength={6}
+                  required
+                />
+                <Button 
+                  type="submit"
+                  className="w-full h-14 text-base font-semibold rounded-xl"
+                  disabled={loading}
+                >
+                  {loading ? (
+                    <Loader2 className="w-5 h-5 animate-spin" />
+                  ) : isSignUp ? (
+                    "Create Account"
+                  ) : (
+                    "Sign In"
+                  )}
+                </Button>
+              </form>
+
+              <p className="mt-6 text-center text-sm text-muted-foreground">
+                {isSignUp ? (
+                  <>
+                    Already have an account?{" "}
+                    <button 
+                      onClick={() => setIsSignUp(false)}
+                      className="text-primary hover:underline font-medium"
+                    >
+                      Sign in
+                    </button>
+                  </>
+                ) : (
+                  <>
+                    Don't have an account?{" "}
+                    <button 
+                      onClick={() => setIsSignUp(true)}
+                      className="text-primary hover:underline font-medium"
+                    >
+                      Sign up
+                    </button>
+                  </>
+                )}
+              </p>
+            </>
+          )}
 
           {/* Fine print */}
           <p className="mt-8 text-xs text-center text-muted-foreground/70 leading-relaxed">
-            Gmail is the only way in.<br />
-            We use it to understand your context—not to spam you.
+            {mode === "choose" ? (
+              <>Gmail gives us context for smarter intros.<br />Email works too—just without signal extraction.</>
+            ) : (
+              <>By continuing, you agree to our terms of service.</>
+            )}
           </p>
         </motion.div>
       </div>

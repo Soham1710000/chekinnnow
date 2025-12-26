@@ -71,17 +71,29 @@ Deno.serve(async (req) => {
 
   try {
     const url = new URL(req.url);
-    const action = url.searchParams.get('action');
-    
+
+    // Allow action to be provided via query param (GET) OR JSON body (POST).
+    let action = url.searchParams.get('action') ?? undefined;
+    let body: any = null;
+
+    if (!action && req.method !== 'GET') {
+      try {
+        body = await req.json();
+        action = body?.action;
+      } catch {
+        // ignore parse errors; handled by per-action validation
+      }
+    }
+
     const supabase = createClient(SUPABASE_URL, SUPABASE_SERVICE_ROLE_KEY);
 
     // Action: Get OAuth URL for user to authorize
     if (action === 'authorize') {
-      const redirectUri = url.searchParams.get('redirect_uri');
+      const redirectUri = url.searchParams.get('redirect_uri') ?? body?.redirect_uri;
       if (!redirectUri) {
         return new Response(JSON.stringify({ error: 'redirect_uri required' }), {
           status: 400,
-          headers: { ...corsHeaders, 'Content-Type': 'application/json' }
+          headers: { ...corsHeaders, 'Content-Type': 'application/json' },
         });
       }
 
@@ -97,23 +109,29 @@ Deno.serve(async (req) => {
 
       console.log('[gmail-oauth] Generated auth URL for redirect:', redirectUri);
 
-      return new Response(JSON.stringify({ 
+      return new Response(JSON.stringify({
         authUrl: authUrl.toString(),
-        state 
+        state,
       }), {
-        headers: { ...corsHeaders, 'Content-Type': 'application/json' }
+        headers: { ...corsHeaders, 'Content-Type': 'application/json' },
       });
     }
 
     // Action: Exchange code for tokens and store user
     if (action === 'callback') {
-      const body = await req.json();
+      if (!body) {
+        return new Response(JSON.stringify({ error: 'JSON body required' }), {
+          status: 400,
+          headers: { ...corsHeaders, 'Content-Type': 'application/json' },
+        });
+      }
+
       const { code, redirect_uri } = body;
 
       if (!code || !redirect_uri) {
         return new Response(JSON.stringify({ error: 'code and redirect_uri required' }), {
           status: 400,
-          headers: { ...corsHeaders, 'Content-Type': 'application/json' }
+          headers: { ...corsHeaders, 'Content-Type': 'application/json' },
         });
       }
 
@@ -138,7 +156,7 @@ Deno.serve(async (req) => {
         console.error('[gmail-oauth] Token exchange error:', tokens.error);
         return new Response(JSON.stringify({ error: tokens.error_description || tokens.error }), {
           status: 400,
-          headers: { ...corsHeaders, 'Content-Type': 'application/json' }
+          headers: { ...corsHeaders, 'Content-Type': 'application/json' },
         });
       }
 
@@ -158,7 +176,7 @@ Deno.serve(async (req) => {
       const tokenExpiry = new Date(Date.now() + (tokens.expires_in * 1000));
 
       // Create or update user
-      const { data: existingUser, error: findError } = await supabase
+      const { data: existingUser } = await supabase
         .from('chekinn_users')
         .select('id')
         .eq('email', userInfo.email)
@@ -170,10 +188,10 @@ Deno.serve(async (req) => {
         userId = existingUser.id;
         await supabase
           .from('chekinn_users')
-          .update({ 
+          .update({
             google_id: userInfo.id,
             consented_at: new Date().toISOString(),
-            status: 'active'
+            status: 'active',
           })
           .eq('id', userId);
         console.log('[gmail-oauth] Updated existing user:', userId);
@@ -184,7 +202,7 @@ Deno.serve(async (req) => {
             email: userInfo.email,
             google_id: userInfo.id,
             consented_at: new Date().toISOString(),
-            status: 'active'
+            status: 'active',
           })
           .select('id')
           .single();
@@ -200,13 +218,16 @@ Deno.serve(async (req) => {
       // Store encrypted tokens
       const { error: tokenError } = await supabase
         .from('oauth_tokens')
-        .upsert({
-          user_id: userId,
-          access_token_encrypted: accessTokenEncrypted,
-          refresh_token_encrypted: refreshTokenEncrypted,
-          token_expiry: tokenExpiry.toISOString(),
-          scopes: SCOPES,
-        }, { onConflict: 'user_id' });
+        .upsert(
+          {
+            user_id: userId,
+            access_token_encrypted: accessTokenEncrypted,
+            refresh_token_encrypted: refreshTokenEncrypted,
+            token_expiry: tokenExpiry.toISOString(),
+            scopes: SCOPES,
+          },
+          { onConflict: 'user_id' }
+        );
 
       if (tokenError) {
         console.error('[gmail-oauth] Error storing tokens:', tokenError);
@@ -215,24 +236,33 @@ Deno.serve(async (req) => {
 
       console.log('[gmail-oauth] OAuth complete for user:', userId);
 
-      return new Response(JSON.stringify({ 
-        success: true,
-        userId,
-        email: userInfo.email
-      }), {
-        headers: { ...corsHeaders, 'Content-Type': 'application/json' }
-      });
+      return new Response(
+        JSON.stringify({
+          success: true,
+          userId,
+          email: userInfo.email,
+        }),
+        {
+          headers: { ...corsHeaders, 'Content-Type': 'application/json' },
+        }
+      );
     }
 
     // Action: Refresh token if needed
     if (action === 'refresh') {
-      const body = await req.json();
+      if (!body) {
+        return new Response(JSON.stringify({ error: 'JSON body required' }), {
+          status: 400,
+          headers: { ...corsHeaders, 'Content-Type': 'application/json' },
+        });
+      }
+
       const { userId } = body;
 
       if (!userId) {
         return new Response(JSON.stringify({ error: 'userId required' }), {
           status: 400,
-          headers: { ...corsHeaders, 'Content-Type': 'application/json' }
+          headers: { ...corsHeaders, 'Content-Type': 'application/json' },
         });
       }
 
@@ -245,7 +275,7 @@ Deno.serve(async (req) => {
       if (tokenError || !tokenData) {
         return new Response(JSON.stringify({ error: 'No tokens found' }), {
           status: 404,
-          headers: { ...corsHeaders, 'Content-Type': 'application/json' }
+          headers: { ...corsHeaders, 'Content-Type': 'application/json' },
         });
       }
 
@@ -255,7 +285,7 @@ Deno.serve(async (req) => {
         // Token still valid for at least 5 minutes
         const accessToken = await decrypt(tokenData.access_token_encrypted);
         return new Response(JSON.stringify({ accessToken }), {
-          headers: { ...corsHeaders, 'Content-Type': 'application/json' }
+          headers: { ...corsHeaders, 'Content-Type': 'application/json' },
         });
       }
 
@@ -280,7 +310,7 @@ Deno.serve(async (req) => {
         console.error('[gmail-oauth] Token refresh error:', tokens.error);
         return new Response(JSON.stringify({ error: tokens.error }), {
           status: 400,
-          headers: { ...corsHeaders, 'Content-Type': 'application/json' }
+          headers: { ...corsHeaders, 'Content-Type': 'application/json' },
         });
       }
 
@@ -299,21 +329,21 @@ Deno.serve(async (req) => {
       console.log('[gmail-oauth] Token refreshed for user:', userId);
 
       return new Response(JSON.stringify({ accessToken: tokens.access_token }), {
-        headers: { ...corsHeaders, 'Content-Type': 'application/json' }
+        headers: { ...corsHeaders, 'Content-Type': 'application/json' },
       });
     }
 
     return new Response(JSON.stringify({ error: 'Invalid action' }), {
       status: 400,
-      headers: { ...corsHeaders, 'Content-Type': 'application/json' }
+      headers: { ...corsHeaders, 'Content-Type': 'application/json' },
     });
-
   } catch (error) {
     const errorMessage = error instanceof Error ? error.message : 'Unknown error';
     console.error('[gmail-oauth] Error:', error);
     return new Response(JSON.stringify({ error: errorMessage }), {
       status: 500,
-      headers: { ...corsHeaders, 'Content-Type': 'application/json' }
+      headers: { ...corsHeaders, 'Content-Type': 'application/json' },
     });
   }
 });
+

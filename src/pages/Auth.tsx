@@ -62,23 +62,21 @@ const Auth = () => {
 
     try {
       const redirectUri = `${window.location.origin}/auth`;
-      
+
       // Exchange code for tokens and create user
-      const response = await supabase.functions.invoke('gmail-oauth', {
-        body: { 
-          code, 
-          redirect_uri: redirectUri 
+      const { data, error } = await supabase.functions.invoke('gmail-oauth', {
+        body: {
+          action: 'callback',
+          code,
+          redirect_uri: redirectUri,
         },
-        headers: {
-          'Content-Type': 'application/json'
-        }
       });
 
-      if (response.error) {
-        throw new Error(response.error.message);
+      if (error) {
+        throw error;
       }
 
-      const { userId, email } = response.data;
+      const { userId, email } = data as { userId: string; email: string };
 
       // Sign in to Supabase Auth with a magic link flow using the email
       // Since we've verified via Google OAuth, create a passwordless session

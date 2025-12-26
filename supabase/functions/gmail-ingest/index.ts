@@ -88,7 +88,7 @@ async function processUserEmails(supabase: any, userId: string, accessToken: str
 
   const afterDate = lastJob?.completed_at 
     ? new Date(lastJob.completed_at)
-    : new Date(Date.now() - 30 * 24 * 60 * 60 * 1000); // Default 30 days
+    : new Date(Date.now() - 90 * 24 * 60 * 60 * 1000); // Default 90 days to capture older emails
   
   const afterTimestamp = Math.floor(afterDate.getTime() / 1000);
   // Include emails from Twitter/X by using OR query

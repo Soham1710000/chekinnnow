@@ -149,12 +149,22 @@ Return ONLY valid JSON, no other text.`;
       }
     }
 
-    // Store signals in database
+    // Store signals in database - deduplicate by gmail_message_id first
     if (signals.length > 0) {
+      // Keep only one signal per gmail_message_id (the one with highest confidence)
+      const deduped = new Map<string, Signal>();
+      for (const s of signals) {
+        const existing = deduped.get(s.gmail_message_id);
+        if (!existing || s.confidence > existing.confidence) {
+          deduped.set(s.gmail_message_id, s);
+        }
+      }
+      const uniqueSignals = Array.from(deduped.values());
+
       const { error } = await supabase
         .from('email_signals')
         .upsert(
-          signals.map(s => ({
+          uniqueSignals.map(s => ({
             user_id: s.user_id,
             type: s.type,
             domain: s.domain,
@@ -171,6 +181,8 @@ Return ONLY valid JSON, no other text.`;
         console.error('Failed to store signals:', error);
         throw error;
       }
+      
+      console.log(`Stored ${uniqueSignals.length} unique signals (from ${signals.length} total)`);
     }
 
     console.log(`Extracted ${signals.length} signals for user ${userId}`);

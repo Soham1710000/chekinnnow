@@ -38,3 +38,9 @@ verify_jwt = false
 
 [functions.evaluate-p2p-chat]
 verify_jwt = false
+
+[functions.gmail-oauth]
+verify_jwt = false
+
+[functions.gmail-ingest]
+verify_jwt = false

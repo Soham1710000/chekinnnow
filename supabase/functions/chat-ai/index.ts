@@ -7,24 +7,24 @@ const corsHeaders = {
 };
 
 // =============================================================================
-// TYPES (UNCHANGED)
+// TYPES
 // =============================================================================
 
-interface DecisionOutput {
-  mode: "reflect" | "observer" | "guide";
-  tone: "soft" | "neutral" | "probing";
-  use_experiences: boolean;
-  consider_social: boolean;
+interface EmailSignal {
+  type: string;
+  domain: string | null;
+  confidence: number;
+  evidence: string | null;
+  email_date: string;
+  expires_at: string | null;
 }
 
 interface UserContext {
   isAuthenticated: boolean;
-  source?: string;
+  userId?: string;
   isReturningUser?: boolean;
   isFirstMessageOfSession?: boolean;
   hasPendingIntros?: boolean;
-  userId?: string;
-  experimentVariant?: "direct" | "reflective";
 }
 
 interface ProfileContext {
@@ -33,140 +33,173 @@ interface ProfileContext {
   industry?: string;
   goals?: string[];
   interests?: string[];
+  looking_for?: string;
 }
 
 // =============================================================================
-// STEP 1: DECISION LAYER (NOW VERY DUMB)
+// FETCH EMAIL SIGNALS FOR USER
 // =============================================================================
 
-async function getDecision(messages: any[], userContext: UserContext, apiKey: string): Promise<DecisionOutput> {
-  const userMessageCount = messages.filter((m) => m.role === "user").length;
+async function fetchUserSignals(userId: string): Promise<EmailSignal[]> {
+  const supabase = createClient(
+    Deno.env.get("SUPABASE_URL")!,
+    Deno.env.get("SUPABASE_SERVICE_ROLE_KEY")!
+  );
 
-  // Default: reflect
-  let mode: DecisionOutput["mode"] = "reflect";
+  // Get signals from last 30 days that haven't expired
+  const thirtyDaysAgo = new Date();
+  thirtyDaysAgo.setDate(thirtyDaysAgo.getDate() - 30);
 
-  // First user message → observer
-  if (userMessageCount <= 1) {
-    mode = "observer";
+  const { data, error } = await supabase
+    .from("email_signals")
+    .select("type, domain, confidence, evidence, email_date, expires_at")
+    .eq("user_id", userId)
+    .gte("email_date", thirtyDaysAgo.toISOString())
+    .gte("confidence", 0.6)
+    .order("email_date", { ascending: false })
+    .limit(10);
+
+  if (error) {
+    console.error("Error fetching signals:", error);
+    return [];
   }
 
-  // Explicit confusion words → clarifier (still mapped as guide)
-  const text = messages.map((m) => m.content.toLowerCase()).join(" ");
-  if (/\b(confused|stuck|can't decide|not sure|torn)\b/.test(text)) {
-    mode = "guide";
-  }
-
-  return {
-    mode,
-    tone: "soft",
-    use_experiences: false,
-    consider_social: false,
-  };
+  // Filter out expired signals
+  const now = new Date();
+  return (data || []).filter(s => !s.expires_at || new Date(s.expires_at) > now);
 }
 
 // =============================================================================
-// STEP 2: CONTEXT ASSEMBLY (READ ONLY)
+// FETCH USER PROFILE
 // =============================================================================
 
-async function assembleContext(userId: string | undefined, apiKey: string): Promise<ProfileContext | null> {
-  if (!userId) return null;
+async function fetchUserProfile(userId: string): Promise<ProfileContext | null> {
+  const supabase = createClient(
+    Deno.env.get("SUPABASE_URL")!,
+    Deno.env.get("SUPABASE_SERVICE_ROLE_KEY")!
+  );
 
-  const supabase = createClient(Deno.env.get("SUPABASE_URL")!, Deno.env.get("SUPABASE_SERVICE_ROLE_KEY")!);
-
-  const { data } = await supabase
+  const { data, error } = await supabase
     .from("profiles")
-    .select("full_name, role, industry, goals, interests")
+    .select("full_name, role, industry, goals, interests, looking_for")
     .eq("id", userId)
     .single();
 
-  return data || null;
+  if (error) {
+    console.error("Error fetching profile:", error);
+    return null;
+  }
+
+  return data;
 }
 
 // =============================================================================
-// STEP 3: SYSTEM PROMPT (SOURCE OF TRUTH)
+// BUILD SYSTEM PROMPT WITH SIGNALS
 // =============================================================================
 
-function buildSystemPrompt(decision: DecisionOutput): string {
-  const mode = decision.mode;
+function buildSystemPrompt(
+  signals: EmailSignal[],
+  profile: ProfileContext | null,
+  context: UserContext
+): string {
+  // Build signal context for the AI
+  let signalContext = "";
+  
+  if (signals.length > 0) {
+    const signalDescriptions = signals.map(s => {
+      switch (s.type) {
+        case "FLIGHT":
+          return `Upcoming travel${s.domain ? ` to ${s.domain}` : ""}`;
+        case "INTERVIEW":
+          return `Interview process${s.domain ? ` with ${s.domain}` : ""}`;
+        case "EVENT":
+          return `Event attendance${s.domain ? `: ${s.domain}` : ""}`;
+        case "TRANSITION":
+          return `Career transition signals`;
+        case "OBSESSION":
+          return `Deep interest in ${s.domain || "a topic"}`;
+        default:
+          return null;
+      }
+    }).filter(Boolean);
 
-  return `
-You are ChekInn.
+    if (signalDescriptions.length > 0) {
+      signalContext = `
+CONTEXT (use naturally, never mention how you know this):
+${signalDescriptions.map(s => `• ${s}`).join("\n")}
+`;
+    }
+  }
 
-You help people think clearly about important decisions over time.
+  // Build profile context
+  let profileContext = "";
+  if (profile) {
+    const parts = [];
+    if (profile.full_name) parts.push(`Name: ${profile.full_name}`);
+    if (profile.role) parts.push(`Role: ${profile.role}`);
+    if (profile.industry) parts.push(`Industry: ${profile.industry}`);
+    if (profile.looking_for) parts.push(`Looking for: ${profile.looking_for}`);
+    if (profile.goals?.length) parts.push(`Goals: ${profile.goals.join(", ")}`);
+    if (profile.interests?.length) parts.push(`Interests: ${profile.interests.join(", ")}`);
+    
+    if (parts.length > 0) {
+      profileContext = `
+USER PROFILE:
+${parts.join("\n")}
+`;
+    }
+  }
 
-You are NOT a task assistant.
-You do NOT send emails.
-You do NOT manage reminders.
-You do NOT browse the web.
-You do NOT take actions for the user.
+  return `You are ChekInn.
+
+You help people think clearly about important life decisions.
+You are NOT a task assistant. You do NOT take actions for the user.
+
+${signalContext}
+${profileContext}
 
 ––––––––––––––––––––
-CORE PRINCIPLES
+CORE APPROACH
 ––––––––––––––––––––
 
-• Do not rush clarity.
-• Do not push decisions.
-• Silence is allowed.
+• If you notice signals (travel, interviews, transitions), weave them in naturally
+• Ask questions that help people process what's happening
+• Connect dots they might not see themselves
+• Be a thoughtful friend, not a bot
 
+• Do not rush clarity
+• Do not push decisions
+• Silence is allowed
+
+${signals.length > 0 ? `
 ––––––––––––––––––––
-MODE: ${mode.toUpperCase()}
+SIGNAL-AWARE GUIDANCE
 ––––––––––––––––––––
 
-${
-  mode === "observer"
-    ? `
-Ask ONE short question.
-No advice.
-Under 25 words.
-`
-    : ""
-}
+You have context about what's happening in their life.
+Use this to:
+• Ask timely questions ("How are you feeling about the interview?")
+• Offer relevant observations ("Sounds like a lot of change happening")
+• Connect their current topic to what you know
 
-${
-  mode === "reflect"
-    ? `
-Make ONE observation.
-No advice.
-Under 30 words.
-`
-    : ""
-}
-
-${
-  mode === "guide"
-    ? `
-Ask ONE constraint-based question.
-No reassurance.
-No solutions.
-`
-    : ""
-}
+NEVER say "I noticed from your emails" or "based on your signals".
+Just naturally incorporate the context as a thoughtful friend would.
+` : ""}
 
 ––––––––––––––––––––
 STYLE
 ––––––––––––––––––––
 
-• Calm
-• Human
-• Texting tone
-• 1–2 sentences max
-
-Never say:
-• “How can I help?”
-• “Here’s what you should do”
-• “I recommend”
-• “You should talk to someone”
-
-Never mention:
-• data
-• signals
-• systems
-• profiles
-• emails
-• introductions
+• Calm, human, texting tone
+• 1–3 sentences max
+• No corporate speak
+• No "How can I help?"
+• No "Here's what you should do"
+• No "I recommend"
 
 If unsure, say less.
-`;
+If they seem stuck, ask one good question.
+If they're processing something big, just acknowledge it.`;
 }
 
 // =============================================================================
@@ -179,17 +212,46 @@ serve(async (req) => {
   }
 
   try {
-    const { messages, userContext } = await req.json();
+    const body = await req.json();
+    const { messages, userId, isAuthenticated, isReturningUser, isFirstMessageOfSession, hasPendingIntros } = body;
 
     if (!messages || !Array.isArray(messages)) {
-      return new Response(JSON.stringify({ error: "Invalid messages" }), { status: 400, headers: corsHeaders });
+      return new Response(JSON.stringify({ error: "Invalid messages" }), { 
+        status: 400, 
+        headers: corsHeaders 
+      });
     }
 
-    const LOVABLE_API_KEY = Deno.env.get("LOVABLE_API_KEY")!;
-    const context: UserContext = userContext || { isAuthenticated: false };
+    console.log(`Chat: userId=${userId}, authenticated=${isAuthenticated}, returning=${isReturningUser}, msgCount=${messages.length}`);
 
-    const decision = await getDecision(messages, context, LOVABLE_API_KEY);
-    const systemPrompt = buildSystemPrompt(decision);
+    const LOVABLE_API_KEY = Deno.env.get("LOVABLE_API_KEY");
+    if (!LOVABLE_API_KEY) {
+      throw new Error("LOVABLE_API_KEY not configured");
+    }
+
+    // Fetch signals and profile if authenticated
+    let signals: EmailSignal[] = [];
+    let profile: ProfileContext | null = null;
+
+    if (userId && isAuthenticated) {
+      const [fetchedSignals, fetchedProfile] = await Promise.all([
+        fetchUserSignals(userId),
+        fetchUserProfile(userId),
+      ]);
+      signals = fetchedSignals;
+      profile = fetchedProfile;
+      console.log(`Fetched ${signals.length} signals, profile: ${profile?.full_name || "none"}`);
+    }
+
+    const context: UserContext = {
+      isAuthenticated: isAuthenticated || false,
+      userId,
+      isReturningUser,
+      isFirstMessageOfSession,
+      hasPendingIntros,
+    };
+
+    const systemPrompt = buildSystemPrompt(signals, profile, context);
 
     const response = await fetch("https://ai.gateway.lovable.dev/v1/chat/completions", {
       method: "POST",
@@ -204,11 +266,32 @@ serve(async (req) => {
       }),
     });
 
+    if (!response.ok) {
+      if (response.status === 429) {
+        return new Response(JSON.stringify({ error: "Rate limited" }), {
+          status: 429,
+          headers: { ...corsHeaders, "Content-Type": "application/json" },
+        });
+      }
+      if (response.status === 402) {
+        return new Response(JSON.stringify({ error: "Payment required" }), {
+          status: 402,
+          headers: { ...corsHeaders, "Content-Type": "application/json" },
+        });
+      }
+      const errorText = await response.text();
+      console.error("AI gateway error:", response.status, errorText);
+      throw new Error("AI gateway error");
+    }
+
     return new Response(response.body, {
       headers: { ...corsHeaders, "Content-Type": "text/event-stream" },
     });
   } catch (err) {
-    console.error(err);
-    return new Response(JSON.stringify({ error: "Internal error" }), { status: 500, headers: corsHeaders });
+    console.error("Chat error:", err);
+    return new Response(JSON.stringify({ error: "Internal error" }), { 
+      status: 500, 
+      headers: corsHeaders 
+    });
   }
 });

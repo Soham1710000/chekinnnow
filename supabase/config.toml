@@ -50,3 +50,9 @@ verify_jwt = false
 
 [functions.decision-engine]
 verify_jwt = false
+
+[functions.infer-social]
+verify_jwt = false
+
+[functions.scrape-social]
+verify_jwt = false

@@ -44,3 +44,9 @@ verify_jwt = false
 
 [functions.gmail-ingest]
 verify_jwt = false
+
+[functions.signal-extract]
+verify_jwt = false
+
+[functions.decision-engine]
+verify_jwt = false

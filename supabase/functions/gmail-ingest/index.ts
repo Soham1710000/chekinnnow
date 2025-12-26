@@ -8,41 +8,32 @@ const corsHeaders = {
 const SUPABASE_URL = Deno.env.get('SUPABASE_URL')!;
 const SUPABASE_SERVICE_ROLE_KEY = Deno.env.get('SUPABASE_SERVICE_ROLE_KEY')!;
 
-// Keywords to filter relevant emails
-const SIGNAL_KEYWORDS = {
-  flight: ['flight', 'boarding pass', 'itinerary', 'airline', 'departure', 'arrival', 'booking confirmation', 'e-ticket'],
-  interview: ['interview', 'interview scheduled', 'interview invitation', 'meeting with hiring', 'technical round', 'HR round'],
-  offer: ['offer letter', 'job offer', 'compensation', 'joining date', 'we are pleased to offer', 'congratulations on your selection'],
-  calendar_invite: ['calendar invitation', 'event invitation', 'you have been invited', 'google calendar', 'outlook calendar', '.ics'],
-  event: ['event confirmation', 'ticket confirmation', 'registration confirmed', 'webinar', 'conference', 'workshop'],
-  exam_confirmation: ['exam confirmation', 'test scheduled', 'admit card', 'hall ticket', 'examination', 'assessment scheduled', 'upsc', 'prelims', 'mains']
-};
-
-// Domains/senders to ignore (promotions, personal)
-const IGNORE_PATTERNS = [
-  'noreply@youtube.com',
-  'notifications@',
-  'newsletter@',
-  'promo@',
-  'marketing@',
-  'deals@',
-  'offers@',
-  'unsubscribe',
-  'linkedin.com/comm/',
-  'facebook.com',
-  'twitter.com',
-  'instagram.com'
+// Keywords to filter relevant emails (pre-filter before LLM)
+const POTENTIAL_SIGNAL_KEYWORDS = [
+  'flight', 'boarding', 'itinerary', 'airline', 'departure', 'arrival', 'booking',
+  'interview', 'hiring', 'technical round', 'HR round', 'screening',
+  'offer letter', 'job offer', 'compensation', 'joining', 'congratulations',
+  'calendar', 'event', 'invitation', 'webinar', 'conference', 'workshop', 'meetup',
+  'exam', 'test', 'admit card', 'assessment', 'upsc', 'prelims', 'registration',
+  'course', 'enrolled', 'subscription', 'learning', 'certification'
 ];
 
-interface EmailSignal {
-  signal_type: string;
-  signal_data: Record<string, unknown>;
-  email_date: string;
-  gmail_message_id: string;
+// Domains/senders to ignore
+const IGNORE_PATTERNS = [
+  'noreply@youtube.com', 'notifications@', 'newsletter@', 'promo@', 
+  'marketing@', 'deals@', 'offers@', 'unsubscribe', 'linkedin.com/comm/',
+  'facebook.com', 'twitter.com', 'instagram.com', 'pinterest.com'
+];
+
+interface EmailForExtraction {
+  messageId: string;
+  subject: string;
+  from: string;
+  date: string;
+  body: string;
 }
 
 async function getAccessToken(supabase: any, userId: string): Promise<string | null> {
-  // Call the gmail-oauth function to get/refresh token
   const response = await fetch(`${SUPABASE_URL}/functions/v1/gmail-oauth?action=refresh`, {
     method: 'POST',
     headers: {
@@ -66,65 +57,29 @@ function shouldIgnoreEmail(from: string, subject: string): boolean {
   return IGNORE_PATTERNS.some(pattern => combined.includes(pattern.toLowerCase()));
 }
 
-function detectSignalType(subject: string, snippet: string): string | null {
+function mightContainSignal(subject: string, snippet: string): boolean {
   const combined = `${subject} ${snippet}`.toLowerCase();
-  
-  for (const [signalType, keywords] of Object.entries(SIGNAL_KEYWORDS)) {
-    if (keywords.some(keyword => combined.includes(keyword.toLowerCase()))) {
-      return signalType;
-    }
-  }
-  
-  return null;
-}
-
-function extractSignalData(signalType: string, subject: string, snippet: string, from: string): Record<string, unknown> {
-  const data: Record<string, unknown> = {
-    subject,
-    from,
-    snippet: snippet.slice(0, 500), // Limit snippet length
-  };
-
-  // Extract specific data based on signal type
-  switch (signalType) {
-    case 'flight':
-      // Try to extract flight number, dates
-      const flightMatch = snippet.match(/([A-Z]{2}\d{3,4})/);
-      if (flightMatch) data.flight_number = flightMatch[1];
-      break;
-    case 'interview':
-      // Try to extract company name from subject/from
-      const companyMatch = from.match(/@([^.]+)\./);
-      if (companyMatch) data.company = companyMatch[1];
-      break;
-    case 'offer':
-      const companyFromEmail = from.match(/@([^.]+)\./);
-      if (companyFromEmail) data.company = companyFromEmail[1];
-      break;
-  }
-
-  return data;
+  return POTENTIAL_SIGNAL_KEYWORDS.some(keyword => combined.includes(keyword.toLowerCase()));
 }
 
 async function processUserEmails(supabase: any, userId: string, accessToken: string): Promise<{ processed: number; signals: number }> {
   console.log('[gmail-ingest] Processing emails for user:', userId);
   
-  // Get emails from last 30 days
   const thirtyDaysAgo = new Date();
   thirtyDaysAgo.setDate(thirtyDaysAgo.getDate() - 30);
   const afterTimestamp = Math.floor(thirtyDaysAgo.getTime() / 1000);
 
-  // Build Gmail API query - exclude promotions and social
   const query = `after:${afterTimestamp} -category:promotions -category:social`;
   
   let processed = 0;
   let signalsFound = 0;
   let pageToken: string | null = null;
+  const emailsForExtraction: EmailForExtraction[] = [];
 
   do {
     const listUrl = new URL('https://gmail.googleapis.com/gmail/v1/users/me/messages');
     listUrl.searchParams.set('q', query);
-    listUrl.searchParams.set('maxResults', '100');
+    listUrl.searchParams.set('maxResults', '50');
     if (pageToken) listUrl.searchParams.set('pageToken', pageToken);
 
     const listResponse = await fetch(listUrl.toString(), {
@@ -140,14 +95,13 @@ async function processUserEmails(supabase: any, userId: string, accessToken: str
     const messages = listData.messages || [];
     pageToken = listData.nextPageToken || null;
 
-    console.log(`[gmail-ingest] Found ${messages.length} messages to process`);
+    console.log(`[gmail-ingest] Found ${messages.length} messages to check`);
 
-    // Process each message
     for (const msg of messages) {
       try {
-        // Get message details (metadata only - not full body to minimize data)
+        // Get message with snippet for pre-filtering
         const msgResponse = await fetch(
-          `https://gmail.googleapis.com/gmail/v1/users/me/messages/${msg.id}?format=metadata&metadataHeaders=Subject&metadataHeaders=From&metadataHeaders=Date`,
+          `https://gmail.googleapis.com/gmail/v1/users/me/messages/${msg.id}?format=full`,
           { headers: { Authorization: `Bearer ${accessToken}` } }
         );
 
@@ -163,50 +117,93 @@ async function processUserEmails(supabase: any, userId: string, accessToken: str
         const snippet = msgData.snippet || '';
 
         // Skip ignored emails
-        if (shouldIgnoreEmail(from, subject)) {
-          continue;
+        if (shouldIgnoreEmail(from, subject)) continue;
+
+        // Pre-filter: only send potentially relevant emails to LLM
+        if (!mightContainSignal(subject, snippet)) continue;
+
+        // Extract body text (simplified - just get text/plain or decoded text/html)
+        let body = snippet;
+        const parts = msgData.payload?.parts || [];
+        for (const part of parts) {
+          if (part.mimeType === 'text/plain' && part.body?.data) {
+            body = atob(part.body.data.replace(/-/g, '+').replace(/_/g, '/'));
+            break;
+          }
+        }
+        // Fallback to payload body if no parts
+        if (body === snippet && msgData.payload?.body?.data) {
+          body = atob(msgData.payload.body.data.replace(/-/g, '+').replace(/_/g, '/'));
         }
 
-        // Detect signal type
-        const signalType = detectSignalType(subject, snippet);
-        if (!signalType) continue;
+        // Limit body length to save tokens
+        body = body.slice(0, 2000);
 
-        // Extract signal data
-        const signalData = extractSignalData(signalType, subject, snippet, from);
-
-        // Parse email date
-        let emailDate: Date;
-        try {
-          emailDate = new Date(dateStr);
-        } catch {
-          emailDate = new Date(msgData.internalDate ? parseInt(msgData.internalDate) : Date.now());
-        }
-
-        // Store signal (upsert to avoid duplicates)
-        const { error } = await supabase
-          .from('email_signals')
-          .upsert({
-            user_id: userId,
-            signal_type: signalType,
-            signal_data: signalData,
-            email_date: emailDate.toISOString(),
-            gmail_message_id: msg.id,
-          }, { onConflict: 'user_id,gmail_message_id' });
-
-        if (!error) {
-          signalsFound++;
-          console.log(`[gmail-ingest] Found ${signalType} signal:`, subject.slice(0, 50));
-        }
+        emailsForExtraction.push({
+          messageId: msg.id,
+          subject,
+          from,
+          date: dateStr || new Date(parseInt(msgData.internalDate || Date.now())).toISOString(),
+          body,
+        });
 
       } catch (err) {
         console.error('[gmail-ingest] Error processing message:', err);
       }
     }
 
-    // Rate limiting - don't hammer the API
     await new Promise(resolve => setTimeout(resolve, 100));
+  } while (pageToken && emailsForExtraction.length < 100); // Limit to 100 emails per run
 
-  } while (pageToken);
+  console.log(`[gmail-ingest] Sending ${emailsForExtraction.length} emails to signal extraction`);
+
+  // Send to signal extraction in batches of 10
+  const batchSize = 10;
+  for (let i = 0; i < emailsForExtraction.length; i += batchSize) {
+    const batch = emailsForExtraction.slice(i, i + batchSize);
+    
+    try {
+      const extractResponse = await fetch(`${SUPABASE_URL}/functions/v1/signal-extract`, {
+        method: 'POST',
+        headers: {
+          'Authorization': `Bearer ${SUPABASE_SERVICE_ROLE_KEY}`,
+          'Content-Type': 'application/json',
+        },
+        body: JSON.stringify({ emails: batch, userId }),
+      });
+
+      if (extractResponse.ok) {
+        const result = await extractResponse.json();
+        signalsFound += result.signals || 0;
+      } else {
+        console.error('[gmail-ingest] Signal extraction failed:', await extractResponse.text());
+      }
+    } catch (err) {
+      console.error('[gmail-ingest] Error calling signal-extract:', err);
+    }
+
+    // Small delay between batches
+    await new Promise(resolve => setTimeout(resolve, 500));
+  }
+
+  // After signal extraction, run decision engine
+  try {
+    const decisionResponse = await fetch(`${SUPABASE_URL}/functions/v1/decision-engine`, {
+      method: 'POST',
+      headers: {
+        'Authorization': `Bearer ${SUPABASE_SERVICE_ROLE_KEY}`,
+        'Content-Type': 'application/json',
+      },
+      body: JSON.stringify({ userId }),
+    });
+
+    if (decisionResponse.ok) {
+      const decision = await decisionResponse.json();
+      console.log(`[gmail-ingest] Decision for ${userId}:`, decision.decision);
+    }
+  } catch (err) {
+    console.error('[gmail-ingest] Error calling decision-engine:', err);
+  }
 
   return { processed, signals: signalsFound };
 }
@@ -219,7 +216,6 @@ Deno.serve(async (req) => {
   try {
     const supabase = createClient(SUPABASE_URL, SUPABASE_SERVICE_ROLE_KEY);
 
-    // Check if this is a single user request or batch job
     let userIds: string[] = [];
 
     if (req.method === 'POST') {
@@ -229,7 +225,6 @@ Deno.serve(async (req) => {
       }
     }
 
-    // If no specific user, get all active users with valid tokens
     if (userIds.length === 0) {
       console.log('[gmail-ingest] Running batch job for all active users');
       
@@ -247,7 +242,6 @@ Deno.serve(async (req) => {
     const results: Record<string, any> = {};
 
     for (const userId of userIds) {
-      // Create job record
       const { data: job, error: jobError } = await supabase
         .from('ingestion_jobs')
         .insert({
@@ -263,7 +257,6 @@ Deno.serve(async (req) => {
       }
 
       try {
-        // Get access token
         const accessToken = await getAccessToken(supabase, userId);
         if (!accessToken) {
           await supabase
@@ -278,10 +271,8 @@ Deno.serve(async (req) => {
           continue;
         }
 
-        // Process emails
         const { processed, signals } = await processUserEmails(supabase, userId, accessToken);
 
-        // Update job record
         await supabase
           .from('ingestion_jobs')
           .update({

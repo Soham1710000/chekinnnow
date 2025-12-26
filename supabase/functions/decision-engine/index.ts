@@ -6,256 +6,15 @@ const corsHeaders = {
   'Access-Control-Allow-Headers': 'authorization, x-client-info, apikey, content-type',
 };
 
-type DecisionState = 'SILENT' | 'NUDGE' | 'CHAT_INVITE';
-type SignalType = 'FLIGHT' | 'INTERVIEW' | 'EVENT' | 'TRANSITION' | 'OBSESSION';
-
-interface EmailSignal {
+interface UserProfile {
   id: string;
-  user_id: string;
-  type: SignalType;
-  domain: string;
-  confidence: number;
-  evidence: string;
-  expires_at: string | null;
-  created_at: string;
-}
-
-interface SocialSignal {
-  id: string;
-  user_id: string;
-  signal_type: string;
-  signal_value: string;
-  confidence: number;
-  evidence: string;
-  expires_at: string | null;
-  created_at: string;
-}
-
-interface Decision {
-  state: DecisionState;
-  signalId: string;
-  signalType: SignalType | string;
-  reason: string;
-  message?: string;
-}
-
-// Message templates - short, human, no emojis, source-agnostic
-const MESSAGE_TEMPLATES: Record<string, { nudge: string[]; chat_invite: string[] }> = {
-  FLIGHT: {
-    nudge: [
-      "You've got an early flight tomorrow.\nSleep.",
-      "Flight coming up.\nPack light.",
-      "Travel day approaching.\nDon't forget your charger.",
-    ],
-    chat_invite: [
-      "Looks like you're traveling soon.\nWant to talk through what you're preparing for?",
-    ],
-  },
-  INTERVIEW: {
-    nudge: [
-      "Interview tomorrow.\nYou've got this.",
-      "Call coming up.\nTake a breath first.",
-    ],
-    chat_invite: [
-      "You've been interviewing a lot.\nWant to think through what you're really looking for?",
-    ],
-  },
-  EVENT: {
-    nudge: [
-      "There's an event this weekend that fits what you're building.\nYou should go.",
-      "Something relevant is happening nearby.\nMight be worth showing up.",
-    ],
-    chat_invite: [
-      "A few events coming up in your space.\nWant help deciding which ones matter?",
-    ],
-  },
-  TRANSITION: {
-    nudge: [
-      "Sounds like something's shifting.\nTake your time with it.",
-    ],
-    chat_invite: [
-      "You've been circling a job switch.\nWant to talk it out?",
-      "Feels like you're thinking about a change.\nI'm here if you want to process it.",
-    ],
-  },
-  OBSESSION: {
-    nudge: [
-      "You keep coming back to this topic.\nMight mean something.",
-    ],
-    chat_invite: [
-      "You've been deep in this for a while.\nWant to explore what's pulling you?",
-    ],
-  },
-  // Social signal types - source-agnostic language
-  topic: {
-    nudge: [
-      "You've been thinking a lot about this.\nMight be worth exploring further.",
-    ],
-    chat_invite: [
-      "This topic keeps showing up in your world.\nWant to dig deeper?",
-    ],
-  },
-  theme: {
-    nudge: [
-      "A pattern is emerging.\nPay attention to it.",
-    ],
-    chat_invite: [
-      "Something's recurring in what you're doing.\nWant to talk it through?",
-    ],
-  },
-  obsession: {
-    nudge: [
-      "You're clearly passionate about this.\nLean into it.",
-    ],
-    chat_invite: [
-      "You've been deep in something for a while.\nWant to explore what's pulling you?",
-    ],
-  },
-  transition: {
-    nudge: [
-      "Something seems to be shifting.\nGive yourself space for it.",
-    ],
-    chat_invite: [
-      "Looks like you're in a transition.\nWant to think it through together?",
-    ],
-  },
-};
-
-function getRandomMessage(type: string, state: 'nudge' | 'chat_invite'): string {
-  const templates = MESSAGE_TEMPLATES[type]?.[state] || MESSAGE_TEMPLATES['OBSESSION'][state];
-  return templates[Math.floor(Math.random() * templates.length)];
-}
-
-function hoursUntil(dateStr: string): number {
-  const target = new Date(dateStr);
-  const now = new Date();
-  return (target.getTime() - now.getTime()) / (1000 * 60 * 60);
-}
-
-function evaluateEmailSignal(signal: EmailSignal, recentSignals: EmailSignal[]): Decision | null {
-  // FLIGHT: Nudge if < 12 hours away
-  if (signal.type === 'FLIGHT' && signal.expires_at) {
-    const hours = hoursUntil(signal.expires_at);
-    if (hours > 0 && hours < 12) {
-      return {
-        state: 'NUDGE',
-        signalId: signal.id,
-        signalType: signal.type,
-        reason: `Flight in ${Math.round(hours)} hours`,
-        message: getRandomMessage('FLIGHT', 'nudge'),
-      };
-    }
-  }
-
-  // INTERVIEW: Nudge if < 24 hours away
-  if (signal.type === 'INTERVIEW' && signal.expires_at) {
-    const hours = hoursUntil(signal.expires_at);
-    if (hours > 0 && hours < 24) {
-      return {
-        state: 'NUDGE',
-        signalId: signal.id,
-        signalType: signal.type,
-        reason: `Interview in ${Math.round(hours)} hours`,
-        message: getRandomMessage('INTERVIEW', 'nudge'),
-      };
-    }
-  }
-
-  // EVENT: Nudge if < 48 hours away
-  if (signal.type === 'EVENT' && signal.expires_at) {
-    const hours = hoursUntil(signal.expires_at);
-    if (hours > 0 && hours < 48) {
-      return {
-        state: 'NUDGE',
-        signalId: signal.id,
-        signalType: signal.type,
-        reason: `Event in ${Math.round(hours)} hours`,
-        message: getRandomMessage('EVENT', 'nudge'),
-      };
-    }
-  }
-
-  // TRANSITION: Chat invite if signals repeat for > 5 days
-  if (signal.type === 'TRANSITION') {
-    const now = new Date();
-    const transitionSignals = recentSignals.filter(s => s.type === 'TRANSITION');
-    const fiveDaysAgo = new Date(now.getTime() - 5 * 24 * 60 * 60 * 1000);
-    const persistentSignals = transitionSignals.filter(s => new Date(s.created_at) < fiveDaysAgo);
-    
-    if (persistentSignals.length >= 2) {
-      return {
-        state: 'CHAT_INVITE',
-        signalId: signal.id,
-        signalType: signal.type,
-        reason: 'Transition signals persisting for 5+ days',
-        message: getRandomMessage('TRANSITION', 'chat_invite'),
-      };
-    }
-  }
-
-  // OBSESSION: Chat invite if same domain appears 3+ times
-  if (signal.type === 'OBSESSION') {
-    const sameDomainSignals = recentSignals.filter(
-      s => s.type === 'OBSESSION' && s.domain === signal.domain
-    );
-    
-    if (sameDomainSignals.length >= 3) {
-      return {
-        state: 'CHAT_INVITE',
-        signalId: signal.id,
-        signalType: signal.type,
-        reason: `Repeated interest in ${signal.domain}`,
-        message: getRandomMessage('OBSESSION', 'chat_invite'),
-      };
-    }
-  }
-
-  return null;
-}
-
-function evaluateSocialSignals(signals: SocialSignal[]): Decision | null {
-  // Group by signal type and value
-  const grouped: Record<string, SocialSignal[]> = {};
-  
-  for (const signal of signals) {
-    const key = `${signal.signal_type}:${signal.signal_value}`;
-    if (!grouped[key]) grouped[key] = [];
-    grouped[key].push(signal);
-  }
-
-  // Find patterns worth acting on
-  for (const [key, groupedSignals] of Object.entries(grouped)) {
-    // Same signal appearing 3+ times = obsession/pattern worth noting
-    if (groupedSignals.length >= 3) {
-      const signal = groupedSignals[0];
-      const avgConfidence = groupedSignals.reduce((sum, s) => sum + s.confidence, 0) / groupedSignals.length;
-      
-      if (avgConfidence >= 0.6) {
-        return {
-          state: 'CHAT_INVITE',
-          signalId: signal.id,
-          signalType: signal.signal_type,
-          reason: `Pattern detected: ${signal.signal_value} (${groupedSignals.length} occurrences)`,
-          message: getRandomMessage(signal.signal_type, 'chat_invite'),
-        };
-      }
-    }
-  }
-
-  // Transition signals are high priority
-  const transitions = signals.filter(s => s.signal_type === 'transition');
-  if (transitions.length >= 2) {
-    const signal = transitions[0];
-    return {
-      state: 'CHAT_INVITE',
-      signalId: signal.id,
-      signalType: 'transition',
-      reason: 'Multiple transition signals from social context',
-      message: getRandomMessage('transition', 'chat_invite'),
-    };
-  }
-
-  return null;
+  full_name: string | null;
+  role: string | null;
+  industry: string | null;
+  looking_for: string | null;
+  skills: string[] | null;
+  interests: string[] | null;
+  learning_complete: boolean | null;
 }
 
 serve(async (req) => {
@@ -264,141 +23,182 @@ serve(async (req) => {
   }
 
   try {
-    const { userId } = await req.json();
+    const { userId, action } = await req.json();
 
     const supabaseUrl = Deno.env.get('SUPABASE_URL')!;
     const supabaseKey = Deno.env.get('SUPABASE_SERVICE_ROLE_KEY')!;
     const supabase = createClient(supabaseUrl, supabaseKey);
 
-    // Check if user already received a message today (max 1 per 24 hours)
-    const twentyFourHoursAgo = new Date(Date.now() - 24 * 60 * 60 * 1000);
-    
-    const { data: recentMessages } = await supabase
-      .from('user_messages')
-      .select('id')
-      .eq('user_id', userId)
-      .gte('sent_at', twentyFourHoursAgo.toISOString())
-      .limit(1);
+    // Action: Check if we should create an intro for this user
+    if (action === 'check_intro') {
+      console.log(`[decision-engine] Checking intro opportunities for user ${userId}`);
 
-    if (recentMessages && recentMessages.length > 0) {
-      console.log(`[decision-engine] User ${userId} received message in last 24h, staying silent`);
-      return new Response(
-        JSON.stringify({ decision: 'SILENT', reason: '24-hour limit reached' }),
-        { headers: { ...corsHeaders, 'Content-Type': 'application/json' } }
-      );
-    }
+      // Get user's profile
+      const { data: userProfile, error: profileError } = await supabase
+        .from('profiles')
+        .select('*')
+        .eq('id', userId)
+        .single();
 
-    const thirtyDaysAgo = new Date(Date.now() - 30 * 24 * 60 * 60 * 1000);
+      if (profileError || !userProfile) {
+        console.log(`[decision-engine] No profile found for user ${userId}`);
+        return new Response(
+          JSON.stringify({ action: 'none', reason: 'No profile found' }),
+          { headers: { ...corsHeaders, 'Content-Type': 'application/json' } }
+        );
+      }
 
-    // Get email signals
-    const { data: emailSignals, error: emailError } = await supabase
-      .from('email_signals')
-      .select('*')
-      .eq('user_id', userId)
-      .gte('created_at', thirtyDaysAgo.toISOString())
-      .gte('confidence', 0.6)
-      .order('created_at', { ascending: false });
+      // Check if learning is complete
+      if (!userProfile.learning_complete) {
+        console.log(`[decision-engine] User ${userId} still in learning phase`);
+        return new Response(
+          JSON.stringify({ action: 'none', reason: 'Learning not complete' }),
+          { headers: { ...corsHeaders, 'Content-Type': 'application/json' } }
+        );
+      }
 
-    if (emailError) throw emailError;
+      // Check if user already has pending/active intros (max 3 active at a time)
+      const { data: existingIntros, error: introError } = await supabase
+        .from('introductions')
+        .select('id, status')
+        .or(`user_a_id.eq.${userId},user_b_id.eq.${userId}`)
+        .in('status', ['pending', 'accepted_a', 'accepted_b', 'active']);
 
-    // Get social signals (not yet processed)
-    const { data: socialSignals, error: socialError } = await supabase
-      .from('social_signals')
-      .select('*')
-      .eq('user_id', userId)
-      .eq('processed', false)
-      .gte('confidence', 0.6)
-      .order('created_at', { ascending: false });
+      if (introError) throw introError;
 
-    if (socialError) throw socialError;
+      const activeCount = existingIntros?.length || 0;
+      if (activeCount >= 3) {
+        console.log(`[decision-engine] User ${userId} already has ${activeCount} active intros`);
+        return new Response(
+          JSON.stringify({ action: 'none', reason: 'Max active intros reached' }),
+          { headers: { ...corsHeaders, 'Content-Type': 'application/json' } }
+        );
+      }
 
-    // Get previously nudged signal IDs (idempotency - no duplicate nudges)
-    const { data: previousMessages } = await supabase
-      .from('user_messages')
-      .select('signal_id')
-      .eq('user_id', userId)
-      .not('signal_id', 'is', null);
+      // Find potential matches - users who are also learning complete
+      // Simple matching: look for users with overlapping interests or complementary needs
+      const { data: candidates, error: candidatesError } = await supabase
+        .from('profiles')
+        .select('*')
+        .eq('learning_complete', true)
+        .neq('id', userId)
+        .limit(50);
 
-    const nudgedSignalIds = new Set((previousMessages || []).map(m => m.signal_id));
+      if (candidatesError) throw candidatesError;
 
-    let bestDecision: Decision | null = null;
+      if (!candidates || candidates.length === 0) {
+        console.log(`[decision-engine] No candidates found for user ${userId}`);
+        return new Response(
+          JSON.stringify({ action: 'none', reason: 'No candidates available' }),
+          { headers: { ...corsHeaders, 'Content-Type': 'application/json' } }
+        );
+      }
 
-    // Evaluate email signals first (time-sensitive)
-    if (emailSignals && emailSignals.length > 0) {
-      for (const signal of emailSignals) {
-        if (nudgedSignalIds.has(signal.id)) continue;
-        if (signal.expires_at && new Date(signal.expires_at) < new Date()) continue;
+      // Get IDs of users we've already matched with (to avoid duplicates)
+      const { data: pastIntros } = await supabase
+        .from('introductions')
+        .select('user_a_id, user_b_id')
+        .or(`user_a_id.eq.${userId},user_b_id.eq.${userId}`);
 
-        const decision = evaluateEmailSignal(signal as EmailSignal, emailSignals as EmailSignal[]);
-        
-        if (decision && decision.state !== 'SILENT') {
-          // Prioritize NUDGE over CHAT_INVITE (more time-sensitive)
-          if (!bestDecision || 
-              (decision.state === 'NUDGE' && bestDecision.state !== 'NUDGE')) {
-            bestDecision = decision;
-          }
+      const alreadyMatchedIds = new Set<string>();
+      pastIntros?.forEach(intro => {
+        if (intro.user_a_id === userId) {
+          alreadyMatchedIds.add(intro.user_b_id);
+        } else {
+          alreadyMatchedIds.add(intro.user_a_id);
+        }
+      });
+
+      // Simple scoring: find someone with overlapping interests or who's looking for what user offers
+      let bestMatch: UserProfile | null = null;
+      let bestScore = 0;
+      let matchReason = '';
+
+      for (const candidate of candidates) {
+        if (alreadyMatchedIds.has(candidate.id)) continue;
+
+        let score = 0;
+        let reasons: string[] = [];
+
+        // Interest overlap
+        const userInterests = userProfile.interests || [];
+        const candidateInterests = candidate.interests || [];
+        const sharedInterests = userInterests.filter((i: string) => 
+          candidateInterests.includes(i)
+        );
+        if (sharedInterests.length > 0) {
+          score += sharedInterests.length * 2;
+          reasons.push(`shared interests: ${sharedInterests.slice(0, 2).join(', ')}`);
+        }
+
+        // Skill match - does candidate have skills user is looking for?
+        const userLookingFor = userProfile.looking_for?.toLowerCase() || '';
+        const candidateSkills = (candidate.skills || []).map((s: string) => s.toLowerCase());
+        if (candidateSkills.some((s: string) => userLookingFor.includes(s))) {
+          score += 3;
+          reasons.push('has skills you need');
+        }
+
+        // Industry match
+        if (userProfile.industry && candidate.industry === userProfile.industry) {
+          score += 2;
+          reasons.push(`both in ${userProfile.industry}`);
+        }
+
+        // Role complementarity - different roles can learn from each other
+        if (userProfile.role && candidate.role && userProfile.role !== candidate.role) {
+          score += 1;
+          reasons.push('different perspectives');
+        }
+
+        if (score > bestScore) {
+          bestScore = score;
+          bestMatch = candidate;
+          matchReason = reasons.join(', ');
         }
       }
-    }
 
-    // If no email decision, check social signals
-    if (!bestDecision && socialSignals && socialSignals.length > 0) {
-      const socialDecision = evaluateSocialSignals(socialSignals as SocialSignal[]);
-      if (socialDecision) {
-        bestDecision = socialDecision;
+      // Only create intro if we have a reasonable match (score >= 2)
+      if (!bestMatch || bestScore < 2) {
+        console.log(`[decision-engine] No good match found for user ${userId} (best score: ${bestScore})`);
+        return new Response(
+          JSON.stringify({ action: 'none', reason: 'No suitable match found' }),
+          { headers: { ...corsHeaders, 'Content-Type': 'application/json' } }
+        );
       }
-    }
 
-    // Mark social signals as processed
-    if (socialSignals && socialSignals.length > 0) {
-      const signalIds = socialSignals.map(s => s.id);
-      await supabase
-        .from('social_signals')
-        .update({ processed: true })
-        .in('id', signalIds);
-    }
+      // Create the intro
+      const introMessage = generateIntroMessage(userProfile, bestMatch, matchReason);
 
-    if (!bestDecision) {
-      await supabase.from('decision_log').insert({
-        user_id: userId,
-        decision_state: 'SILENT',
-        reason: 'No actionable signals',
-      });
+      const { data: newIntro, error: createError } = await supabase
+        .from('introductions')
+        .insert({
+          user_a_id: userId,
+          user_b_id: bestMatch.id,
+          intro_message: introMessage,
+          status: 'pending',
+        })
+        .select()
+        .single();
+
+      if (createError) throw createError;
+
+      console.log(`[decision-engine] Created intro ${newIntro.id} between ${userId} and ${bestMatch.id}`);
 
       return new Response(
-        JSON.stringify({ decision: 'SILENT', reason: 'No actionable signals' }),
+        JSON.stringify({
+          action: 'intro_created',
+          introId: newIntro.id,
+          matchedWith: bestMatch.full_name,
+          reason: matchReason,
+        }),
         { headers: { ...corsHeaders, 'Content-Type': 'application/json' } }
       );
     }
 
-    // Log decision
-    await supabase.from('decision_log').insert({
-      user_id: userId,
-      signal_id: bestDecision.signalId,
-      decision_state: bestDecision.state,
-      signal_type: bestDecision.signalType as any,
-      reason: bestDecision.reason,
-    });
-
-    // Store message (only once per signal - idempotent)
-    if (bestDecision.message) {
-      await supabase.from('user_messages').insert({
-        user_id: userId,
-        signal_id: bestDecision.signalId,
-        decision_state: bestDecision.state,
-        message_content: bestDecision.message,
-      });
-    }
-
-    console.log(`[decision-engine] Decision for ${userId}: ${bestDecision.state} - ${bestDecision.reason}`);
-
+    // Default: just acknowledge
     return new Response(
-      JSON.stringify({
-        decision: bestDecision.state,
-        message: bestDecision.message,
-        reason: bestDecision.reason,
-        signalType: bestDecision.signalType,
-      }),
+      JSON.stringify({ action: 'none', reason: 'No action specified' }),
       { headers: { ...corsHeaders, 'Content-Type': 'application/json' } }
     );
 
@@ -410,3 +210,19 @@ serve(async (req) => {
     );
   }
 });
+
+function generateIntroMessage(userA: UserProfile, userB: UserProfile, reason: string): string {
+  const nameA = userA.full_name || 'Someone';
+  const nameB = userB.full_name || 'someone';
+  const roleA = userA.role || 'a professional';
+  const roleB = userB.role || 'another professional';
+
+  const templates = [
+    `Hey! Meet ${nameB}. They're ${roleB}. You two might have interesting things to talk about — ${reason}.`,
+    `I think you'd get along with ${nameB} (${roleB}). ${reason.charAt(0).toUpperCase() + reason.slice(1)}.`,
+    `Here's an intro to ${nameB}. They're ${roleB}, and I noticed ${reason}. Worth a chat?`,
+    `${nameB} is ${roleB}. You both have ${reason}. Thought you should connect.`,
+  ];
+
+  return templates[Math.floor(Math.random() * templates.length)];
+}

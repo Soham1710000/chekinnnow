@@ -3,7 +3,7 @@ import { useAuth } from "@/hooks/useAuth";
 import { supabase } from "@/integrations/supabase/client";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
-import { Send, ArrowLeft, MessageCircle, Users, Clock, Sparkles, Mic, Keyboard, Shield } from "lucide-react";
+import { Send, ArrowLeft, MessageCircle, Users, Clock, Sparkles, Mic, Shield } from "lucide-react";
 import { motion, AnimatePresence } from "framer-motion";
 import { useNavigate } from "react-router-dom";
 import { useToast } from "@/hooks/use-toast";
@@ -14,10 +14,7 @@ import LearningProgress from "@/components/chat/LearningProgress";
 
 // Lazy load heavy components that aren't needed immediately
 const UserChatView = lazy(() => import("@/components/chat/UserChatView"));
-const OnboardingOverlay = lazy(() => import("@/components/chat/OnboardingOverlay"));
 const UserProfileCard = lazy(() => import("@/components/chat/UserProfileCard"));
-const SaveProgressNudge = lazy(() => import("@/components/chat/SaveProgressNudge"));
-const WhatsAppCommunityNudge = lazy(() => import("@/components/chat/WhatsAppCommunityNudge"));
 const VoiceInput = lazy(() => import("@/components/chat/VoiceInput"));
 
 // Lazy load undercurrents - only needed for authenticated users with access
@@ -58,11 +55,7 @@ interface Introduction {
 
 const CHAT_URL = `${import.meta.env.VITE_SUPABASE_URL}/functions/v1/chat-ai`;
 
-// Nudge thresholds - adjusted for exam prep users who have faster AI transitions
-const getLoginNudgeThreshold = () => isUPSCSource() || isCATSource() ? 3 : 5;
-const getSaveProgressThreshold = () => isUPSCSource() || isCATSource() ? 2 : 3;
-
-// Generate or get session ID for anonymous users
+// Generate or get session ID
 const getSessionId = () => {
   let sessionId = sessionStorage.getItem("chekinn_session_id");
   if (!sessionId) {
@@ -71,31 +64,6 @@ const getSessionId = () => {
   }
   return sessionId;
 };
-
-// Get source for cohort-specific experience
-const getSource = () => sessionStorage.getItem("chekinn_source") || "";
-const isUPSCSource = () => getSource() === "upsc";
-const isCATSource = () => getSource() === "cat";
-
-// UPSC-specific templates
-const UPSC_TEMPLATES = [
-  "Where do I even start?",
-  "How to pick my optional?",
-  "Stuck with answer writing",
-  "Need mentor guidance",
-  "Prelims anxiety",
-  "Interview prep help",
-];
-
-// CAT/MBA-specific templates
-const CAT_TEMPLATES = [
-  "CAT didn't go well",
-  "Gap year concerns",
-  "Which IIMs to target?",
-  "Need mock interview",
-  "Profile evaluation",
-  "Career track anxiety",
-];
 
 // General templates
 const GENERAL_TEMPLATES = [
@@ -121,94 +89,52 @@ const Chat = () => {
   const [showUndercurrent, setShowUndercurrent] = useState(false);
   
   const [messages, setMessages] = useState<Message[]>([]);
-  const [source] = useState(() => getSource());
-  const isUPSC = source === "upsc";
-  const isCAT = source === "cat";
   
-  const [localMessages, setLocalMessages] = useState<Message[]>(() => [{
-    id: `local-${Date.now()}`,
-    role: "assistant" as const,
-    content: isUPSCSource() 
-      ? "Hey! I know the UPSC journey can feel overwhelming. Tell me what you're struggling with — I'll connect you with someone who's been through it."
-      : isCATSource()
-      ? "Hey! CAT prep can be intense. Tell me what's on your mind — I'll connect you with someone who's been through it."
-      : "Hey! A few quick questions and I'll find you the right person. What brings you here?",
-    message_type: "text",
-    metadata: {},
-    created_at: new Date().toISOString(),
-  }]); // Pre-populate for instant load
   const [introductions, setIntroductions] = useState<Introduction[]>([]);
   const [unreadCounts, setUnreadCounts] = useState<Record<string, number>>({});
   const [input, setInput] = useState("");
-  const [loading, setLoading] = useState(false); // Start false for instant render
+  const [loading, setLoading] = useState(false);
   const [sending, setSending] = useState(false);
   const [activeChat, setActiveChat] = useState<Introduction | null>(null);
   const [view, setView] = useState<"chekinn" | "connections">("chekinn");
   const [learningComplete, setLearningComplete] = useState(false);
   const [userProfile, setUserProfile] = useState<any>(null);
-  const [showLoginNudge, setShowLoginNudge] = useState(false);
-  const [showSaveProgress, setShowSaveProgress] = useState(false);
   const [sessionId] = useState(() => getSessionId());
-  const [showOnboarding, setShowOnboarding] = useState(false);
-  const [showWACommunity, setShowWACommunity] = useState(false);
   const evaluatedIntros = useRef<Set<string>>(new Set());
   
   const messagesEndRef = useRef<HTMLDivElement>(null);
   const hasTrackedPageLoad = useRef(false);
   const hasSentInitialMessage = useRef(false);
-  const hasShownSaveProgress = useRef(false);
-  const hasShownLoginNudge = useRef(false);
-  const chatMessageCounts = useRef<Record<string, number>>({}); // Track message counts per intro
+  const chatMessageCounts = useRef<Record<string, number>>({});
 
-  // Memoized handlers to prevent re-renders
-  const handleSaveProgressDismiss = useCallback(() => {
-    setShowSaveProgress(false);
-    // Show WA community nudge after dismissing save progress (for UPSC/CAT users)
-    if (isUPSC || isCAT) {
-      setTimeout(() => setShowWACommunity(true), 500);
+  // Redirect to auth if not logged in
+  useEffect(() => {
+    if (!authLoading && !user) {
+      navigate("/auth");
     }
-  }, [isUPSC, isCAT]);
-
-  const handleWACommunityDismiss = useCallback(() => {
-    setShowWACommunity(false);
-  }, []);
-
-  // Stable no-op handler for compact WA nudge that can't be dismissed
-  const noopHandler = useCallback(() => {}, []);
-
-  const handleOnboardingComplete = () => {
-    sessionStorage.setItem("chekinn_onboarding_seen", "true");
-    setShowOnboarding(false);
-  };
+  }, [authLoading, user, navigate]);
 
   // Track chat page loaded
   useEffect(() => {
-    if (!hasTrackedPageLoad.current && !authLoading) {
+    if (!hasTrackedPageLoad.current && !authLoading && user) {
       hasTrackedPageLoad.current = true;
-      trackEvent("chat_page_loaded" as any, { isAuthenticated: !!user });
+      trackEvent("chat_page_loaded" as any, { isAuthenticated: true });
     }
   }, [authLoading, user, trackEvent]);
 
-  // Auto-send initial message from variant C landing page
+  // Auto-send initial message from landing page
   useEffect(() => {
-    if (!hasSentInitialMessage.current && !authLoading) {
+    if (!hasSentInitialMessage.current && !authLoading && user) {
       const initialMessage = sessionStorage.getItem("chekinn_initial_message");
       if (initialMessage) {
         hasSentInitialMessage.current = true;
         sessionStorage.removeItem("chekinn_initial_message");
-        // Small delay to ensure chat is ready
         setTimeout(() => {
           handleSend(initialMessage);
         }, 500);
       }
     }
-  }, [authLoading]);
-
-  // Get the active messages list based on auth state
-  const activeMessages = user ? messages : localMessages;
-
-  // Anonymous user: already has message pre-populated, no action needed
-  // Authenticated user loading is handled separately
+  }, [authLoading, user]);
 
   // Authenticated user: load from DB
   useEffect(() => {
@@ -227,7 +153,6 @@ const Chat = () => {
   const loadEvaluatedStatus = async () => {
     if (!user) return;
     
-    // Mark already-evaluated intros so we don't evaluate again
     const { data, error } = await supabase
       .from("chat_debriefs")
       .select("id, introduction_id")
@@ -276,7 +201,6 @@ const Chat = () => {
         },
         (payload) => {
           const introId = payload.new.introduction_id;
-          // Only increment if not in active chat for that intro
           if (!activeChat || activeChat.id !== introId) {
             setUnreadCounts(prev => ({
               ...prev,
@@ -292,9 +216,8 @@ const Chat = () => {
     };
   };
 
-  // Clear unread count when opening a chat and track message count
+  // Clear unread count when opening a chat
   const handleOpenChat = async (intro: Introduction) => {
-    // Store current message count before entering chat
     const { count } = await supabase
       .from("user_chats")
       .select("id", { count: "exact", head: true })
@@ -304,7 +227,6 @@ const Chat = () => {
     
     setActiveChat(intro);
     
-    // Mark messages as read
     if (user) {
       await supabase
         .from("user_chats")
@@ -320,31 +242,25 @@ const Chat = () => {
     }
   };
 
-  // Trigger P2P evaluation silently when closing a chat (no user feedback)
+  // Trigger P2P evaluation silently when closing a chat
   const prevActiveChat = useRef<Introduction | null>(null);
   useEffect(() => {
-    // If user just closed a user-to-user chat (activeChat went from something to null)
     if (prevActiveChat.current && !activeChat && user && introductions.length > 0) {
       const closedIntro = prevActiveChat.current;
       
-      // Silently evaluate P2P chat for reputation (no user feedback needed)
       const triggerEvaluation = async () => {
-        // Check current message count
         const { count: msgCount } = await supabase
           .from("user_chats")
           .select("id", { count: "exact", head: true })
           .eq("introduction_id", closedIntro.id);
         
-        const hasEnoughMessages = (msgCount || 0) >= 5; // At least 5 messages for meaningful evaluation
+        const hasEnoughMessages = (msgCount || 0) >= 5;
         
-        // Only evaluate if: has enough messages and hasn't been evaluated yet
         if (hasEnoughMessages && !evaluatedIntros.current.has(closedIntro.id)) {
           evaluatedIntros.current.add(closedIntro.id);
-          // Trigger P2P reputation evaluation silently in background
           evaluateP2PChat(closedIntro.id, 'chat_end');
         }
         
-        // Do the regular check-in
         setTimeout(() => {
           checkInOnActiveIntros();
         }, 500);
@@ -354,66 +270,6 @@ const Chat = () => {
     }
     prevActiveChat.current = activeChat;
   }, [activeChat, user, introductions]);
-
-  // Check if we should show save progress nudge or login nudge (thresholds adjust for UPSC/CAT)
-  const variant = sessionStorage.getItem("ab_variant");
-  useEffect(() => {
-    if (!user && variant !== "C") {
-      const userMsgCount = localMessages.filter(m => m.role === "user").length;
-      const saveThreshold = getSaveProgressThreshold();
-      const loginThreshold = getLoginNudgeThreshold();
-      
-      // Show save progress nudge (mid-conversation) - only once
-      if (userMsgCount >= saveThreshold && !hasShownSaveProgress.current && !showSaveProgress) {
-        hasShownSaveProgress.current = true;
-        setShowSaveProgress(true);
-        trackEvent("save_progress_shown" as any);
-      }
-      
-      // Show login nudge (blocks further input) - only once
-      if (userMsgCount >= loginThreshold && !hasShownLoginNudge.current && !showLoginNudge) {
-        hasShownLoginNudge.current = true;
-        setShowLoginNudge(true);
-      }
-    }
-  }, [localMessages.length, user, variant]); // Only depend on message length, not full array
-
-  // Save anonymous chat to leads table
-  const saveLeadToDb = async (msgs: Message[]) => {
-    try {
-      const messagesForDb = msgs.map(m => ({
-        role: m.role,
-        content: m.content,
-        created_at: m.created_at,
-      }));
-
-      // Check if lead already exists
-      const { data: existing } = await supabase
-        .from("leads")
-        .select("id")
-        .eq("session_id", sessionId)
-        .maybeSingle();
-
-      if (existing) {
-        // Update existing lead
-        await supabase
-          .from("leads")
-          .update({ messages: messagesForDb })
-          .eq("session_id", sessionId);
-      } else {
-        // Insert new lead
-        await supabase
-          .from("leads")
-          .insert({
-            session_id: sessionId,
-            messages: messagesForDb,
-          });
-      }
-    } catch (error) {
-      console.error("Error saving lead:", error);
-    }
-  };
-
 
   const checkLearningStatus = async () => {
     if (!user) return;
@@ -431,7 +287,7 @@ const Chat = () => {
 
   useEffect(() => {
     messagesEndRef.current?.scrollIntoView({ behavior: "smooth" });
-  }, [activeMessages]);
+  }, [messages]);
 
   const loadMessages = async () => {
     if (!user) return;
@@ -448,54 +304,11 @@ const Chat = () => {
     }
 
     if (data.length === 0) {
-      // Check if we have local messages to migrate
-      if (localMessages.length > 0) {
-        await migrateLocalMessages();
-      } else {
-        // Send welcome message for new authenticated users
-        await sendBotMessage("Hey! A few quick questions and I'll find you the right person. What brings you here?");
-      }
+      await sendBotMessage("Hey! A few quick questions and I'll find you the right person. What brings you here?");
     } else {
       setMessages(data as Message[]);
     }
     setLoading(false);
-  };
-
-  const migrateLocalMessages = async () => {
-    if (!user || localMessages.length === 0) return;
-    
-    // Save all local messages to DB
-    for (const msg of localMessages) {
-      await supabase.from("chat_messages").insert({
-        user_id: user.id,
-        role: msg.role,
-        content: msg.content,
-        message_type: msg.message_type,
-        metadata: msg.metadata,
-      });
-    }
-
-    // Link lead to user (mark as converted)
-    await supabase
-      .from("leads")
-      .update({ 
-        user_id: user.id, 
-        converted_at: new Date().toISOString() 
-      })
-      .eq("session_id", sessionId);
-    
-    // Reload from DB
-    const { data } = await supabase
-      .from("chat_messages")
-      .select("*")
-      .eq("user_id", user.id)
-      .order("created_at", { ascending: true });
-    
-    if (data) {
-      setMessages(data as Message[]);
-    }
-    setLocalMessages([]);
-    setShowLoginNudge(false);
   };
 
   const loadIntroductions = async () => {
@@ -512,7 +325,6 @@ const Chat = () => {
       return;
     }
 
-    // Fetch other user profiles
     const introsWithProfiles = await Promise.all(
       (data || []).map(async (intro) => {
         const otherUserId = intro.user_a_id === user.id ? intro.user_b_id : intro.user_a_id;
@@ -529,11 +341,10 @@ const Chat = () => {
     setIntroductions(introsWithProfiles as Introduction[]);
   };
 
-  // Check in on active intros when user comes back to ChekInn chat
+  // Check in on active intros when user comes back
   const checkInOnActiveIntros = async () => {
     if (!user) return;
     
-    // Find active intros we haven't checked in on
     const activeIntrosToCheckIn = introductions.filter(
       intro => intro.status === "active" && !evaluatedIntros.current.has(intro.id)
     );
@@ -544,7 +355,7 @@ const Chat = () => {
       const otherName = intro.other_user?.full_name || "them";
       
       const checkInMessages = [
-        `Hey! How's it going with ${otherName}? 👀`,
+        `Hey! How's it going with ${otherName}?`,
         `So... how's the chat with ${otherName} going?`,
         `Quick check-in — how's ${otherName}? Getting good vibes?`,
       ];
@@ -623,9 +434,7 @@ const Chat = () => {
     conversationHistory: { role: string; content: string }[],
     onDelta: (text: string) => void
   ): Promise<string | null> => {
-    // Check if user is returning (has existing messages in DB)
     const isReturningUser = user && messages.length > 0;
-    // Check if they have pending or active intros
     const hasPendingIntros = introductions.some(i => 
       i.status === "pending" || 
       i.status === "accepted_a" || 
@@ -634,7 +443,6 @@ const Chat = () => {
     );
     const isFirstMessageOfSession = isFirstMessageOfSessionRef.current;
     
-    // Mark that we've sent first message
     if (isFirstMessageOfSession) {
       isFirstMessageOfSessionRef.current = false;
     }
@@ -649,8 +457,7 @@ const Chat = () => {
         body: JSON.stringify({
           messages: conversationHistory,
           userId: user?.id || null,
-          isAuthenticated: !!user,
-          source: sessionStorage.getItem("chekinn_source") || undefined,
+          isAuthenticated: true,
           isReturningUser,
           isFirstMessageOfSession,
           hasPendingIntros,
@@ -682,7 +489,6 @@ const Chat = () => {
 
         buffer += decoder.decode(value, { stream: true });
 
-        // Process complete lines
         let newlineIndex: number;
         while ((newlineIndex = buffer.indexOf("\n")) !== -1) {
           let line = buffer.slice(0, newlineIndex);
@@ -722,142 +528,68 @@ const Chat = () => {
 
   const handleSend = async (messageOverride?: string) => {
     const messageToSend = messageOverride || input.trim();
-    if (!messageToSend || sending) return;
-
-    // If showing login nudge, don't allow more messages
-    if (showLoginNudge && !user) {
-      toast({
-        title: "Quick step needed",
-        description: "Sign up to continue and get your introductions!",
-      });
-      return;
-    }
+    if (!messageToSend || sending || !user) return;
 
     setSending(true);
     if (!messageOverride) setInput("");
     const userMessage = messageToSend;
 
-    if (user) {
-      // Authenticated: save to DB
-      const { data: newMsg, error } = await supabase
-        .from("chat_messages")
-        .insert({
-          user_id: user.id,
-          role: "user",
-          content: userMessage,
-          message_type: "text",
-        })
-        .select()
-        .single();
-
-      if (error) {
-        console.error("Error sending message:", error);
-        setSending(false);
-        return;
-      }
-
-      setMessages((prev) => [...prev, newMsg as Message]);
-
-      const conversationHistory = [
-        ...messages.map((m) => ({ role: m.role, content: m.content })),
-        { role: "user", content: userMessage },
-      ];
-
-      // Stream the AI response
-      let streamingContent = "";
-      const streamingMsgId = `streaming-${Date.now()}`;
-      
-      const aiResponse = await getAIResponseStreaming(conversationHistory, (delta) => {
-        streamingContent += delta;
-        setMessages((prev) => {
-          const last = prev[prev.length - 1];
-          if (last?.id === streamingMsgId) {
-            return prev.map((m, i) => 
-              i === prev.length - 1 ? { ...m, content: streamingContent } : m
-            );
-          }
-          return [...prev, {
-            id: streamingMsgId,
-            role: "assistant" as const,
-            content: streamingContent,
-            message_type: "text",
-            metadata: {},
-            created_at: new Date().toISOString(),
-          }];
-        });
-      });
-      
-      if (aiResponse) {
-        // Save final message to DB (replace streaming placeholder)
-        setMessages((prev) => prev.filter(m => m.id !== streamingMsgId));
-        await sendBotMessage(aiResponse);
-        
-        // Track reputation silently
-        trackReputationAction('message_sent');
-      }
-    } else {
-      // Anonymous: store locally
-      const newMsg: Message = {
-        id: `local-${Date.now()}`,
+    // Save to DB
+    const { data: newMsg, error } = await supabase
+      .from("chat_messages")
+      .insert({
+        user_id: user.id,
         role: "user",
         content: userMessage,
         message_type: "text",
-        metadata: {},
-        created_at: new Date().toISOString(),
-      };
+      })
+      .select()
+      .single();
 
-      // Show user message immediately
-      setLocalMessages((prev) => [...prev, newMsg]);
+    if (error) {
+      console.error("Error sending message:", error);
+      setSending(false);
+      return;
+    }
 
-      const conversationHistory = [
-        ...localMessages.map((m) => ({ role: m.role, content: m.content })),
-        { role: "user", content: userMessage },
-      ];
+    setMessages((prev) => [...prev, newMsg as Message]);
 
-      // Stream the AI response for anonymous users
-      let streamingContent = "";
-      const streamingMsgId = `local-streaming-${Date.now()}`;
-      
-      const aiResponse = await getAIResponseStreaming(conversationHistory, (delta) => {
-        streamingContent += delta;
-        setLocalMessages((prev) => {
-          const last = prev[prev.length - 1];
-          if (last?.id === streamingMsgId) {
-            return prev.map((m, i) => 
-              i === prev.length - 1 ? { ...m, content: streamingContent } : m
-            );
-          }
-          return [...prev, {
-            id: streamingMsgId,
-            role: "assistant" as const,
-            content: streamingContent,
-            message_type: "text",
-            metadata: {},
-            created_at: new Date().toISOString(),
-          }];
-        });
+    const conversationHistory = [
+      ...messages.map((m) => ({ role: m.role, content: m.content })),
+      { role: "user", content: userMessage },
+    ];
+
+    // Stream the AI response
+    let streamingContent = "";
+    const streamingMsgId = `streaming-${Date.now()}`;
+    
+    const aiResponse = await getAIResponseStreaming(conversationHistory, (delta) => {
+      streamingContent += delta;
+      setMessages((prev) => {
+        const last = prev[prev.length - 1];
+        if (last?.id === streamingMsgId) {
+          return prev.map((m, i) => 
+            i === prev.length - 1 ? { ...m, content: streamingContent } : m
+          );
+        }
+        return [...prev, {
+          id: streamingMsgId,
+          role: "assistant" as const,
+          content: streamingContent,
+          message_type: "text",
+          metadata: {},
+          created_at: new Date().toISOString(),
+        }];
       });
+    });
+    
+    if (aiResponse) {
+      // Save final message to DB
+      setMessages((prev) => prev.filter(m => m.id !== streamingMsgId));
+      await sendBotMessage(aiResponse);
       
-      if (aiResponse) {
-        // Replace streaming message with final
-        setLocalMessages((prev) => {
-          const filtered = prev.filter(m => m.id !== streamingMsgId);
-          const botMsg: Message = {
-            id: `local-${Date.now() + 1}`,
-            role: "assistant",
-            content: aiResponse,
-            message_type: "text",
-            metadata: {},
-            created_at: new Date().toISOString(),
-          };
-          return [...filtered, botMsg];
-        });
-        // Save to leads table after every message exchange
-        saveLeadToDb([...localMessages, newMsg, { id: '', role: 'assistant', content: aiResponse, message_type: 'text', metadata: {}, created_at: new Date().toISOString() }]);
-      } else {
-        // Still save even if AI fails
-        saveLeadToDb([...localMessages, newMsg]);
-      }
+      // Track reputation silently
+      trackReputationAction('message_sent');
     }
     
     setSending(false);
@@ -909,8 +641,8 @@ const Chat = () => {
 
   const activeIntros = introductions.filter((i) => i.status === "active");
 
-  // Only show loading for authenticated users who are still loading data
-  if (user && loading) {
+  // Loading state
+  if (authLoading || !user) {
     return (
       <div className="min-h-screen bg-background flex items-center justify-center">
         <div className="animate-pulse text-muted-foreground">Loading...</div>
@@ -929,10 +661,9 @@ const Chat = () => {
     );
   }
 
-
   return (
     <div className="min-h-screen bg-background flex flex-col relative">
-      {/* Undercurrents - Reputation-gated feature (lazy loaded) */}
+      {/* Undercurrents - Reputation-gated feature */}
       <Suspense fallback={null}>
         <AnimatePresence>
           {undercurrents.isFirstAccess && (
@@ -962,38 +693,6 @@ const Chat = () => {
         )}
       </Suspense>
 
-
-      {/* Onboarding overlay for new users (lazy loaded) */}
-      <Suspense fallback={null}>
-        <AnimatePresence>
-          {showOnboarding && (
-            <OnboardingOverlay onStart={handleOnboardingComplete} />
-          )}
-        </AnimatePresence>
-      </Suspense>
-
-      {/* Login nudge banner for non-authenticated users */}
-      {!user && (
-        <motion.div
-          initial={{ opacity: 0, y: -10 }}
-          animate={{ opacity: 1, y: 0 }}
-          className="bg-primary text-primary-foreground px-4 py-2.5 flex items-center justify-between gap-3"
-        >
-          <div className="flex items-center gap-2 text-sm">
-            <Sparkles className="w-4 h-4" />
-            <span className="font-medium">Sign up to get matched with the right person</span>
-          </div>
-          <Button
-            size="sm"
-            variant="secondary"
-            onClick={() => navigate("/auth")}
-            className="text-xs font-semibold px-4 h-7"
-          >
-            Sign up
-          </Button>
-        </motion.div>
-      )}
-
       {/* Header */}
       <header className="border-b border-border bg-background/95 backdrop-blur sticky top-0 z-40">
         <div className="flex items-center justify-between px-4 py-3">
@@ -1001,71 +700,63 @@ const Chat = () => {
             <ArrowLeft className="w-5 h-5" />
           </button>
           <h1 className="font-semibold text-lg">ChekInn</h1>
-          {user ? (
-            <motion.button
-              onClick={() => navigate("/reputation")}
-              className="relative text-primary/80 hover:text-primary transition-colors"
-              title="Reputation & Access"
-              whileHover={{ scale: 1.1 }}
-              whileTap={{ scale: 0.95 }}
-            >
-              {/* Shimmer ring */}
-              <motion.div
-                className="absolute inset-0 rounded-full bg-primary/20"
-                animate={{
-                  scale: [1, 1.5, 1],
-                  opacity: [0.5, 0, 0.5],
-                }}
-                transition={{
-                  duration: 2,
-                  repeat: Infinity,
-                  ease: "easeInOut",
-                }}
-              />
-              {/* Glow effect */}
-              <div className="absolute inset-0 rounded-full bg-primary/10 blur-sm" />
-              <Shield className="w-5 h-5 relative z-10" />
-            </motion.button>
-          ) : (
-            <div className="w-5" />
-          )}
+          <motion.button
+            onClick={() => navigate("/reputation")}
+            className="relative text-primary/80 hover:text-primary transition-colors"
+            title="Reputation & Access"
+            whileHover={{ scale: 1.1 }}
+            whileTap={{ scale: 0.95 }}
+          >
+            <motion.div
+              className="absolute inset-0 rounded-full bg-primary/20"
+              animate={{
+                scale: [1, 1.5, 1],
+                opacity: [0.5, 0, 0.5],
+              }}
+              transition={{
+                duration: 2,
+                repeat: Infinity,
+                ease: "easeInOut",
+              }}
+            />
+            <div className="absolute inset-0 rounded-full bg-primary/10 blur-sm" />
+            <Shield className="w-5 h-5 relative z-10" />
+          </motion.button>
         </div>
         
-        {/* Tabs - only show for authenticated users */}
-        {user && (
-          <div className="flex border-t border-border">
-            <button
-              onClick={() => setView("chekinn")}
-              className={`flex-1 py-3 text-sm font-medium transition-colors flex items-center justify-center gap-2 ${
-                view === "chekinn" 
-                  ? "text-primary border-b-2 border-primary" 
-                  : "text-muted-foreground hover:text-foreground"
-              }`}
-            >
-              <MessageCircle className="w-4 h-4" />
-              Chat with ChekInn
-            </button>
-            <button
-              onClick={() => setView("connections")}
-              className={`flex-1 py-3 text-sm font-medium transition-colors flex items-center justify-center gap-2 ${
-                view === "connections" 
-                  ? "text-primary border-b-2 border-primary" 
-                  : "text-muted-foreground hover:text-foreground"
-              }`}
-            >
-              <Users className="w-4 h-4" />
-              Connections
-              {activeIntros.length > 0 && (
-                <span className="bg-primary text-primary-foreground text-xs px-1.5 py-0.5 rounded-full">
-                  {activeIntros.length}
-                </span>
-              )}
-            </button>
-          </div>
-        )}
+        {/* Tabs */}
+        <div className="flex border-t border-border">
+          <button
+            onClick={() => setView("chekinn")}
+            className={`flex-1 py-3 text-sm font-medium transition-colors flex items-center justify-center gap-2 ${
+              view === "chekinn" 
+                ? "text-primary border-b-2 border-primary" 
+                : "text-muted-foreground hover:text-foreground"
+            }`}
+          >
+            <MessageCircle className="w-4 h-4" />
+            Chat with ChekInn
+          </button>
+          <button
+            onClick={() => setView("connections")}
+            className={`flex-1 py-3 text-sm font-medium transition-colors flex items-center justify-center gap-2 ${
+              view === "connections" 
+                ? "text-primary border-b-2 border-primary" 
+                : "text-muted-foreground hover:text-foreground"
+            }`}
+          >
+            <Users className="w-4 h-4" />
+            Connections
+            {activeIntros.length > 0 && (
+              <span className="bg-primary text-primary-foreground text-xs px-1.5 py-0.5 rounded-full">
+                {activeIntros.length}
+              </span>
+            )}
+          </button>
+        </div>
       </header>
 
-      {view === "chekinn" || !user ? (
+      {view === "chekinn" ? (
         <>
           {/* Learning Progress or Profile Card */}
           {learningComplete && userProfile ? (
@@ -1074,16 +765,15 @@ const Chat = () => {
             </Suspense>
           ) : (
             <LearningProgress 
-              messageCount={activeMessages.filter(m => m.role === "user").length}
+              messageCount={messages.filter(m => m.role === "user").length}
               learningComplete={learningComplete}
             />
           )}
           
           {/* Messages */}
           <div className="flex-1 overflow-y-auto p-4 space-y-4">
-
             <AnimatePresence mode="popLayout">
-              {activeMessages.map((msg, index) => (
+              {messages.map((msg, index) => (
                 <motion.div
                   key={msg.id}
                   initial={{ opacity: 0, y: 10 }}
@@ -1100,28 +790,11 @@ const Chat = () => {
                     {msg.content}
                   </div>
                   
-                  {/* Inline Sign Up button when AI prompts to create account */}
-                  {msg.role === "assistant" && !user && msg.content.toLowerCase().includes("create account") && (
-                    <motion.div
-                      initial={{ opacity: 0, y: 5 }}
-                      animate={{ opacity: 1, y: 0 }}
-                      className="mt-2"
-                    >
-                      <Button
-                        onClick={() => navigate("/auth")}
-                        className="bg-primary hover:bg-primary/90 text-primary-foreground font-semibold px-6 py-2 rounded-full shadow-lg hover:shadow-xl transition-all hover:scale-105"
-                      >
-                        Create Account (30 sec) →
-                      </Button>
-                    </motion.div>
-                  )}
-                  
                   {/* Template buttons after first AI message */}
-                  {index === 0 && msg.role === "assistant" && activeMessages.length === 1 && (
+                  {index === 0 && msg.role === "assistant" && messages.length === 1 && (
                     <div className="mt-3 animate-fade-in">
-                      {/* Template buttons - different for UPSC/CAT */}
                       <div className="flex flex-wrap gap-1.5 max-w-[300px]">
-                        {(isUPSC ? UPSC_TEMPLATES : isCAT ? CAT_TEMPLATES : GENERAL_TEMPLATES).map((template) => (
+                        {GENERAL_TEMPLATES.map((template) => (
                           <button
                             key={template}
                             onClick={() => handleSend(template)}
@@ -1136,65 +809,10 @@ const Chat = () => {
                   )}
                 </motion.div>
               ))}
-
-              {/* Progress Indicator - DISABLED for now */}
             </AnimatePresence>
 
-            {/* Nudges OUTSIDE of AnimatePresence to prevent layout/refresh issues */}
-            <AnimatePresence mode="wait">
-              {/* Save Progress Nudge - shown after 3 messages (mid-conversation) */}
-              {showSaveProgress && !user && !showLoginNudge && (
-                <motion.div key="save-progress-nudge" layout={false}>
-                  <Suspense fallback={null}>
-                    <SaveProgressNudge onDismiss={handleSaveProgressDismiss} />
-                  </Suspense>
-                </motion.div>
-              )}
-
-              {/* WhatsApp Community Nudge - shown after save progress is dismissed */}
-              {showWACommunity && !user && !showLoginNudge && (isUPSC || isCAT) && (
-                <motion.div key="wa-community-nudge" layout={false}>
-                  <Suspense fallback={null}>
-                    <WhatsAppCommunityNudge onDismiss={handleWACommunityDismiss} />
-                  </Suspense>
-                </motion.div>
-              )}
-
-              {/* Login Nudge for Anonymous Users - shown after 5 messages */}
-              {showLoginNudge && !user && (
-                <motion.div
-                  key="login-nudge"
-                  layout={false}
-                  initial={{ opacity: 0, scale: 0.95, y: 20 }}
-                  animate={{ opacity: 1, scale: 1, y: 0 }}
-                  className="bg-gradient-to-br from-primary/10 to-primary/20 border border-primary/30 rounded-2xl p-5"
-                >
-                  <div className="flex items-center gap-2 text-primary mb-3">
-                    <Sparkles className="w-5 h-5" />
-                    <span className="font-semibold text-sm">Ready to find your intros!</span>
-                  </div>
-                  
-                  <p className="text-foreground mb-4">
-                    I've learned enough about you. Quick signup so I can save your profile and find the right connections for you.
-                  </p>
-                  
-                  <Button 
-                    onClick={() => navigate("/auth")} 
-                    className="w-full"
-                    size="lg"
-                  >
-                    Continue with Email →
-                  </Button>
-                  
-                  <p className="text-xs text-muted-foreground text-center mt-3">
-                    Takes 30 seconds • Your conversation is saved
-                  </p>
-                </motion.div>
-              )}
-            </AnimatePresence>
-
-            {/* Pending Intro Cards - only for authenticated users */}
-            {user && pendingIntros.map((intro) => (
+            {/* Pending Intro Cards */}
+            {pendingIntros.map((intro) => (
               <IntroCard
                 key={intro.id}
                 introduction={intro}
@@ -1204,7 +822,7 @@ const Chat = () => {
             ))}
 
             {/* Nudge when learning is complete but no intros yet */}
-            {user && learningComplete && pendingIntros.length === 0 && activeIntros.length === 0 && (
+            {learningComplete && pendingIntros.length === 0 && activeIntros.length === 0 && (
               <motion.div
                 initial={{ opacity: 0, y: 10 }}
                 animate={{ opacity: 1, y: 0 }}
@@ -1217,18 +835,8 @@ const Chat = () => {
                   </p>
                 </div>
                 <p className="text-xs text-muted-foreground">
-                  We're working on finding the right person for you. You'll get an email + it'll show up right here — usually within 12 hours!
+                  We're working on finding the right person for you. You'll get a notification when we find someone — usually within 12 hours!
                 </p>
-                
-                {/* WA Community nudge for UPSC/CAT users waiting for match */}
-                {(isUPSC || isCAT) && (
-                  <Suspense fallback={null}>
-                    <WhatsAppCommunityNudge
-                      variant="compact"
-                      onDismiss={noopHandler}
-                    />
-                  </Suspense>
-                )}
               </motion.div>
             )}
             
@@ -1257,9 +865,11 @@ const Chat = () => {
                 </div>
               </motion.div>
             )}
+            
+            <div ref={messagesEndRef} />
           </div>
 
-          {/* Input - Voice or Text based on experiment variant */}
+          {/* Input */}
           {voiceExperiment.currentInputMode === "voice" || voiceExperiment.isRecording ? (
             <Suspense fallback={<div className="border-t border-border p-4 h-20" />}>
               <VoiceInput
@@ -1274,7 +884,7 @@ const Chat = () => {
                   voiceExperiment.trackMessageSent("voice", voiceExperiment.recordingDuration);
                   handleSend(text);
                 }}
-                disabled={sending || (showLoginNudge && !user)}
+                disabled={sending}
               />
             </Suspense>
           ) : (
@@ -1289,15 +899,15 @@ const Chat = () => {
                       handleSend();
                     }
                   }}
-                  placeholder={showLoginNudge && !user ? "Sign up to continue..." : "Type a message..."}
+                  placeholder="Type a message..."
                   className="flex-1"
-                  disabled={sending || (showLoginNudge && !user)}
+                  disabled={sending}
                 />
                 <Button
                   variant="ghost"
                   size="icon"
                   onClick={() => voiceExperiment.switchInputMode("voice")}
-                  disabled={sending || (showLoginNudge && !user)}
+                  disabled={sending}
                   className="text-muted-foreground hover:text-primary"
                   title="Use voice instead"
                 >
@@ -1308,7 +918,7 @@ const Chat = () => {
                     voiceExperiment.trackMessageSent("text");
                     handleSend();
                   }} 
-                  disabled={!input.trim() || sending || (showLoginNudge && !user)} 
+                  disabled={!input.trim() || sending} 
                   size="icon"
                 >
                   <Send className="w-4 h-4" />
@@ -1319,30 +929,56 @@ const Chat = () => {
         </>
       ) : (
         /* Connections View */
-        <div className="flex-1 overflow-y-auto p-4 space-y-6">
-          {/* Waiting for acceptance */}
+        <div className="flex-1 overflow-y-auto p-4 space-y-4">
+          {/* Active Connections */}
+          {activeIntros.length > 0 && (
+            <div className="space-y-3">
+              <h3 className="text-sm font-medium text-muted-foreground">Active Chats</h3>
+              {activeIntros.map((intro) => (
+                <motion.button
+                  key={intro.id}
+                  onClick={() => handleOpenChat(intro)}
+                  className="w-full bg-card border border-border rounded-xl p-4 text-left hover:bg-muted/50 transition-colors"
+                  whileHover={{ scale: 1.01 }}
+                  whileTap={{ scale: 0.99 }}
+                >
+                  <div className="flex items-center gap-3">
+                    <div className="w-10 h-10 rounded-full bg-primary/10 flex items-center justify-center">
+                      <span className="text-lg font-medium text-primary">
+                        {intro.other_user?.full_name?.[0] || "?"}
+                      </span>
+                    </div>
+                    <div className="flex-1">
+                      <p className="font-medium">{intro.other_user?.full_name || "Connection"}</p>
+                      <p className="text-sm text-muted-foreground">{intro.other_user?.role || "Member"}</p>
+                    </div>
+                    {unreadCounts[intro.id] > 0 && (
+                      <span className="bg-primary text-primary-foreground text-xs px-2 py-0.5 rounded-full">
+                        {unreadCounts[intro.id]}
+                      </span>
+                    )}
+                  </div>
+                </motion.button>
+              ))}
+            </div>
+          )}
+
+          {/* Waiting for Response */}
           {waitingIntros.length > 0 && (
             <div className="space-y-3">
-              <h3 className="text-sm font-medium text-muted-foreground flex items-center gap-2">
-                <Clock className="w-4 h-4" />
-                Waiting for acceptance
-              </h3>
+              <h3 className="text-sm font-medium text-muted-foreground">Waiting for Response</h3>
               {waitingIntros.map((intro) => (
                 <div
                   key={intro.id}
-                  className="p-4 bg-yellow-500/5 border border-yellow-500/20 rounded-xl"
+                  className="bg-card border border-border rounded-xl p-4 opacity-70"
                 >
                   <div className="flex items-center gap-3">
-                    <div className="w-12 h-12 rounded-full bg-yellow-500/10 flex items-center justify-center text-yellow-600 font-semibold">
-                      {intro.other_user?.full_name?.charAt(0) || "?"}
+                    <div className="w-10 h-10 rounded-full bg-muted flex items-center justify-center">
+                      <Clock className="w-5 h-5 text-muted-foreground" />
                     </div>
-                    <div className="flex-1 min-w-0">
-                      <h3 className="font-medium truncate">
-                        {intro.other_user?.full_name || "Someone"}
-                      </h3>
-                      <p className="text-sm text-muted-foreground">
-                        Waiting for them to accept...
-                      </p>
+                    <div>
+                      <p className="font-medium">{intro.other_user?.full_name || "Connection"}</p>
+                      <p className="text-sm text-muted-foreground">Waiting for them to accept...</p>
                     </div>
                   </div>
                 </div>
@@ -1350,52 +986,18 @@ const Chat = () => {
             </div>
           )}
 
-          {/* Active connections */}
-          {activeIntros.length === 0 && waitingIntros.length === 0 ? (
-            <div className="text-center py-12 text-muted-foreground">
-              <Users className="w-12 h-12 mx-auto mb-4 opacity-50" />
-              <p>No active connections yet</p>
-              <p className="text-sm mt-1">Keep chatting with ChekInn to get matched!</p>
+          {/* Empty State */}
+          {activeIntros.length === 0 && waitingIntros.length === 0 && pendingIntros.length === 0 && (
+            <div className="flex flex-col items-center justify-center h-64 text-center">
+              <Users className="w-12 h-12 text-muted-foreground/50 mb-4" />
+              <h3 className="font-medium text-foreground mb-2">No connections yet</h3>
+              <p className="text-sm text-muted-foreground">
+                Keep chatting with ChekInn and we'll introduce you to the right people.
+              </p>
             </div>
-          ) : activeIntros.length > 0 ? (
-            <div className="space-y-3">
-              {waitingIntros.length > 0 && (
-                <h3 className="text-sm font-medium text-muted-foreground flex items-center gap-2">
-                  <MessageCircle className="w-4 h-4" />
-                  Active chats
-                </h3>
-              )}
-              {activeIntros.map((intro) => (
-                <button
-                  key={intro.id}
-                  onClick={() => handleOpenChat(intro)}
-                  className="w-full p-4 bg-card border border-border rounded-xl text-left hover:bg-muted/50 transition-colors relative"
-                >
-                  <div className="flex items-center gap-3">
-                    <div className="w-12 h-12 rounded-full bg-primary/10 flex items-center justify-center text-primary font-semibold relative">
-                      {intro.other_user?.full_name?.charAt(0) || "?"}
-                      {unreadCounts[intro.id] > 0 && (
-                        <span className="absolute -top-1 -right-1 min-w-5 h-5 px-1 bg-destructive text-destructive-foreground text-xs font-bold rounded-full flex items-center justify-center">
-                          {unreadCounts[intro.id] > 9 ? "9+" : unreadCounts[intro.id]}
-                        </span>
-                      )}
-                    </div>
-                    <div className="flex-1 min-w-0">
-                      <h3 className={`font-medium truncate ${unreadCounts[intro.id] > 0 ? "font-semibold" : ""}`}>
-                        {intro.other_user?.full_name || "Anonymous"}
-                      </h3>
-                      <p className="text-sm text-muted-foreground truncate">
-                        {intro.other_user?.role || "ChekInn member"}
-                      </p>
-                    </div>
-                  </div>
-                </button>
-              ))}
-            </div>
-          ) : null}
+          )}
         </div>
       )}
-
     </div>
   );
 };

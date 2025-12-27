@@ -8,21 +8,20 @@ const corsHeaders = {
 
 interface Signal {
   user_id: string;
-  type: "TRAVEL" | "CAREER" | "WORK" | "FINANCE" | "LEARNING" | "SOCIAL";
-  subtype: string;
+  type: "FLIGHT" | "INTERVIEW" | "EVENT" | "TRANSITION" | "OBSESSION";
+  domain: string;
   confidence: number;
   evidence: string;
   expires_at: string | null;
-  intent_hint?: "follow_up" | "prepare" | "decide" | "show_up" | "ignore";
   gmail_message_id: string;
   email_date: string;
 }
 
-// Parse RFC 2822 / ISO dates safely
+// Parse RFC 2822 date format to ISO 8601
 function parseEmailDate(dateStr: string): string {
   try {
-    const d = new Date(dateStr);
-    return isNaN(d.getTime()) ? new Date().toISOString() : d.toISOString();
+    const date = new Date(dateStr);
+    return isNaN(date.getTime()) ? new Date().toISOString() : date.toISOString();
   } catch {
     return new Date().toISOString();
   }
@@ -35,6 +34,7 @@ serve(async (req) => {
 
   try {
     const { emails, userId } = await req.json();
+
     if (!emails || !userId) {
       return new Response(JSON.stringify({ error: "Missing emails or userId" }), {
         status: 400,
@@ -43,7 +43,7 @@ serve(async (req) => {
     }
 
     const LOVABLE_API_KEY = Deno.env.get("LOVABLE_API_KEY");
-    if (!LOVABLE_API_KEY) throw new Error("LOVABLE_API_KEY not set");
+    if (!LOVABLE_API_KEY) throw new Error("LOVABLE_API_KEY is not configured");
 
     const supabase = createClient(Deno.env.get("SUPABASE_URL")!, Deno.env.get("SUPABASE_SERVICE_ROLE_KEY")!);
 
@@ -51,11 +51,10 @@ serve(async (req) => {
 
     for (const email of emails) {
       const prompt = `
-You are a conservative life-context extraction engine.
+You are a conservative signal extraction engine.
 
-Your job is to extract ONLY clear, factual life contexts from a SINGLE email.
-Do NOT infer emotions, urgency, or intent.
-If unsure, return [].
+Your job is to extract ONLY clear, factual life signals from a SINGLE email.
+If a signal is incomplete or ambiguous, DO NOT extract it.
 
 EMAIL:
 Subject: ${email.subject}
@@ -63,49 +62,57 @@ From: ${email.from}
 Date: ${email.date}
 Body: ${email.body}
 
-DOMAINS & SUBTYPES:
-- TRAVEL: flight, hotel, visa, conference travel
-- CAREER: job application, interview, offer, resignation
-- WORK: meeting, commitment, follow-up, project artifact
-- FINANCE: salary, bonus, offer compensation, large purchase
-- LEARNING: paid course, certification, bootcamp enrollment
-- SOCIAL: event invite, community, speaking, public appearance
+SIGNAL TYPES (STRICT):
+
+FLIGHT
+- Only extract if at least TWO of these exist:
+  destination, departure date/time, flight number, boarding pass language
+- Ignore invoices that lack travel details
+
+INTERVIEW
+- Scheduled interviews, screening calls, hiring rounds
+- Ignore prep courses or content
+
+EVENT
+- Calendar invites, conferences, meetups
+- Ignore newsletters unless attendance is explicit
+
+TRANSITION
+- ONLY if explicit offer / resignation language exists:
+  "offer letter", "we are pleased to offer", "joining date", "resignation"
+- Ignore warnings, spam, or advisory emails
+
+OBSESSION
+- ONLY for strong commitment:
+  paid courses, enrollments, subscriptions
+- Confidence must be ≥ 0.75
+- Ignore articles, interviews, free newsletters
 
 RULES:
-1. Confidence must be ≥ 0.6 (≥ 0.75 for FINANCE or LEARNING)
-2. Extract facts only — not tasks
+1. Confidence ≥ 0.6 (≥ 0.75 for OBSESSION)
+2. Extract facts, NOT interpretations
 3. Evidence must quote or closely paraphrase a concrete phrase
-4. Never extract reminders or advice
-5. If expiration is unclear, set expires_at = null
+4. Never infer emotions, urgency, or decisions
+5. If required details are missing, return no signal
 
-INTENT_HINT (ONLY if obvious from text):
-- prepare (something upcoming)
-- follow_up (response expected)
-- show_up (attendance implied)
-- decide (offer / choice present)
-- ignore (FYI-only content)
-
-EXPIRY GUIDELINES:
-- TRAVEL → start date
-- CAREER interview → interview date + 48h
-- CAREER offer → 14 days
-- WORK meeting → meeting end
-- FINANCE → null
-- LEARNING → null
-- SOCIAL event → event end
+EXPIRY:
+- FLIGHT → departure time
+- INTERVIEW → interview time + 48h
+- EVENT → event end
+- TRANSITION → 14 days from email date
+- OBSESSION → null
 
 OUTPUT:
-Return a JSON array:
+Return JSON array:
 {
-  "type": "...",
-  "subtype": "...",
-  "confidence": 0.0–1.0,
-  "evidence": "...",
-  "expires_at": "ISO timestamp or null",
-  "intent_hint": "optional"
+  "type": "FLIGHT|INTERVIEW|EVENT|TRANSITION|OBSESSION",
+  "domain": "airline, company, or topic",
+  "confidence": 0.0-1.0,
+  "evidence": "quoted or paraphrased phrase",
+  "expires_at": "ISO timestamp or null"
 }
 
-If nothing qualifies, return [].
+If no valid signals exist, return [].
 Return ONLY valid JSON.
 `;
 
@@ -118,7 +125,7 @@ Return ONLY valid JSON.
         body: JSON.stringify({
           model: "google/gemini-2.5-flash",
           messages: [
-            { role: "system", content: "You extract life context. Respond with JSON only." },
+            { role: "system", content: "You extract conservative life signals. Respond with JSON only." },
             { role: "user", content: prompt },
           ],
         }),
@@ -135,62 +142,61 @@ Return ONLY valid JSON.
           content = content.replace(/^```(?:json)?\n?/, "").replace(/\n?```$/, "");
         }
 
-        const extracted = JSON.parse(content);
+        const extractedSignals = JSON.parse(content);
 
-        for (const s of extracted) {
-          if (s.confidence >= 0.6) {
+        for (const signal of extractedSignals) {
+          if (signal.confidence >= 0.6) {
             signals.push({
               user_id: userId,
-              type: s.type,
-              subtype: s.subtype || "unknown",
-              confidence: s.confidence,
-              evidence: s.evidence,
-              expires_at: s.expires_at ? parseEmailDate(s.expires_at) : null,
-              intent_hint: s.intent_hint,
+              type: signal.type,
+              domain: signal.domain || "unknown",
+              confidence: signal.confidence,
+              evidence: signal.evidence || "",
+              expires_at: signal.expires_at ? parseEmailDate(signal.expires_at) : null,
               gmail_message_id: email.messageId,
               email_date: parseEmailDate(email.date),
             });
           }
         }
       } catch (err) {
-        console.error("Parse error:", err);
+        console.error("Signal parse error:", err);
       }
     }
 
     // Deduplicate by gmail_message_id (highest confidence wins)
-    const deduped = new Map<string, Signal>();
-    for (const s of signals) {
-      const existing = deduped.get(s.gmail_message_id);
-      if (!existing || s.confidence > existing.confidence) {
-        deduped.set(s.gmail_message_id, s);
+    if (signals.length > 0) {
+      const deduped = new Map<string, Signal>();
+      for (const s of signals) {
+        const existing = deduped.get(s.gmail_message_id);
+        if (!existing || s.confidence > existing.confidence) {
+          deduped.set(s.gmail_message_id, s);
+        }
       }
-    }
 
-    const uniqueSignals = Array.from(deduped.values());
+      const uniqueSignals = Array.from(deduped.values());
 
-    if (uniqueSignals.length > 0) {
       const { error } = await supabase.from("email_signals").upsert(
         uniqueSignals.map((s) => ({
           user_id: s.user_id,
           type: s.type,
-          subtype: s.subtype,
+          domain: s.domain,
           confidence: s.confidence,
           evidence: s.evidence,
           expires_at: s.expires_at,
-          intent_hint: s.intent_hint,
           gmail_message_id: s.gmail_message_id,
           email_date: s.email_date,
         })),
         { onConflict: "gmail_message_id" },
       );
+
       if (error) throw error;
     }
 
-    return new Response(JSON.stringify({ extracted: uniqueSignals.length }), {
+    return new Response(JSON.stringify({ signals: signals.length }), {
       headers: { ...corsHeaders, "Content-Type": "application/json" },
     });
-  } catch (err) {
-    return new Response(JSON.stringify({ error: err instanceof Error ? err.message : "Unknown error" }), {
+  } catch (error) {
+    return new Response(JSON.stringify({ error: error instanceof Error ? error.message : "Unknown error" }), {
       status: 500,
       headers: { ...corsHeaders, "Content-Type": "application/json" },
     });

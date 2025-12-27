@@ -15,19 +15,21 @@ const corsHeaders = {
 // 3. Generates the response within the judge's constraints
 // =============================================================================
 
-interface JudgeDecision {
+interface ChatDecision {
   mode: "observer" | "reflect" | "guide";
   tone: "soft" | "neutral" | "playful";
-  reference_intent: boolean;
-  max_lines: number;
-  banter_allowed: boolean;
+  reference_signal: boolean;
   ask_question: boolean;
+  allow_banter: boolean;
 }
 
-interface IntentCandidate {
-  type: string;
-  evidence: string;
-  confidence: number;
+interface ActionableSignal {
+  id: string;
+  type: "FLIGHT" | "INTERVIEW" | "TRANSITION" | "EVENT" | "OBSESSION";
+  domain: string | null;
+  evidence: string | null;
+  email_date: string;
+  details_complete: boolean;
 }
 
 interface EmailSignal {
@@ -171,7 +173,7 @@ async function callJudge(
   userId: string,
   userMessage: string | null,
   conversationHistory: any[]
-): Promise<{ decision: JudgeDecision; intents: IntentCandidate[] }> {
+): Promise<{ decision: ChatDecision; signal: ActionableSignal | null }> {
   try {
     const response = await fetch(
       `${Deno.env.get("SUPABASE_URL")}/functions/v1/chat-judge`,
@@ -198,12 +200,11 @@ async function callJudge(
       decision: {
         mode: "observer",
         tone: "soft",
-        reference_intent: false,
-        max_lines: 1,
-        banter_allowed: false,
+        reference_signal: false,
         ask_question: false,
+        allow_banter: false,
       },
-      intents: [],
+      signal: null,
     };
   }
 }
@@ -213,8 +214,8 @@ async function callJudge(
 // =============================================================================
 
 function buildSystemPrompt(
-  decision: JudgeDecision,
-  intents: IntentCandidate[],
+  decision: ChatDecision,
+  actionableSignal: ActionableSignal | null,
   signals: EmailSignal[],
   socialProfiles: SocialProfile[],
   profile: ProfileContext | null
@@ -222,56 +223,43 @@ function buildSystemPrompt(
   // Build context section
   let contextSection = "";
   
-  // Add signal context with RICH details from evidence
-  if (signals.length > 0) {
-    const now = new Date();
-    const signalDescriptions = signals.map(s => {
-      const isExpired = s.expires_at && new Date(s.expires_at) < now;
-      const tense = isExpired ? "(recent)" : "(upcoming)";
-      
-      // Extract useful details from evidence
-      const extractDestination = (evidence: string | null): string | null => {
-        if (!evidence) return null;
-        // Look for "to [City]" pattern
-        const toMatch = evidence.match(/to\s+([A-Z][a-z]+(?:\s+[A-Z][a-z]+)?)/);
-        if (toMatch) return toMatch[1];
-        return null;
-      };
-      
-      const extractJobDetails = (evidence: string | null): string | null => {
-        if (!evidence) return evidence;
-        // Keep the evidence as-is for transitions, it's useful
-        if (evidence.length > 100) return evidence.slice(0, 100) + "...";
-        return evidence;
-      };
-      
-      switch (s.type) {
-        case "FLIGHT": {
-          const destination = extractDestination(s.evidence) || s.domain;
-          return `Travel to ${destination || "somewhere"} ${tense}${s.evidence ? ` - "${s.evidence.slice(0, 80)}..."` : ""}`;
-        }
-        case "INTERVIEW": 
-          return `Interview${s.domain ? ` with ${s.domain}` : ""} ${tense}`;
-        case "EVENT": 
-          return `Event${s.domain ? `: ${s.domain}` : ""} ${tense}`;
-        case "TRANSITION": 
-          return `Career transition: ${extractJobDetails(s.evidence) || "weighing options"}`;
-        case "OBSESSION": 
-          return `Interest in ${s.domain || "something"}`;
-        default: 
-          return null;
-      }
-    }).filter(Boolean);
-
-    if (signalDescriptions.length > 0) {
-      contextSection += `\nKnown context (weave in naturally, be SPECIFIC about details, never explain how you know):\n${signalDescriptions.map(s => `- ${s}`).join("\n")}`;
+  // Add actionable signal context FIRST if judge approved it
+  if (decision.reference_signal && actionableSignal) {
+    const signalContext = formatActionableSignal(actionableSignal);
+    if (signalContext) {
+      contextSection += `\n\n**REFERENCE THIS IN YOUR RESPONSE** (be specific, use the details):\n${signalContext}`;
     }
   }
+  
+  // Add background signal context (NOT for direct reference unless judge approved)
+  if (signals.length > 0) {
+    const now = new Date();
+    const signalDescriptions = signals
+      .filter(s => s.type !== "OBSESSION") // Never mention obsessions
+      .map(s => {
+        const isExpired = s.expires_at && new Date(s.expires_at) < now;
+        const tense = isExpired ? "(past)" : "(upcoming)";
+        
+        switch (s.type) {
+          case "FLIGHT": {
+            const destination = s.domain || extractDestination(s.evidence);
+            return destination ? `Travel to ${destination} ${tense}` : null;
+          }
+          case "INTERVIEW": 
+            return s.domain ? `Interview with ${s.domain} ${tense}` : null;
+          case "EVENT": 
+            return s.domain ? `Event: ${s.domain} ${tense}` : null;
+          case "TRANSITION": 
+            return s.evidence ? `Career moment: ${truncate(s.evidence, 60)}` : null;
+          default: 
+            return null;
+        }
+      }).filter(Boolean);
 
-  // Add intent context if judge says to reference it
-  if (decision.reference_intent && intents.length > 0) {
-    const intent = intents[0];
-    contextSection += `\n\nRelevant signal to reference: ${intent.evidence}`;
+    if (signalDescriptions.length > 0 && !decision.reference_signal) {
+      // Only add as background if NOT already referencing a signal
+      contextSection += `\n\nBackground context (do NOT bring up unless user mentions first):\n${signalDescriptions.map(s => `- ${s}`).join("\n")}`;
+    }
   }
 
   // Add profile context
@@ -289,7 +277,7 @@ function buildSystemPrompt(
   // Build mode-specific instructions
   const modeInstructions = {
     observer: "Acknowledge, mirror, stay light. Don't push.",
-    reflect: "Gently point out a pattern you notice. One observation only.",
+    reflect: "Gently surface a pattern or observation. One thought only.",
     guide: "Suggest ONE small next step. Only if clearly needed.",
   };
 
@@ -314,7 +302,7 @@ Core behavior:
 - You help without making it a "thing"
 
 Rules:
-- ${decision.max_lines} line${decision.max_lines > 1 ? "s" : ""} max
+- 2 lines max (unless reflecting on something important, then 3)
 - Never explain your thinking
 - Never list options
 - Never sound instructional or motivational
@@ -327,7 +315,7 @@ ${modeInstructions[decision.mode]}
 Tone: ${decision.tone}
 ${toneInstructions[decision.tone]}
 
-${decision.banter_allowed ? "Banter: Subtle, dry, respectful. Never trying to impress." : "Banter: Not now."}
+${decision.allow_banter ? "Banter: Subtle, dry, respectful. Never trying to impress." : "Banter: Not now."}
 
 ${decision.ask_question ? "You may ask ONE clarifying question if it helps." : "Do not ask questions."}
 ${contextSection}
@@ -338,9 +326,64 @@ Examples of good responses:
 - "Want help with this, or should I stay out?"
 - "You're thinking more than you're sending."
 - "Might be reading this wrong. Ignore me if so."
+- "How was Dubai?" (when user had a recent flight to Dubai)
+- "The Stripe thing still on your mind?" (when user had an interview)
 
 If there's no strong signal, stay quiet or check in lightly.
 No emojis. No hype. No advice dumping. No over-validation.`;
+}
+
+// =============================================================================
+// HELPER FUNCTIONS
+// =============================================================================
+
+function formatActionableSignal(signal: ActionableSignal): string | null {
+  switch (signal.type) {
+    case "FLIGHT": {
+      const destination = signal.domain || extractDestination(signal.evidence);
+      if (!destination) return null;
+      const date = new Date(signal.email_date);
+      const now = new Date();
+      const isPast = date < now;
+      return isPast 
+        ? `User recently traveled to ${destination}. Ask how it was.`
+        : `User has upcoming travel to ${destination}. Could check in about it.`;
+    }
+    case "INTERVIEW": {
+      const company = signal.domain;
+      if (!company) return null;
+      const date = new Date(signal.email_date);
+      const now = new Date();
+      const isPast = date < now;
+      return isPast
+        ? `User had an interview with ${company}. Could gently ask how it went.`
+        : `User has an interview coming up with ${company}. Could acknowledge it.`;
+    }
+    case "TRANSITION": {
+      // Never name company first for transitions - too sensitive
+      return signal.evidence 
+        ? `User may be going through a career transition. Tread carefully. Evidence: "${truncate(signal.evidence, 80)}"`
+        : null;
+    }
+    default:
+      return null;
+  }
+}
+
+function extractDestination(evidence: string | null): string | null {
+  if (!evidence) return null;
+  // Look for "to [City]" pattern
+  const toMatch = evidence.match(/to\s+([A-Z][a-z]+(?:\s+[A-Z][a-z]+)?)/);
+  if (toMatch) return toMatch[1];
+  // Look for city names
+  const cityMatch = evidence.match(/(Dubai|London|Singapore|Mumbai|Delhi|Bangalore|New York|San Francisco|Tokyo|Paris|Berlin)/i);
+  if (cityMatch) return cityMatch[1];
+  return null;
+}
+
+function truncate(str: string, maxLen: number): string {
+  if (str.length <= maxLen) return str;
+  return str.slice(0, maxLen) + "...";
 }
 
 // =============================================================================
@@ -380,14 +423,23 @@ serve(async (req) => {
     const latestUserMessage = userMessages.length > 0 ? userMessages[userMessages.length - 1].content : null;
 
     // Call the judge to decide how to respond
-    const { decision, intents } = userId 
+    const { decision, signal: actionableSignal } = userId 
       ? await callJudge(userId, latestUserMessage, messages)
       : { 
-          decision: { mode: "observer" as const, tone: "soft" as const, reference_intent: false, max_lines: 1, banter_allowed: false, ask_question: false }, 
-          intents: [] 
+          decision: { 
+            mode: "observer" as const, 
+            tone: "soft" as const, 
+            reference_signal: false, 
+            ask_question: false, 
+            allow_banter: false 
+          }, 
+          signal: null 
         };
 
     console.log(`[chat-ai] Judge decision:`, JSON.stringify(decision));
+    if (actionableSignal) {
+      console.log(`[chat-ai] Actionable signal:`, JSON.stringify(actionableSignal));
+    }
 
     // Fetch context data if authenticated
     let signals: EmailSignal[] = [];
@@ -410,7 +462,7 @@ serve(async (req) => {
     }
 
     // Build the system prompt with judge decision
-    const systemPrompt = buildSystemPrompt(decision, intents, signals, socialProfiles, profile);
+    const systemPrompt = buildSystemPrompt(decision, actionableSignal, signals, socialProfiles, profile);
 
     // Call AI gateway
     const response = await fetch("https://ai.gateway.lovable.dev/v1/chat/completions", {

@@ -60,7 +60,7 @@ serve(async (req) => {
 
     // Process emails in batches to avoid rate limits
     for (const email of emails) {
-      const prompt = `You are a signal extraction engine. Analyze this email and extract structured signals.
+      const prompt = `You are a signal extraction engine. Analyze this email and extract RICH, SPECIFIC signals.
 
 EMAIL CONTENT:
 Subject: ${email.subject}
@@ -69,24 +69,43 @@ Date: ${email.date}
 Body: ${email.body}
 
 SIGNAL TYPES:
-- FLIGHT: Flight bookings, travel itineraries, boarding passes
+- FLIGHT: Flight bookings, travel itineraries, boarding passes, check-in reminders
 - INTERVIEW: Job interviews, screening calls, hiring process emails
 - EVENT: Conferences, meetups, webinars, calendar invites
-- TRANSITION: Job offers, resignations, role changes, promotions
+- TRANSITION: Job offers, resignations, role changes, promotions, job decisions
 - OBSESSION: Repeated interest in a topic (newsletters, courses, research)
 
-RULES:
+EXTRACTION RULES:
 1. Only extract signals with confidence >= 0.6
 2. Be conservative - if unsure, don't extract
 3. Set appropriate expiration (flights: departure time, interviews: interview time, events: event time)
-4. For OBSESSION, look for patterns (this is a single email, so only if very clear interest)
+
+CRITICAL - DOMAIN FIELD REQUIREMENTS:
+- For FLIGHT: Include the DESTINATION CITY (e.g., "Jaipur", "Delhi", "Mumbai"), NOT the airline name
+- For INTERVIEW: Include the COMPANY NAME
+- For EVENT: Include the EVENT NAME or topic
+- For TRANSITION: Include what the transition is about (e.g., "job offers decision", "resignation from X")
+- For OBSESSION: Include the specific TOPIC of interest
+
+CRITICAL - EVIDENCE FIELD REQUIREMENTS:
+The evidence field should be DETAILED and ACTIONABLE. Include:
+- For FLIGHT: Destination, flight number, dates, booking reference, airline
+- For INTERVIEW: Company, role, interview time, round (phone screen, onsite, etc.)
+- For EVENT: Event name, date, location, what it's about
+- For TRANSITION: Specific details about the offers/change, companies involved
+- For OBSESSION: What topic, why it seems like an interest
+
+EXAMPLES:
+Flight email → domain: "Jaipur", evidence: "Air India flight AI 1719 to Jaipur on Dec 26, booking ref 8TCPQN, web check-in available"
+Interview email → domain: "Stripe", evidence: "Final round interview with Stripe for Senior Engineer role, scheduled Jan 5"
+Transition email → domain: "job offers - Flipkart vs Google", evidence: "User is deciding between Flipkart and Google offers, mentioned in email to mentor"
 
 Respond with a JSON array of signals. Each signal:
 {
   "type": "FLIGHT|INTERVIEW|EVENT|TRANSITION|OBSESSION",
-  "domain": "company or topic domain",
+  "domain": "specific destination/company/topic - BE SPECIFIC",
   "confidence": 0.0-1.0,
-  "evidence": "brief explanation why this is a signal",
+  "evidence": "DETAILED explanation with specific dates, names, and actionable context",
   "expires_at": "ISO timestamp or null"
 }
 
@@ -149,37 +168,60 @@ Return ONLY valid JSON, no other text.`;
       }
     }
 
-    // Store signals in database - deduplicate by gmail_message_id first
+    // Store signals in database - deduplicate by gmail_message_id + type combination
     if (signals.length > 0) {
-      // Keep only one signal per gmail_message_id (the one with highest confidence)
+      // Keep one signal per gmail_message_id+type pair (highest confidence wins)
       const deduped = new Map<string, Signal>();
       for (const s of signals) {
-        const existing = deduped.get(s.gmail_message_id);
+        const key = `${s.gmail_message_id}:${s.type}`;
+        const existing = deduped.get(key);
         if (!existing || s.confidence > existing.confidence) {
-          deduped.set(s.gmail_message_id, s);
+          deduped.set(key, s);
         }
       }
       const uniqueSignals = Array.from(deduped.values());
 
-      const { error } = await supabase
-        .from('email_signals')
-        .upsert(
-          uniqueSignals.map(s => ({
-            user_id: s.user_id,
-            type: s.type,
-            domain: s.domain,
-            confidence: s.confidence,
-            evidence: s.evidence,
-            expires_at: s.expires_at,
-            gmail_message_id: s.gmail_message_id,
-            email_date: s.email_date,
-          })),
-          { onConflict: 'gmail_message_id' }
-        );
+      // Upsert with a composite key approach - delete old and insert new
+      for (const signal of uniqueSignals) {
+        // Check if this exact signal exists
+        const { data: existing } = await supabase
+          .from('email_signals')
+          .select('id')
+          .eq('gmail_message_id', signal.gmail_message_id)
+          .eq('type', signal.type)
+          .maybeSingle();
 
-      if (error) {
-        console.error('Failed to store signals:', error);
-        throw error;
+        if (existing) {
+          // Update existing
+          await supabase
+            .from('email_signals')
+            .update({
+              domain: signal.domain,
+              confidence: signal.confidence,
+              evidence: signal.evidence,
+              expires_at: signal.expires_at,
+              email_date: signal.email_date,
+            })
+            .eq('id', existing.id);
+        } else {
+          // Insert new
+          const { error } = await supabase
+            .from('email_signals')
+            .insert({
+              user_id: signal.user_id,
+              type: signal.type,
+              domain: signal.domain,
+              confidence: signal.confidence,
+              evidence: signal.evidence,
+              expires_at: signal.expires_at,
+              gmail_message_id: signal.gmail_message_id,
+              email_date: signal.email_date,
+            });
+
+          if (error) {
+            console.error('Failed to insert signal:', error);
+          }
+        }
       }
       
       console.log(`Stored ${uniqueSignals.length} unique signals (from ${signals.length} total)`);

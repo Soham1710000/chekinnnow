@@ -7,8 +7,28 @@ const corsHeaders = {
 };
 
 // =============================================================================
-// TYPES
+// CHAT-AI (INTEGRATED JUDGE + RESPOND)
 // =============================================================================
+// This function now:
+// 1. Calls chat-judge to decide HOW to reply (mode, tone, limits)
+// 2. Builds the system prompt with the dignified personality
+// 3. Generates the response within the judge's constraints
+// =============================================================================
+
+interface JudgeDecision {
+  mode: "observer" | "reflect" | "guide";
+  tone: "soft" | "neutral" | "playful";
+  reference_intent: boolean;
+  max_lines: number;
+  banter_allowed: boolean;
+  ask_question: boolean;
+}
+
+interface IntentCandidate {
+  type: string;
+  evidence: string;
+  confidence: number;
+}
 
 interface EmailSignal {
   type: string;
@@ -27,14 +47,6 @@ interface SocialProfile {
   source_type: string;
 }
 
-interface UserContext {
-  isAuthenticated: boolean;
-  userId?: string;
-  isReturningUser?: boolean;
-  isFirstMessageOfSession?: boolean;
-  hasPendingIntros?: boolean;
-}
-
 interface ProfileContext {
   full_name?: string;
   role?: string;
@@ -49,7 +61,6 @@ interface ProfileContext {
 // =============================================================================
 
 async function getChekinnUserId(authUserId: string, supabase: any): Promise<string | null> {
-  // First get the email from auth user's profile
   const { data: profile } = await supabase
     .from("profiles")
     .select("email")
@@ -57,11 +68,9 @@ async function getChekinnUserId(authUserId: string, supabase: any): Promise<stri
     .maybeSingle();
 
   if (!profile?.email) {
-    // Try auth.users directly
     const { data: authUser } = await supabase.auth.admin.getUserById(authUserId);
     if (!authUser?.user?.email) return null;
     
-    // Look up chekinn_users by email
     const { data: chekinnUser } = await supabase
       .from("chekinn_users")
       .select("id")
@@ -71,7 +80,6 @@ async function getChekinnUserId(authUserId: string, supabase: any): Promise<stri
     return chekinnUser?.id || null;
   }
 
-  // Look up chekinn_users by email
   const { data: chekinnUser } = await supabase
     .from("chekinn_users")
     .select("id")
@@ -82,11 +90,10 @@ async function getChekinnUserId(authUserId: string, supabase: any): Promise<stri
 }
 
 // =============================================================================
-// FETCH EMAIL SIGNALS FOR USER
+// FETCH DATA FUNCTIONS
 // =============================================================================
 
 async function fetchUserSignals(chekinnUserId: string, supabase: any): Promise<EmailSignal[]> {
-  // Get signals from last 30 days that haven't expired
   const thirtyDaysAgo = new Date();
   thirtyDaysAgo.setDate(thirtyDaysAgo.getDate() - 30);
 
@@ -104,14 +111,9 @@ async function fetchUserSignals(chekinnUserId: string, supabase: any): Promise<E
     return [];
   }
 
-  // Filter out expired signals
   const now = new Date();
   return (data || []).filter((s: EmailSignal) => !s.expires_at || new Date(s.expires_at) > now);
 }
-
-// =============================================================================
-// FETCH SOCIAL PROFILES FOR USER
-// =============================================================================
 
 async function fetchUserSocialProfiles(chekinnUserId: string, supabase: any): Promise<SocialProfile[]> {
   const { data, error } = await supabase
@@ -127,16 +129,11 @@ async function fetchUserSocialProfiles(chekinnUserId: string, supabase: any): Pr
     return [];
   }
 
-  // Filter out obvious false positives
   const falsePositives = ['email', 'font', 'mail', 'digest', 'notifications', 'import', 'culture', '100', 'invest', 'daily', 'engage', 'media', 'snacks'];
   return (data || []).filter((p: SocialProfile) => 
     p.profile_handle && !falsePositives.includes(p.profile_handle.toLowerCase())
   );
 }
-
-// =============================================================================
-// FETCH USER PROFILE
-// =============================================================================
 
 async function fetchUserProfile(authUserId: string, supabase: any): Promise<ProfileContext | null> {
   const { data, error } = await supabase
@@ -154,123 +151,155 @@ async function fetchUserProfile(authUserId: string, supabase: any): Promise<Prof
 }
 
 // =============================================================================
-// BUILD SYSTEM PROMPT WITH SIGNALS
+// CALL CHAT-JUDGE
+// =============================================================================
+
+async function callJudge(
+  userId: string,
+  userMessage: string | null,
+  conversationHistory: any[]
+): Promise<{ decision: JudgeDecision; intents: IntentCandidate[] }> {
+  try {
+    const response = await fetch(
+      `${Deno.env.get("SUPABASE_URL")}/functions/v1/chat-judge`,
+      {
+        method: "POST",
+        headers: {
+          "Content-Type": "application/json",
+          Authorization: `Bearer ${Deno.env.get("SUPABASE_SERVICE_ROLE_KEY")}`,
+        },
+        body: JSON.stringify({ userId, userMessage, conversationHistory }),
+      }
+    );
+
+    if (!response.ok) {
+      console.error("Judge call failed:", response.status);
+      throw new Error("Judge failed");
+    }
+
+    return await response.json();
+  } catch (error) {
+    console.error("Judge error:", error);
+    // Default safe decision
+    return {
+      decision: {
+        mode: "observer",
+        tone: "soft",
+        reference_intent: false,
+        max_lines: 1,
+        banter_allowed: false,
+        ask_question: false,
+      },
+      intents: [],
+    };
+  }
+}
+
+// =============================================================================
+// BUILD DIGNIFIED SYSTEM PROMPT
 // =============================================================================
 
 function buildSystemPrompt(
+  decision: JudgeDecision,
+  intents: IntentCandidate[],
   signals: EmailSignal[],
   socialProfiles: SocialProfile[],
-  profile: ProfileContext | null,
-  context: UserContext
+  profile: ProfileContext | null
 ): string {
-  // Build signal context for the AI
-  let signalContext = "";
+  // Build context section
+  let contextSection = "";
   
+  // Add signal context (use naturally, never mention source)
   if (signals.length > 0) {
     const signalDescriptions = signals.map(s => {
       switch (s.type) {
-        case "FLIGHT":
-          return `Upcoming travel${s.domain ? ` to ${s.domain}` : ""}`;
-        case "INTERVIEW":
-          return `Interview process${s.domain ? ` with ${s.domain}` : ""}`;
-        case "EVENT":
-          return `Event attendance${s.domain ? `: ${s.domain}` : ""}`;
-        case "TRANSITION":
-          return `Career transition signals`;
-        case "OBSESSION":
-          return `Deep interest in ${s.domain || "a topic"}`;
-        default:
-          return null;
+        case "FLIGHT": return `Travel${s.domain ? ` to ${s.domain}` : ""}`;
+        case "INTERVIEW": return `Interview${s.domain ? ` with ${s.domain}` : ""}`;
+        case "EVENT": return `Event${s.domain ? `: ${s.domain}` : ""}`;
+        case "TRANSITION": return `Career transition`;
+        case "OBSESSION": return `Interest in ${s.domain || "something"}`;
+        default: return null;
       }
     }).filter(Boolean);
 
     if (signalDescriptions.length > 0) {
-      signalContext = `
-CONTEXT (use naturally, never mention how you know this):
-${signalDescriptions.map(s => `• ${s}`).join("\n")}
-`;
+      contextSection += `\nKnown context (weave in naturally, never explain how you know):\n${signalDescriptions.map(s => `- ${s}`).join("\n")}`;
     }
   }
 
-  // Build social profile context
-  let socialContext = "";
-  if (socialProfiles.length > 0) {
-    // Find user's own Twitter handle if present
-    const userTwitter = socialProfiles.find(p => p.platform === 'twitter' && p.source_type === 'email_signature');
-    if (userTwitter?.profile_handle) {
-      socialContext += `\nUser's Twitter: @${userTwitter.profile_handle}`;
-    }
+  // Add intent context if judge says to reference it
+  if (decision.reference_intent && intents.length > 0) {
+    const intent = intents[0];
+    contextSection += `\n\nRelevant signal to reference: ${intent.evidence}`;
   }
 
-  // Build profile context
-  let profileContext = "";
-  if (profile) {
-    const parts = [];
-    if (profile.full_name) parts.push(`Name: ${profile.full_name}`);
-    if (profile.role) parts.push(`Role: ${profile.role}`);
-    if (profile.industry) parts.push(`Industry: ${profile.industry}`);
-    if (profile.looking_for) parts.push(`Looking for: ${profile.looking_for}`);
-    if (profile.goals?.length) parts.push(`Goals: ${profile.goals.join(", ")}`);
-    if (profile.interests?.length) parts.push(`Interests: ${profile.interests.join(", ")}`);
-    
-    if (parts.length > 0) {
-      profileContext = `
-USER PROFILE:
-${parts.join("\n")}${socialContext}
-`;
-    }
+  // Add profile context
+  if (profile?.full_name) {
+    contextSection += `\n\nUser: ${profile.full_name}`;
+    if (profile.role) contextSection += ` (${profile.role})`;
   }
 
+  // Add social context
+  const userTwitter = socialProfiles.find(p => p.platform === 'twitter' && p.source_type === 'email_signature');
+  if (userTwitter?.profile_handle) {
+    contextSection += `\nTwitter: @${userTwitter.profile_handle}`;
+  }
+
+  // Build mode-specific instructions
+  const modeInstructions = {
+    observer: "Acknowledge, mirror, stay light. Don't push.",
+    reflect: "Gently point out a pattern you notice. One observation only.",
+    guide: "Suggest ONE small next step. Only if clearly needed.",
+  };
+
+  const toneInstructions = {
+    soft: "Warm, gentle, unhurried.",
+    neutral: "Matter-of-fact, practical.",
+    playful: "Light, dry humor. Never sarcastic or mocking.",
+  };
+
+  // THE DIGNIFIED SYSTEM PROMPT
   return `You are ChekInn.
 
-You help people think clearly about important life decisions.
-You are NOT a task assistant. You do NOT take actions for the user.
+You are a close friend with self-respect.
+Warm, observant, and calm — never needy, never preachy.
 
-${signalContext}
-${profileContext}
+You speak like a human texting.
+Short. Natural. Unforced.
 
-––––––––––––––––––––
-CORE APPROACH
-––––––––––––––––––––
+Core behavior:
+- You notice patterns quietly
+- You speak only when it feels worth it
+- You help without making it a "thing"
 
-• If you notice signals (travel, interviews, transitions), weave them in naturally
-• Ask questions that help people process what's happening
-• Connect dots they might not see themselves
-• Be a thoughtful friend, not a bot
+Rules:
+- ${decision.max_lines} line${decision.max_lines > 1 ? "s" : ""} max
+- Never explain your thinking
+- Never list options
+- Never sound instructional or motivational
+- Never over-comfort
+- If unsure, say less or say nothing
 
-• Do not rush clarity
-• Do not push decisions
-• Silence is allowed
+Current mode: ${decision.mode}
+${modeInstructions[decision.mode]}
 
-${signals.length > 0 ? `
-––––––––––––––––––––
-SIGNAL-AWARE GUIDANCE
-––––––––––––––––––––
+Tone: ${decision.tone}
+${toneInstructions[decision.tone]}
 
-You have context about what's happening in their life.
-Use this to:
-• Ask timely questions ("How are you feeling about the interview?")
-• Offer relevant observations ("Sounds like a lot of change happening")
-• Connect their current topic to what you know
+${decision.banter_allowed ? "Banter: Subtle, dry, respectful. Never trying to impress." : "Banter: Not now."}
 
-NEVER say "I noticed from your emails" or "based on your signals".
-Just naturally incorporate the context as a thoughtful friend would.
-` : ""}
+${decision.ask_question ? "You may ask ONE clarifying question if it helps." : "Do not ask questions."}
+${contextSection}
 
-––––––––––––––––––––
-STYLE
-––––––––––––––––––––
+Examples of good responses:
+- "You usually don't leave things hanging like this."
+- "Feels like this matters more than you're letting on."
+- "Want help with this, or should I stay out?"
+- "You're thinking more than you're sending."
+- "Might be reading this wrong. Ignore me if so."
 
-• Calm, human, texting tone
-• 1–3 sentences max
-• No corporate speak
-• No "How can I help?"
-• No "Here's what you should do"
-• No "I recommend"
-
-If unsure, say less.
-If they seem stuck, ask one good question.
-If they're processing something big, just acknowledge it.`;
+If there's no strong signal, stay quiet or check in lightly.
+No emojis. No hype. No advice dumping. No over-validation.`;
 }
 
 // =============================================================================
@@ -284,7 +313,7 @@ serve(async (req) => {
 
   try {
     const body = await req.json();
-    const { messages, userId, isAuthenticated, isReturningUser, isFirstMessageOfSession, hasPendingIntros } = body;
+    const { messages, userId, isAuthenticated } = body;
 
     if (!messages || !Array.isArray(messages)) {
       return new Response(JSON.stringify({ error: "Invalid messages" }), { 
@@ -293,7 +322,7 @@ serve(async (req) => {
       });
     }
 
-    console.log(`Chat: authUserId=${userId}, authenticated=${isAuthenticated}, returning=${isReturningUser}, msgCount=${messages.length}`);
+    console.log(`[chat-ai] userId=${userId}, authenticated=${isAuthenticated}, msgCount=${messages.length}`);
 
     const LOVABLE_API_KEY = Deno.env.get("LOVABLE_API_KEY");
     if (!LOVABLE_API_KEY) {
@@ -305,15 +334,28 @@ serve(async (req) => {
       Deno.env.get("SUPABASE_SERVICE_ROLE_KEY")!
     );
 
-    // Fetch signals, social profiles, and profile if authenticated
+    // Get the latest user message
+    const userMessages = messages.filter((m: any) => m.role === "user");
+    const latestUserMessage = userMessages.length > 0 ? userMessages[userMessages.length - 1].content : null;
+
+    // Call the judge to decide how to respond
+    const { decision, intents } = userId 
+      ? await callJudge(userId, latestUserMessage, messages)
+      : { 
+          decision: { mode: "observer" as const, tone: "soft" as const, reference_intent: false, max_lines: 1, banter_allowed: false, ask_question: false }, 
+          intents: [] 
+        };
+
+    console.log(`[chat-ai] Judge decision:`, JSON.stringify(decision));
+
+    // Fetch context data if authenticated
     let signals: EmailSignal[] = [];
     let socialProfiles: SocialProfile[] = [];
     let profile: ProfileContext | null = null;
 
     if (userId && isAuthenticated) {
-      // Get chekinn_user_id to look up signals
       const chekinnUserId = await getChekinnUserId(userId, supabase);
-      console.log(`Mapped auth user ${userId} to chekinn user ${chekinnUserId}`);
+      console.log(`[chat-ai] Mapped auth user to chekinn user ${chekinnUserId}`);
 
       const [fetchedSignals, fetchedSocialProfiles, fetchedProfile] = await Promise.all([
         chekinnUserId ? fetchUserSignals(chekinnUserId, supabase) : Promise.resolve([]),
@@ -323,19 +365,13 @@ serve(async (req) => {
       signals = fetchedSignals;
       socialProfiles = fetchedSocialProfiles;
       profile = fetchedProfile;
-      console.log(`Fetched ${signals.length} signals, ${socialProfiles.length} social profiles, profile: ${profile?.full_name || "none"}`);
+      console.log(`[chat-ai] Context: ${signals.length} signals, ${socialProfiles.length} social profiles, profile: ${profile?.full_name || "none"}`);
     }
 
-    const context: UserContext = {
-      isAuthenticated: isAuthenticated || false,
-      userId,
-      isReturningUser,
-      isFirstMessageOfSession,
-      hasPendingIntros,
-    };
+    // Build the system prompt with judge decision
+    const systemPrompt = buildSystemPrompt(decision, intents, signals, socialProfiles, profile);
 
-    const systemPrompt = buildSystemPrompt(signals, socialProfiles, profile, context);
-
+    // Call AI gateway
     const response = await fetch("https://ai.gateway.lovable.dev/v1/chat/completions", {
       method: "POST",
       headers: {
@@ -363,7 +399,7 @@ serve(async (req) => {
         });
       }
       const errorText = await response.text();
-      console.error("AI gateway error:", response.status, errorText);
+      console.error("[chat-ai] AI gateway error:", response.status, errorText);
       throw new Error("AI gateway error");
     }
 
@@ -371,7 +407,7 @@ serve(async (req) => {
       headers: { ...corsHeaders, "Content-Type": "text/event-stream" },
     });
   } catch (err) {
-    console.error("Chat error:", err);
+    console.error("[chat-ai] Error:", err);
     return new Response(JSON.stringify({ error: "Internal error" }), { 
       status: 500, 
       headers: corsHeaders 

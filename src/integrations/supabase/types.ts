@@ -352,6 +352,45 @@ export type Database = {
           },
         ]
       }
+      intent_candidates: {
+        Row: {
+          confidence: number
+          created_at: string
+          evidence: string | null
+          expires_at: string | null
+          freshness_hours: number
+          id: string
+          processed: boolean | null
+          source_signal_id: string | null
+          type: string
+          user_id: string
+        }
+        Insert: {
+          confidence?: number
+          created_at?: string
+          evidence?: string | null
+          expires_at?: string | null
+          freshness_hours?: number
+          id?: string
+          processed?: boolean | null
+          source_signal_id?: string | null
+          type: string
+          user_id: string
+        }
+        Update: {
+          confidence?: number
+          created_at?: string
+          evidence?: string | null
+          expires_at?: string | null
+          freshness_hours?: number
+          id?: string
+          processed?: boolean | null
+          source_signal_id?: string | null
+          type?: string
+          user_id?: string
+        }
+        Relationships: []
+      }
       introductions: {
         Row: {
           created_at: string | null

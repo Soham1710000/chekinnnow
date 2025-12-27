@@ -75,31 +75,61 @@ const Auth = () => {
 
       const { userId: chekinnUserId, email } = data as { userId: string; email: string };
 
-      // Sign in to Supabase Auth with a temp password (auto-generated)
-      // First try to sign in, if fails, sign up
-      let authError = null;
+      // Use a consistent password based on chekinn user ID
       const tempPassword = `ChekInn_${chekinnUserId.slice(0, 8)}!`;
       
+      // First try to sign in with existing credentials
       const { error: signInError } = await supabase.auth.signInWithPassword({
         email,
         password: tempPassword,
       });
 
       if (signInError) {
-        // User doesn't exist, create them
-        const { error: signUpError } = await supabase.auth.signUp({
-          email,
-          password: tempPassword,
-          options: {
-            emailRedirectTo: `${window.location.origin}/chat`,
-            data: { chekinn_user_id: chekinnUserId }
+        console.log('[Auth] Sign in failed, attempting signup:', signInError.message);
+        
+        // Check if user exists but with different password (edge case)
+        if (signInError.message.includes('Invalid login credentials')) {
+          // User might exist with different password - try signup anyway
+          const { error: signUpError } = await supabase.auth.signUp({
+            email,
+            password: tempPassword,
+            options: {
+              emailRedirectTo: `${window.location.origin}/chat`,
+              data: { chekinn_user_id: chekinnUserId }
+            }
+          });
+          
+          if (signUpError) {
+            // If signup also fails with "already registered", user has different password
+            if (signUpError.message.includes('already registered')) {
+              console.log('[Auth] User exists with different credentials, using admin password reset');
+              // Request password reset via edge function
+              const { error: resetError } = await supabase.functions.invoke('send-temp-password', {
+                body: { email, adminOverridePassword: tempPassword }
+              });
+              
+              if (resetError) {
+                console.error('[Auth] Password reset failed:', resetError);
+                throw new Error('Account exists but could not reset password. Please contact support.');
+              }
+              
+              // Now try signing in again with the new password
+              const { error: retrySignInError } = await supabase.auth.signInWithPassword({
+                email,
+                password: tempPassword,
+              });
+              
+              if (retrySignInError) {
+                console.error('[Auth] Retry sign in failed:', retrySignInError);
+                throw new Error('Authentication failed. Please try again.');
+              }
+            } else {
+              throw signUpError;
+            }
           }
-        });
-        authError = signUpError;
-      }
-
-      if (authError) {
-        console.error('[Auth] Auth error:', authError);
+        } else {
+          throw signInError;
+        }
       }
 
       // Trigger email ingestion in background
@@ -124,6 +154,8 @@ const Auth = () => {
         description: error.message || "Failed to connect Gmail. Please try again.",
         variant: "destructive",
       });
+      setLoading(false);
+      setProcessingCallback(false);
     } finally {
       setLoading(false);
       setProcessingCallback(false);

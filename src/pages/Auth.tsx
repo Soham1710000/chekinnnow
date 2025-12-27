@@ -113,6 +113,9 @@ const Auth = () => {
                 throw new Error('Account exists but could not reset password. Please contact support.');
               }
               
+              // Wait briefly for password update to propagate
+              await new Promise(resolve => setTimeout(resolve, 1000));
+              
               // Now try signing in again with the new password
               const { error: retrySignInError } = await supabase.auth.signInWithPassword({
                 email,
@@ -123,6 +126,8 @@ const Auth = () => {
                 console.error('[Auth] Retry sign in failed:', retrySignInError);
                 throw new Error('Authentication failed. Please try again.');
               }
+              
+              console.log('[Auth] Successfully signed in after password reset');
             } else {
               throw signUpError;
             }

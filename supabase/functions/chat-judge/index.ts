@@ -7,37 +7,36 @@ const corsHeaders = {
 };
 
 // =============================================================================
-// CHAT JUDGE
+// CHAT JUDGE - Signal-Aware Decision Engine
 // =============================================================================
 // This decides HOW to reply, not WHAT to say.
-// Output is a fixed schema, no creativity.
-// Defaults: mode=observer, tone=soft, max_lines=1
-// If unsure → observer + soft + no question
-// This is where dignity is enforced.
+// Core principle: If ChekInn can't be specific, it shuts up.
+// Never proactive. Only responds when user opens the door.
 // =============================================================================
 
-interface JudgeDecision {
+interface Signal {
+  id: string;
+  type: "FLIGHT" | "INTERVIEW" | "TRANSITION" | "EVENT" | "OBSESSION";
+  domain: string | null;
+  evidence: string | null;
+  email_date: string;
+  details_complete: boolean;
+}
+
+interface JudgeInput {
+  user_message?: string;
+  recent_signals: Signal[];
+  time_since_last_user_action_hours: number;
+  conversation_state: "active" | "stale" | "returning";
+  has_prior_banter: boolean;
+}
+
+interface ChatDecision {
   mode: "observer" | "reflect" | "guide";
   tone: "soft" | "neutral" | "playful";
-  reference_intent: boolean;
-  max_lines: number;
-  banter_allowed: boolean;
+  reference_signal: boolean;
   ask_question: boolean;
-}
-
-interface IntentCandidate {
-  id: string;
-  type: string;
-  confidence: number;
-  freshness_hours: number;
-  evidence: string;
-}
-
-interface ConversationContext {
-  message_count: number;
-  last_message_role: string;
-  hours_since_last: number;
-  has_recent_activity: boolean;
+  allow_banter: boolean;
 }
 
 serve(async (req) => {
@@ -53,38 +52,60 @@ serve(async (req) => {
       Deno.env.get("SUPABASE_SERVICE_ROLE_KEY")!
     );
 
-    // Fetch top 3 intent candidates for this user
-    const { data: candidates } = await supabase
-      .from("intent_candidates")
-      .select("id, type, confidence, freshness_hours, evidence")
+    // Fetch recent signals (last 14 days)
+    const fourteenDaysAgo = new Date();
+    fourteenDaysAgo.setDate(fourteenDaysAgo.getDate() - 14);
+
+    const { data: signalsData } = await supabase
+      .from("email_signals")
+      .select("id, signal_type, domain, evidence, email_date")
       .eq("user_id", userId)
-      .eq("processed", false)
-      .gte("confidence", 0.6)
-      .order("confidence", { ascending: false })
-      .limit(3);
+      .gte("email_date", fourteenDaysAgo.toISOString())
+      .order("email_date", { ascending: false });
 
-    const intents: IntentCandidate[] = candidates || [];
+    const recentSignals: Signal[] = (signalsData || []).map(s => ({
+      id: s.id,
+      type: s.signal_type as Signal["type"],
+      domain: s.domain,
+      evidence: s.evidence,
+      email_date: s.email_date,
+      details_complete: Boolean(s.domain && s.evidence),
+    }));
 
-    // Build conversation context
-    const context = buildConversationContext(conversationHistory || []);
+    // Build conversation state
+    const conversationState = deriveConversationState(conversationHistory || []);
+    const hasPriorBanter = checkPriorBanter(conversationHistory || []);
+
+    // Build input
+    const input: JudgeInput = {
+      user_message: userMessage || undefined,
+      recent_signals: recentSignals,
+      time_since_last_user_action_hours: conversationState.hoursSinceLast,
+      conversation_state: conversationState.state,
+      has_prior_banter: hasPriorBanter,
+    };
 
     // Make the judgment
-    const decision = judge(userMessage, intents, context);
+    const decision = chatJudge(input);
 
     console.log(`[chat-judge] Decision for ${userId}:`, JSON.stringify(decision));
+    console.log(`[chat-judge] Input state:`, JSON.stringify({
+      hasMessage: Boolean(userMessage),
+      signalCount: recentSignals.length,
+      conversationState: conversationState.state,
+      hasPriorBanter,
+    }));
 
-    // Mark used intents as processed if we're referencing them
-    if (decision.reference_intent && intents.length > 0) {
-      await supabase
-        .from("intent_candidates")
-        .update({ processed: true })
-        .in("id", intents.map(i => i.id));
+    // Find the actionable signal if we're referencing one
+    let actionableSignal: Signal | null = null;
+    if (decision.reference_signal) {
+      actionableSignal = findActionableSignal(recentSignals, input);
     }
 
     return new Response(
       JSON.stringify({
         decision,
-        intents: decision.reference_intent ? intents.slice(0, 1) : [],
+        signal: actionableSignal,
       }),
       { headers: { ...corsHeaders, "Content-Type": "application/json" } }
     );
@@ -92,151 +113,276 @@ serve(async (req) => {
     console.error("[chat-judge] Error:", error);
     
     // Default safe decision on error
-    const safeDecision: JudgeDecision = {
+    const safeDecision: ChatDecision = {
       mode: "observer",
       tone: "soft",
-      reference_intent: false,
-      max_lines: 1,
-      banter_allowed: false,
+      reference_signal: false,
       ask_question: false,
+      allow_banter: false,
     };
 
     return new Response(
-      JSON.stringify({ decision: safeDecision, intents: [] }),
+      JSON.stringify({ decision: safeDecision, signal: null }),
       { headers: { ...corsHeaders, "Content-Type": "application/json" } }
     );
   }
 });
 
 // =============================================================================
-// BUILD CONVERSATION CONTEXT
+// DERIVE CONVERSATION STATE
 // =============================================================================
 
-function buildConversationContext(history: any[]): ConversationContext {
-  const now = new Date();
-  const lastMessage = history[history.length - 1];
-  const hoursSinceLast = lastMessage
-    ? (now.getTime() - new Date(lastMessage.created_at || Date.now()).getTime()) / (1000 * 60 * 60)
-    : 999;
+function deriveConversationState(history: any[]): {
+  state: "active" | "stale" | "returning";
+  hoursSinceLast: number;
+} {
+  if (history.length === 0) {
+    return { state: "returning", hoursSinceLast: 999 };
+  }
 
-  return {
-    message_count: history.length,
-    last_message_role: lastMessage?.role || "none",
-    hours_since_last: hoursSinceLast,
-    has_recent_activity: hoursSinceLast < 24,
-  };
+  const now = new Date();
+  const lastUserMessage = [...history].reverse().find(m => m.role === "user");
+  
+  if (!lastUserMessage) {
+    return { state: "returning", hoursSinceLast: 999 };
+  }
+
+  const lastTime = new Date(lastUserMessage.created_at || Date.now());
+  const hoursSinceLast = (now.getTime() - lastTime.getTime()) / (1000 * 60 * 60);
+
+  if (hoursSinceLast < 1) {
+    return { state: "active", hoursSinceLast };
+  } else if (hoursSinceLast < 24) {
+    return { state: "stale", hoursSinceLast };
+  } else {
+    return { state: "returning", hoursSinceLast };
+  }
+}
+
+// =============================================================================
+// CHECK PRIOR BANTER
+// =============================================================================
+
+function checkPriorBanter(history: any[]): boolean {
+  // Look for playful exchanges in recent history
+  const recentHistory = history.slice(-10);
+  
+  for (const msg of recentHistory) {
+    if (msg.role === "assistant") {
+      const content = (msg.content || "").toLowerCase();
+      // Simple heuristic: emojis, exclamations, casual language
+      if (/[😊😄🎉!]{2,}|haha|lol|nice|cool|awesome/i.test(content)) {
+        return true;
+      }
+    }
+  }
+  
+  return false;
+}
+
+// =============================================================================
+// FIND ACTIONABLE SIGNAL
+// =============================================================================
+
+function findActionableSignal(signals: Signal[], input: JudgeInput): Signal | null {
+  const eligible = filterEligibleSignals(signals);
+  
+  for (const signal of eligible) {
+    const hoursSinceSignal = getHoursSinceSignal(signal);
+    
+    if (signal.type === "FLIGHT" && hoursSinceSignal >= 6) {
+      return signal;
+    }
+    
+    if (signal.type === "INTERVIEW" && hoursSinceSignal >= 24) {
+      return signal;
+    }
+    
+    if (signal.type === "TRANSITION" && hoursSinceSignal >= 48) {
+      return signal;
+    }
+  }
+  
+  return null;
+}
+
+function filterEligibleSignals(signals: Signal[]): Signal[] {
+  const eligible: Signal[] = [];
+  
+  for (const signal of signals) {
+    // OBSESSION: never speak about
+    if (signal.type === "OBSESSION") {
+      continue;
+    }
+    
+    // EVENT: only if user mentions explicitly (handled elsewhere)
+    if (signal.type === "EVENT") {
+      continue;
+    }
+    
+    // FLIGHT: must have destination and date
+    if (signal.type === "FLIGHT") {
+      if (signal.domain && signal.email_date) {
+        eligible.push(signal);
+      }
+      continue;
+    }
+    
+    // INTERVIEW: must be past or deadline approaching
+    if (signal.type === "INTERVIEW") {
+      const hoursSince = getHoursSinceSignal(signal);
+      // Past interview or within next 48 hours
+      if (hoursSince >= 0) {
+        eligible.push(signal);
+      }
+      continue;
+    }
+    
+    // TRANSITION: must have explicit offer/resignation language
+    if (signal.type === "TRANSITION") {
+      const evidence = (signal.evidence || "").toLowerCase();
+      if (/offer|resign|accept|quit|leave|joining|last day|notice/i.test(evidence)) {
+        eligible.push(signal);
+      }
+      continue;
+    }
+  }
+  
+  return eligible;
+}
+
+function getHoursSinceSignal(signal: Signal): number {
+  const signalTime = new Date(signal.email_date);
+  const now = new Date();
+  return (now.getTime() - signalTime.getTime()) / (1000 * 60 * 60);
 }
 
 // =============================================================================
 // THE JUDGE - CORE DECISION LOGIC
 // =============================================================================
 
-function judge(
-  userMessage: string | null,
-  intents: IntentCandidate[],
-  context: ConversationContext
-): JudgeDecision {
-  // Default: observer + soft + no question (silence is respect)
-  const decision: JudgeDecision = {
+function chatJudge(input: JudgeInput): ChatDecision {
+  // Step 0 — Defaults (MOST IMPORTANT)
+  const decision: ChatDecision = {
     mode: "observer",
     tone: "soft",
-    reference_intent: false,
-    max_lines: 1,
-    banter_allowed: false,
+    reference_signal: false,
     ask_question: false,
+    allow_banter: false,
   };
 
-  // If no user message and no strong intents, stay quiet
-  if (!userMessage && intents.length === 0) {
+  // Step 1 — If no user message, stay silent
+  if (!input.user_message) {
     return decision;
   }
 
-  const hasStrongIntent = intents.some(i => i.confidence >= 0.75);
-  const topIntent = intents[0];
+  // Step 2 — Detect whether user opened the door
+  const userMessage = input.user_message.toLowerCase();
+  
+  const containsQuestion = userMessage.includes("?") ||
+    /^(what|how|why|when|where|should|can|could|would|is|are|do|does)/i.test(userMessage.trim());
+  
+  const mentionsPlans = /plan|help|what to do|next|decide|thinking|consider|advice|suggest/i.test(userMessage);
+  
+  const isReturning = input.conversation_state === "returning";
+  
+  const userOpenedDoor = containsQuestion || mentionsPlans || isReturning;
 
-  // ==========================================================================
-  // RULE 1: User just sent a message - prioritize responding to them
-  // ==========================================================================
-  if (userMessage && userMessage.trim().length > 0) {
-    const msg = userMessage.toLowerCase();
-    
-    // Check for explicit questions from user
-    const isQuestion = msg.includes("?") || 
-                       msg.startsWith("what") || 
-                       msg.startsWith("how") ||
-                       msg.startsWith("why") ||
-                       msg.startsWith("should") ||
-                       msg.startsWith("can you");
-    
-    // Check for emotional content
-    const isEmotional = /stress|anxious|worried|nervous|excited|happy|sad|frustrated/i.test(msg);
-    
-    // Check for help request
-    const needsHelp = /help|advice|suggest|think|opinion/i.test(msg);
+  // Step 3 — Filter eligible signals
+  const eligibleSignals = filterEligibleSignals(input.recent_signals);
 
-    if (needsHelp || isQuestion) {
-      decision.mode = "guide";
-      decision.tone = "neutral";
-      decision.max_lines = 2;
-      decision.ask_question = !isQuestion; // Ask clarifying question only if they didn't ask one
-    } else if (isEmotional) {
-      decision.mode = "reflect";
-      decision.tone = "soft";
-      decision.max_lines = 1;
-      decision.ask_question = false; // Don't interrogate emotions
-    } else {
-      decision.mode = "observer";
-      decision.tone = "soft";
-      // Allow playful only if we have history and recent activity
-      if (context.message_count > 5 && context.has_recent_activity) {
-        decision.banter_allowed = true;
-        decision.tone = "playful";
-      }
+  // Step 4 — Find actionable signal with timing restraint
+  let actionableSignal: Signal | null = null;
+  
+  for (const signal of eligibleSignals) {
+    const hoursSinceSignal = getHoursSinceSignal(signal);
+    
+    if (signal.type === "FLIGHT" && hoursSinceSignal >= 6) {
+      actionableSignal = signal;
+      break;
+    }
+    
+    if (signal.type === "INTERVIEW" && hoursSinceSignal >= 24) {
+      actionableSignal = signal;
+      break;
+    }
+    
+    if (signal.type === "TRANSITION" && hoursSinceSignal >= 48) {
+      actionableSignal = signal;
+      break;
     }
   }
 
-  // ==========================================================================
-  // RULE 2: Reference intent only if it's very relevant
-  // ==========================================================================
-  if (hasStrongIntent && topIntent) {
-    // Only reference intent if:
-    // 1. It's high confidence (>0.75)
-    // 2. It's fresh (< 24h old)
-    // 3. User hasn't been active recently (don't interrupt)
-    if (
-      topIntent.confidence >= 0.75 &&
-      topIntent.freshness_hours < 24 &&
-      !context.has_recent_activity
-    ) {
-      decision.reference_intent = true;
-      decision.mode = "reflect";
-      
-      // Important reminders get slightly more urgency
-      if (topIntent.type === "important_reminder") {
-        decision.max_lines = 2;
-      }
-    }
+  // Step 5 — Open-poke restraint gate
+  if (!userOpenedDoor) {
+    return decision;
   }
 
-  // ==========================================================================
-  // RULE 3: Long conversation = allow more natural flow
-  // ==========================================================================
-  if (context.message_count > 10) {
-    decision.banter_allowed = true;
-    if (context.has_recent_activity) {
-      decision.max_lines = Math.min(decision.max_lines + 1, 3);
-    }
-  }
-
-  // ==========================================================================
-  // RULE 4: First few messages = stay reserved
-  // ==========================================================================
-  if (context.message_count < 3) {
+  if (!actionableSignal) {
+    // No signal to reference, but user opened door
+    // Allow basic response without signal reference
     decision.mode = "observer";
     decision.tone = "soft";
-    decision.banter_allowed = false;
-    decision.max_lines = 1;
+    return decision;
   }
 
+  // Step 6 — Map signal → mode
+  if (actionableSignal.type === "FLIGHT") {
+    decision.mode = "reflect";
+    decision.reference_signal = true;
+    decision.ask_question = true;
+  }
+
+  if (actionableSignal.type === "INTERVIEW") {
+    decision.mode = "reflect";
+    decision.reference_signal = true;
+    decision.ask_question = true;
+  }
+
+  if (actionableSignal.type === "TRANSITION") {
+    decision.mode = "reflect";
+    decision.reference_signal = false; // Never name company first
+    decision.ask_question = true;
+  }
+
+  // Step 7 — Tone selection
+  if (decision.mode === "observer") {
+    decision.tone = "soft";
+  }
+
+  if (decision.mode === "reflect") {
+    decision.tone = "soft";
+  }
+
+  if (decision.mode === "guide") {
+    decision.tone = "neutral";
+  }
+
+  // Step 8 — Banter rules
+  // Never banter in career/money moments
+  const isSensitiveMoment = actionableSignal.type === "INTERVIEW" || 
+                            actionableSignal.type === "TRANSITION";
+  
+  if (
+    input.has_prior_banter &&
+    decision.mode !== "guide" &&
+    !isSensitiveMoment
+  ) {
+    decision.allow_banter = true;
+  }
+
+  // Step 9 — Final safety kill switch
+  // If ChekInn can't be specific, it shuts up
+  if (decision.reference_signal && !actionableSignal.details_complete) {
+    return {
+      mode: "observer",
+      tone: "soft",
+      reference_signal: false,
+      ask_question: false,
+      allow_banter: false,
+    };
+  }
+
+  // Step 10 — Return decision
   return decision;
 }

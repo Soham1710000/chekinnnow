@@ -104,15 +104,28 @@ async function fetchUserSignals(chekinnUserId: string, supabase: any): Promise<E
     .gte("email_date", thirtyDaysAgo.toISOString())
     .gte("confidence", 0.6)
     .order("email_date", { ascending: false })
-    .limit(10);
+    .limit(15);
 
   if (error) {
     console.error("Error fetching signals:", error);
     return [];
   }
 
+  // Don't filter out expired FLIGHT signals immediately - they're still useful context
+  // Only filter if expired more than 3 days ago
   const now = new Date();
-  return (data || []).filter((s: EmailSignal) => !s.expires_at || new Date(s.expires_at) > now);
+  const threeDaysAgo = new Date();
+  threeDaysAgo.setDate(threeDaysAgo.getDate() - 3);
+  
+  return (data || []).filter((s: EmailSignal) => {
+    if (!s.expires_at) return true;
+    const expiryDate = new Date(s.expires_at);
+    // For FLIGHT signals, keep them even if recently expired (useful for "how was your trip?")
+    if (s.type === 'FLIGHT') {
+      return expiryDate > threeDaysAgo;
+    }
+    return expiryDate > now;
+  });
 }
 
 async function fetchUserSocialProfiles(chekinnUserId: string, supabase: any): Promise<SocialProfile[]> {
@@ -209,21 +222,49 @@ function buildSystemPrompt(
   // Build context section
   let contextSection = "";
   
-  // Add signal context (use naturally, never mention source)
+  // Add signal context with RICH details from evidence
   if (signals.length > 0) {
+    const now = new Date();
     const signalDescriptions = signals.map(s => {
+      const isExpired = s.expires_at && new Date(s.expires_at) < now;
+      const tense = isExpired ? "(recent)" : "(upcoming)";
+      
+      // Extract useful details from evidence
+      const extractDestination = (evidence: string | null): string | null => {
+        if (!evidence) return null;
+        // Look for "to [City]" pattern
+        const toMatch = evidence.match(/to\s+([A-Z][a-z]+(?:\s+[A-Z][a-z]+)?)/);
+        if (toMatch) return toMatch[1];
+        return null;
+      };
+      
+      const extractJobDetails = (evidence: string | null): string | null => {
+        if (!evidence) return evidence;
+        // Keep the evidence as-is for transitions, it's useful
+        if (evidence.length > 100) return evidence.slice(0, 100) + "...";
+        return evidence;
+      };
+      
       switch (s.type) {
-        case "FLIGHT": return `Travel${s.domain ? ` to ${s.domain}` : ""}`;
-        case "INTERVIEW": return `Interview${s.domain ? ` with ${s.domain}` : ""}`;
-        case "EVENT": return `Event${s.domain ? `: ${s.domain}` : ""}`;
-        case "TRANSITION": return `Career transition`;
-        case "OBSESSION": return `Interest in ${s.domain || "something"}`;
-        default: return null;
+        case "FLIGHT": {
+          const destination = extractDestination(s.evidence) || s.domain;
+          return `Travel to ${destination || "somewhere"} ${tense}${s.evidence ? ` - "${s.evidence.slice(0, 80)}..."` : ""}`;
+        }
+        case "INTERVIEW": 
+          return `Interview${s.domain ? ` with ${s.domain}` : ""} ${tense}`;
+        case "EVENT": 
+          return `Event${s.domain ? `: ${s.domain}` : ""} ${tense}`;
+        case "TRANSITION": 
+          return `Career transition: ${extractJobDetails(s.evidence) || "weighing options"}`;
+        case "OBSESSION": 
+          return `Interest in ${s.domain || "something"}`;
+        default: 
+          return null;
       }
     }).filter(Boolean);
 
     if (signalDescriptions.length > 0) {
-      contextSection += `\nKnown context (weave in naturally, never explain how you know):\n${signalDescriptions.map(s => `- ${s}`).join("\n")}`;
+      contextSection += `\nKnown context (weave in naturally, be SPECIFIC about details, never explain how you know):\n${signalDescriptions.map(s => `- ${s}`).join("\n")}`;
     }
   }
 

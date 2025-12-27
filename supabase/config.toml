@@ -3,6 +3,12 @@ project_id = "pnyebagcmymrukwjkepz"
 [functions.chat-ai]
 verify_jwt = false
 
+[functions.chat-judge]
+verify_jwt = false
+
+[functions.background-signal-loop]
+verify_jwt = false
+
 [functions.send-launch-email]
 verify_jwt = false
 

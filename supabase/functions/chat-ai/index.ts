@@ -170,11 +170,31 @@ async function fetchUserProfile(authUserId: string, supabase: any): Promise<Prof
 // =============================================================================
 
 async function callJudge(
-  userId: string,
   userMessage: string | null,
-  conversationHistory: any[]
-): Promise<{ decision: ChatDecision; signal: ActionableSignal | null }> {
+  recentSignals: EmailSignal[],
+  conversationHistory: any[],
+  hasPriorBanter: boolean
+): Promise<{ decision: ChatDecision; actionableSignal: ActionableSignal | null }> {
   try {
+    // Determine conversation state
+    const lastUserMsgIndex = [...conversationHistory].reverse().findIndex(m => m.role === "user");
+    const conversationState: "active" | "stale" | "returning" = 
+      conversationHistory.length === 0 ? "returning" :
+      lastUserMsgIndex > 3 ? "stale" : "active";
+
+    // Calculate time since last user action (approximate from conversation)
+    const timeSinceLastAction = conversationHistory.length === 0 ? 24 : 0.5;
+
+    // Transform EmailSignal[] to the format chat-judge expects
+    const judgeSignals = recentSignals.map(s => ({
+      id: crypto.randomUUID(), // Judge doesn't need real IDs
+      type: s.type as "FLIGHT" | "INTERVIEW" | "EVENT" | "TRANSITION" | "OBSESSION",
+      email_date: s.email_date,
+      evidence: s.evidence,
+      confidence: s.confidence,
+      domain: s.domain,
+    }));
+
     const response = await fetch(
       `${Deno.env.get("SUPABASE_URL")}/functions/v1/chat-judge`,
       {
@@ -183,18 +203,37 @@ async function callJudge(
           "Content-Type": "application/json",
           Authorization: `Bearer ${Deno.env.get("SUPABASE_SERVICE_ROLE_KEY")}`,
         },
-        body: JSON.stringify({ userId, userMessage, conversationHistory }),
+        body: JSON.stringify({
+          user_message: userMessage,
+          recent_signals: judgeSignals,
+          time_since_last_user_action_hours: timeSinceLastAction,
+          conversation_state: conversationState,
+          has_prior_banter: hasPriorBanter,
+        }),
       }
     );
 
     if (!response.ok) {
-      console.error("Judge call failed:", response.status);
+      console.error("[chat-ai] Judge call failed:", response.status);
       throw new Error("Judge failed");
     }
 
-    return await response.json();
+    // chat-judge returns the decision directly with actionable_signal inside
+    const judgeResult = await response.json();
+    console.log("[chat-ai] Raw judge response:", JSON.stringify(judgeResult));
+
+    return {
+      decision: {
+        mode: judgeResult.mode,
+        tone: judgeResult.tone,
+        reference_signal: judgeResult.reference_signal,
+        ask_question: judgeResult.ask_question,
+        allow_banter: judgeResult.allow_banter,
+      },
+      actionableSignal: judgeResult.actionable_signal || null,
+    };
   } catch (error) {
-    console.error("Judge error:", error);
+    console.error("[chat-ai] Judge error:", error);
     // Default safe decision
     return {
       decision: {
@@ -204,7 +243,7 @@ async function callJudge(
         ask_question: false,
         allow_banter: false,
       },
-      signal: null,
+      actionableSignal: null,
     };
   }
 }
@@ -422,26 +461,7 @@ serve(async (req) => {
     const userMessages = messages.filter((m: any) => m.role === "user");
     const latestUserMessage = userMessages.length > 0 ? userMessages[userMessages.length - 1].content : null;
 
-    // Call the judge to decide how to respond
-    const { decision, signal: actionableSignal } = userId 
-      ? await callJudge(userId, latestUserMessage, messages)
-      : { 
-          decision: { 
-            mode: "observer" as const, 
-            tone: "soft" as const, 
-            reference_signal: false, 
-            ask_question: false, 
-            allow_banter: false 
-          }, 
-          signal: null 
-        };
-
-    console.log(`[chat-ai] Judge decision:`, JSON.stringify(decision));
-    if (actionableSignal) {
-      console.log(`[chat-ai] Actionable signal:`, JSON.stringify(actionableSignal));
-    }
-
-    // Fetch context data if authenticated
+    // Fetch context data first (needed for judge)
     let signals: EmailSignal[] = [];
     let socialProfiles: SocialProfile[] = [];
     let profile: ProfileContext | null = null;
@@ -459,6 +479,30 @@ serve(async (req) => {
       socialProfiles = fetchedSocialProfiles;
       profile = fetchedProfile;
       console.log(`[chat-ai] Context: ${signals.length} signals, ${socialProfiles.length} social profiles, profile: ${profile?.full_name || "none"}`);
+    }
+
+    // Detect if there's been prior banter (playful exchanges)
+    const hasPriorBanter = messages.some((m: any) => 
+      m.role === "assistant" && /haha|lol|funny/i.test(m.content)
+    );
+
+    // Call the judge to decide how to respond
+    const { decision, actionableSignal } = userId 
+      ? await callJudge(latestUserMessage, signals, messages, hasPriorBanter)
+      : { 
+          decision: { 
+            mode: "observer" as const, 
+            tone: "soft" as const, 
+            reference_signal: false, 
+            ask_question: false, 
+            allow_banter: false 
+          }, 
+          actionableSignal: null 
+        };
+
+    console.log(`[chat-ai] Judge decision:`, JSON.stringify(decision));
+    if (actionableSignal) {
+      console.log(`[chat-ai] Actionable signal:`, JSON.stringify(actionableSignal));
     }
 
     // Build the system prompt with judge decision

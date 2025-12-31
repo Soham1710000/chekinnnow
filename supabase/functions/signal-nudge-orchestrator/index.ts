@@ -119,6 +119,15 @@ async function runPipeline(supabase: any, userId: string): Promise<PipelineResul
       actionableSignal = signal;
     }
     
+    // Fetch user profile for personalization
+    const { data: userProfile } = await supabase
+      .from('profiles')
+      .select('*')
+      .eq('id', userId)
+      .maybeSingle();
+    
+    console.log(`[orchestrator] User profile: ${userProfile ? `${userProfile.full_name} - ${userProfile.role} @ ${userProfile.industry}` : 'none'}`);
+    
     const messageResult = await callEdgeFunction('message-generate', { 
       userId,
       decision: {
@@ -128,6 +137,7 @@ async function runPipeline(supabase: any, userId: string): Promise<PipelineResul
       context: {
         intents: stateResult.intents,
         state: stateResult.state,
+        profile: userProfile, // Include user profile for personalization
       },
     });
     result.messageResult = messageResult;

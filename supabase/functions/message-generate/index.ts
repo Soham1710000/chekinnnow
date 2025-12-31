@@ -128,7 +128,6 @@ CRITICAL CONSTRAINTS:
 - Maximum ${policy.max_sentences} sentences (HARD LIMIT)
 - Must include: ${policy.must_include.join(', ') || 'none specified'}
 - NEVER use: ${policy.must_avoid.join(', ') || 'none specified'}
-${policy.call_to_action ? `- End with: ${policy.call_to_action}` : '- No call-to-action needed'}
 - Personalization: ${policy.personalization_level}
 
 TONE GUIDELINES:
@@ -138,7 +137,7 @@ TONE GUIDELINES:
 - friendly: Warm, supportive, personal
 
 PERSONALIZATION LEVELS:
-- high: Use user's context, reference specific details, conversational
+- high: Use user's context, reference specific details from their profile, conversational
 - medium: Some context, but keep it professional
 - low: Generic, informative, minimal personal reference
 
@@ -150,16 +149,26 @@ BANNED PHRASES (NEVER USE):
 - "You should really..."
 - "Congratulations on..."
 - "Exciting news!"
+- "view_profile" or any action/button text
+- "networking can really make a difference" or similar generic advice
+- "Consider attending local meetups" without naming a specific meetup
 - Any emoji
+
+CRITICAL QUALITY RULES:
+1. NEVER give generic advice like "attend meetups" or "expand your contacts" - if you don't have specific names/events, output SKIP
+2. If the intervention type is "connect", you MUST have a specific person's name to connect with. If no name is provided in context, output SKIP
+3. If the intervention type is "discover", you MUST have a specific event/venue name. If none provided, output SKIP
+4. For "prepare" interventions, be specific about what to prepare for (company name, interviewer name, etc.)
+5. The message should feel like it was written by a friend who knows you, not a generic AI assistant
 
 OUTPUT REQUIREMENTS:
 - Plain text only, no markdown, no formatting
 - Start directly with the relevant information
-- Be specific, not vague
-- If showing evidence, weave it naturally into the message
-- If no good message can be generated within constraints, output: SKIP
+- Be SPECIFIC - use names, dates, locations from the context provided
+- If you cannot be specific because the context lacks details, output: SKIP
+- SKIP is always better than a vague, generic message
 
-Remember: Silence is better than a mediocre message.`;
+Remember: Silence is ALWAYS better than a mediocre or generic message. Output SKIP if you cannot be highly specific.`;
 }
 
 function buildUserPrompt(decision: Decision, context: any): string {
@@ -173,20 +182,58 @@ INTERVENTION TYPE: ${decision.intervention_type}
     prompt += `ACTIONABLE SIGNAL:
 - Category: ${decision.actionable_signal.category}
 - Type: ${decision.actionable_signal.type}
+- Subtype: ${decision.actionable_signal.subtype}
 - Evidence: ${decision.actionable_signal.evidence}
+- User Story: ${decision.actionable_signal.user_story}
 - Metadata: ${JSON.stringify(decision.actionable_signal.metadata || {})}
 
 `;
   }
 
-  if (context) {
-    prompt += `ADDITIONAL CONTEXT:
-${JSON.stringify(context, null, 2)}
+  // Add user profile for personalization
+  if (context?.profile) {
+    const p = context.profile;
+    prompt += `USER PROFILE:
+- Name: ${p.full_name || 'Unknown'}
+- Role: ${p.role || 'Not specified'}
+- Industry: ${p.industry || 'Not specified'}
+- Skills: ${(p.skills || []).join(', ') || 'Not specified'}
+- Goals: ${(p.goals || []).join(', ') || 'Not specified'}
+- Looking for: ${p.looking_for || 'Not specified'}
+- Connection intent: ${p.connection_intent || 'Not specified'}
 
 `;
   }
 
-  prompt += `Craft a message for the user based on this situation. Remember your constraints.`;
+  // Add user state
+  if (context?.state) {
+    const s = context.state;
+    prompt += `CURRENT STATE:
+- Travel destination: ${s.travel_destination || 'None'}
+- Career state: ${s.career_state || 'Unknown'}
+- Next event: ${s.next_event_name || 'None'}
+
+`;
+  }
+
+  // Add specific people/events if available (for connect/discover interventions)
+  if (context?.connections_in_location) {
+    prompt += `PEOPLE IN THIS LOCATION (for connect intervention):
+${JSON.stringify(context.connections_in_location, null, 2)}
+
+`;
+  }
+
+  if (context?.events_in_location) {
+    prompt += `EVENTS IN THIS LOCATION (for discover intervention):
+${JSON.stringify(context.events_in_location, null, 2)}
+
+`;
+  }
+
+  prompt += `IMPORTANT: If you cannot write a SPECIFIC message with real names/events/details, output only: SKIP
+
+Craft a message for the user based on this situation. Be specific and personal, or SKIP.`;
 
   return prompt;
 }

@@ -390,7 +390,7 @@ serve(async (req) => {
 
   try {
     const body = await req.json();
-    const { userId, processEmails, processLinkedIn, limit } = body;
+    const { userId, processEmails, processLinkedIn, limit, emailIds } = body;
 
     if (!userId) {
       return new Response(JSON.stringify({ error: "Missing userId" }), {
@@ -412,16 +412,24 @@ serve(async (req) => {
     const processLimit = limit || 10;
 
     // Process emails from raw_inputs
-    if (processEmails) {
-      const { data: emailInputs, error } = await supabase
+    if (processEmails || (emailIds && emailIds.length > 0)) {
+      let query = supabase
         .from("raw_inputs")
         .select("*")
         .eq("user_id", userId)
-        .eq("source", "gmail")
-        .eq("processed", false)
-        .order("occurred_at", { ascending: false })
-        .limit(processLimit);
-
+        .eq("source", "gmail");
+      
+      // If specific IDs provided, use those; otherwise get unprocessed
+      if (emailIds && emailIds.length > 0) {
+        query = query.in("id", emailIds);
+      } else {
+        query = query.eq("processed", false)
+          .order("occurred_at", { ascending: false })
+          .limit(processLimit);
+      }
+      
+      const { data: emailInputs, error } = await query;
+      
       if (error) {
         console.error("[signal-extract] Error fetching email raw_inputs:", error);
       } else if (emailInputs && emailInputs.length > 0) {

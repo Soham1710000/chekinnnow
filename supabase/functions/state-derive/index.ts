@@ -3,7 +3,7 @@ import { createClient } from "https://esm.sh/@supabase/supabase-js@2";
 /**
  * LAYERS 3-4: INTENT INFERENCE + STATE DERIVATION
  * 
- * Layer 3: Intent Inference (ephemeral, in-memory)
+ * Layer 3: Intent Inference (AI-powered, Claude 3.5 Sonnet)
  * Layer 4: State Derivation (stable summaries, stored)
  * 
  * Output: user_state table
@@ -16,6 +16,7 @@ const corsHeaders = {
 
 const SUPABASE_URL = Deno.env.get('SUPABASE_URL')!;
 const SUPABASE_SERVICE_ROLE_KEY = Deno.env.get('SUPABASE_SERVICE_ROLE_KEY')!;
+const ANTHROPIC_API_KEY = Deno.env.get('ANTHROPIC_API_KEY')!;
 
 // ===== INTENT VOCABULARY (LOCKED) =====
 type Intent =
@@ -32,6 +33,7 @@ interface InferredIntent {
   intent: Intent;
   strength: 'LOW' | 'MEDIUM' | 'HIGH';
   supporting_signal_ids: string[];
+  reasoning?: string;
 }
 
 interface Signal {
@@ -47,19 +49,125 @@ interface Signal {
   occurred_at: string;
 }
 
-// ===== LAYER 3: INTENT INFERENCE (ephemeral) =====
-function inferIntents(signals: Signal[]): InferredIntent[] {
+// ===== LAYER 3: INTENT INFERENCE (Claude 3.5 Sonnet) =====
+async function inferIntentsWithAI(signals: Signal[]): Promise<InferredIntent[]> {
+  if (signals.length === 0) {
+    return [];
+  }
+
+  const signalSummaries = signals.map(s => ({
+    id: s.id,
+    story: s.user_story,
+    category: s.category,
+    subtype: s.subtype,
+    confidence: s.confidence,
+    evidence: s.evidence?.slice(0, 200),
+    occurred_at: s.occurred_at,
+    metadata: s.metadata,
+  }));
+
+  const systemPrompt = `You are an intent inference engine for a professional networking platform. Your job is to analyze user signals and infer their current intents.
+
+VALID INTENTS (you may ONLY output these):
+- JOB_SWITCH: User is actively looking for a new role
+- JOB_ACCELERATION: Momentum is building in their job search (interviews, recruiter calls)
+- JOB_DECISION: User has an offer in hand and needs to decide
+- TRAVEL_ARRIVAL: User is traveling to or has arrived in a new city
+- EVENT_ATTENDANCE: User is attending an event
+- NEEDS_PREP: User has an upcoming time-bound event that requires preparation
+- SOCIAL_OPENNESS: User is socially active and open to connections
+- DECISION_STALLED: User has unfinished business or decisions pending
+
+STRENGTH LEVELS:
+- HIGH: Multiple high-confidence signals or very clear evidence
+- MEDIUM: Some evidence but not overwhelming
+- LOW: Weak signals or low confidence
+
+For each intent you infer, provide:
+1. The intent type (from the valid list above)
+2. The strength (HIGH, MEDIUM, or LOW)
+3. The IDs of signals that support this inference
+4. Brief reasoning
+
+Return a JSON array of inferred intents. Be conservative - only infer intents with real evidence.`;
+
+  const userPrompt = `Analyze these signals and infer the user's current intents:
+
+${JSON.stringify(signalSummaries, null, 2)}
+
+Return ONLY a valid JSON array like this:
+[
+  {
+    "intent": "JOB_ACCELERATION",
+    "strength": "HIGH",
+    "supporting_signal_ids": ["id1", "id2"],
+    "reasoning": "Multiple interview confirmations within 48 hours"
+  }
+]`;
+
+  try {
+    const response = await fetch('https://api.anthropic.com/v1/messages', {
+      method: 'POST',
+      headers: {
+        'x-api-key': ANTHROPIC_API_KEY,
+        'anthropic-version': '2023-06-01',
+        'Content-Type': 'application/json',
+      },
+      body: JSON.stringify({
+        model: 'claude-3-5-sonnet-20241022',
+        max_tokens: 2048,
+        messages: [
+          { role: 'user', content: `${systemPrompt}\n\n${userPrompt}` }
+        ],
+      }),
+    });
+
+    if (!response.ok) {
+      const error = await response.text();
+      console.error('[state-derive] Claude API error:', error);
+      // Fallback to rule-based inference
+      return inferIntentsRuleBased(signals);
+    }
+
+    const data = await response.json();
+    const content = data.content?.[0]?.text || '[]';
+    
+    // Extract JSON from response
+    const jsonMatch = content.match(/\[[\s\S]*\]/);
+    if (!jsonMatch) {
+      console.error('[state-derive] Failed to parse Claude response');
+      return inferIntentsRuleBased(signals);
+    }
+
+    const parsed = JSON.parse(jsonMatch[0]);
+    console.log('[state-derive] Claude inferred intents:', parsed);
+    
+    return parsed.map((p: any) => ({
+      intent: p.intent,
+      strength: p.strength,
+      supporting_signal_ids: p.supporting_signal_ids || [],
+      reasoning: p.reasoning,
+    }));
+
+  } catch (error) {
+    console.error('[state-derive] AI inference failed, using rules:', error);
+    return inferIntentsRuleBased(signals);
+  }
+}
+
+// ===== FALLBACK: RULE-BASED INFERENCE =====
+function inferIntentsRuleBased(signals: Signal[]): InferredIntent[] {
   const intents: InferredIntent[] = [];
   
-  // Group signals by category
   const byCategory: Record<string, Signal[]> = {};
   for (const sig of signals) {
     if (!byCategory[sig.category]) byCategory[sig.category] = [];
     byCategory[sig.category].push(sig);
   }
 
-  // ===== JOB_SWITCH =====
   const careerSignals = byCategory.CAREER || [];
+  
+  // JOB_SWITCH
   const switchSubtypes = ['ROLE_APPLICATION', 'BURNOUT', 'RECRUITER_INTEREST'];
   const switchSignals = careerSignals.filter(s => switchSubtypes.includes(s.subtype));
   if (switchSignals.length > 0) {
@@ -70,7 +178,7 @@ function inferIntents(signals: Signal[]): InferredIntent[] {
     });
   }
 
-  // ===== JOB_ACCELERATION =====
+  // JOB_ACCELERATION
   const accelSubtypes = ['INTERVIEW_CONFIRMED', 'RECRUITER_INTEREST'];
   const accelSignals = careerSignals.filter(s => accelSubtypes.includes(s.subtype));
   if (accelSignals.length > 0) {
@@ -81,17 +189,17 @@ function inferIntents(signals: Signal[]): InferredIntent[] {
     });
   }
 
-  // ===== JOB_DECISION =====
+  // JOB_DECISION
   const offerSignals = careerSignals.filter(s => s.subtype === 'OFFER_STAGE');
   if (offerSignals.length > 0) {
     intents.push({
       intent: 'JOB_DECISION',
-      strength: 'HIGH', // Always high if offer exists
+      strength: 'HIGH',
       supporting_signal_ids: offerSignals.map(s => s.id),
     });
   }
 
-  // ===== TRAVEL_ARRIVAL =====
+  // TRAVEL_ARRIVAL
   const travelSignals = byCategory.TRAVEL || [];
   const travelSubtypes = ['UPCOMING_TRIP', 'FLIGHT_BOOKED', 'HOTEL_BOOKED', 'IN_CITY'];
   const arrivalSignals = travelSignals.filter(s => travelSubtypes.includes(s.subtype));
@@ -103,7 +211,7 @@ function inferIntents(signals: Signal[]): InferredIntent[] {
     });
   }
 
-  // ===== EVENT_ATTENDANCE =====
+  // EVENT_ATTENDANCE
   const eventSignals = byCategory.EVENTS || [];
   const attendanceSubtypes = ['TICKET_CONFIRMED', 'RSVP_YES', 'SPEAKER'];
   const attendSignals = eventSignals.filter(s => attendanceSubtypes.includes(s.subtype));
@@ -115,7 +223,7 @@ function inferIntents(signals: Signal[]): InferredIntent[] {
     });
   }
 
-  // ===== NEEDS_PREP =====
+  // NEEDS_PREP
   const prepSignals = [
     ...careerSignals.filter(s => s.subtype === 'INTERVIEW_CONFIRMED'),
     ...(byCategory.MEETINGS || []),
@@ -130,7 +238,7 @@ function inferIntents(signals: Signal[]): InferredIntent[] {
     });
   }
 
-  // ===== SOCIAL_OPENNESS =====
+  // SOCIAL_OPENNESS
   const socialSignals = byCategory.SOCIAL || [];
   if (socialSignals.length > 0) {
     intents.push({
@@ -140,7 +248,7 @@ function inferIntents(signals: Signal[]): InferredIntent[] {
     });
   }
 
-  // ===== DECISION_STALLED =====
+  // DECISION_STALLED
   const lifeOpsSignals = byCategory.LIFE_OPS || [];
   if (lifeOpsSignals.length > 0) {
     intents.push({
@@ -164,7 +272,6 @@ function calculateStrength(signals: Signal[]): 'LOW' | 'MEDIUM' | 'HIGH' {
 }
 
 function isImminent(occurredAt: string, metadata: any): boolean {
-  // Check if event/meeting is scheduled in the future
   const eventDate = metadata?.departure_date || metadata?.interview_date || 
                     metadata?.event_date || metadata?.meeting_date;
   
@@ -174,7 +281,6 @@ function isImminent(occurredAt: string, metadata: any): boolean {
     return hoursUntil > 0 && hoursUntil <= 48;
   }
   
-  // Fallback: signal occurred recently and might be time-sensitive
   const signalDate = new Date(occurredAt);
   const hoursSince = (Date.now() - signalDate.getTime()) / (1000 * 60 * 60);
   return hoursSince < 24;
@@ -182,7 +288,6 @@ function isImminent(occurredAt: string, metadata: any): boolean {
 
 // ===== LAYER 4: STATE DERIVATION =====
 async function deriveState(supabase: any, userId: string, intents: InferredIntent[], signals: Signal[]) {
-  // Get current state
   const { data: currentState } = await supabase
     .from('user_state')
     .select('*')
@@ -194,11 +299,7 @@ async function deriveState(supabase: any, userId: string, intents: InferredInten
     updated_at: new Date().toISOString(),
   };
 
-  // ===== CAREER STATE =====
-  const careerIntents = intents.filter(i => 
-    i.intent === 'JOB_SWITCH' || i.intent === 'JOB_ACCELERATION' || i.intent === 'JOB_DECISION'
-  );
-
+  // CAREER STATE
   if (intents.some(i => i.intent === 'JOB_DECISION')) {
     newState.career_state = 'DECIDING';
   } else if (intents.some(i => i.intent === 'JOB_ACCELERATION' && i.strength === 'HIGH')) {
@@ -215,7 +316,7 @@ async function deriveState(supabase: any, userId: string, intents: InferredInten
     newState.career_state_since = currentState?.career_state_since;
   }
 
-  // ===== TRAVEL STATE =====
+  // TRAVEL STATE
   const travelIntent = intents.find(i => i.intent === 'TRAVEL_ARRIVAL');
   if (travelIntent) {
     const travelSignals = signals.filter(s => travelIntent.supporting_signal_ids.includes(s.id));
@@ -251,7 +352,7 @@ async function deriveState(supabase: any, userId: string, intents: InferredInten
     newState.travel_arrival_at = null;
   }
 
-  // ===== EVENT STATE =====
+  // EVENT STATE
   const eventIntent = intents.find(i => i.intent === 'EVENT_ATTENDANCE');
   if (eventIntent) {
     const eventSignals = signals.filter(s => eventIntent.supporting_signal_ids.includes(s.id));
@@ -280,7 +381,7 @@ async function deriveState(supabase: any, userId: string, intents: InferredInten
     newState.next_event_name = null;
   }
 
-  // ===== TRUST & FATIGUE =====
+  // TRUST & FATIGUE
   const { data: interactions } = await supabase
     .from('interaction_log')
     .select('*')
@@ -309,10 +410,8 @@ async function deriveState(supabase: any, userId: string, intents: InferredInten
   const ignores = allInteractions.filter((i: any) => i.interaction_type === 'user_ignored');
   newState.ignored_nudges = ignores.length;
 
-  // Fatigue score: higher = more fatigued
   newState.fatigue_score = (newState.nudges_24h * 10) + (newState.ignored_nudges * 20);
 
-  // Upsert state
   const { error } = await supabase
     .from('user_state')
     .upsert(newState, { onConflict: 'user_id' });
@@ -352,8 +451,8 @@ Deno.serve(async (req) => {
     const allSignals = (signals || []) as Signal[];
     console.log(`[state-derive] Found ${allSignals.length} signals for user:`, userId);
 
-    // Layer 3: Infer intents (ephemeral)
-    const intents = inferIntents(allSignals);
+    // Layer 3: Infer intents with Claude 3.5 Sonnet
+    const intents = await inferIntentsWithAI(allSignals);
     console.log(`[state-derive] Inferred ${intents.length} intents:`, intents.map(i => i.intent));
 
     // Layer 4: Derive state (persistent)
@@ -362,7 +461,7 @@ Deno.serve(async (req) => {
 
     return new Response(JSON.stringify({ 
       success: true,
-      intents: intents.map(i => ({ intent: i.intent, strength: i.strength })),
+      intents: intents.map(i => ({ intent: i.intent, strength: i.strength, reasoning: i.reasoning })),
       state: {
         career_state: state.career_state,
         travel_state: state.travel_state,

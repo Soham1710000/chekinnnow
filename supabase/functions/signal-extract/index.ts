@@ -50,9 +50,46 @@ function mapConfidenceToEnum(confidence: string | number): string {
   return 'LOW';
 }
 
+// Pre-filter to skip low-value emails before AI processing
+function shouldSkipEmail(email: any): boolean {
+  const subject = (email.subject || "").toLowerCase();
+  const from = (email.from || "").toLowerCase();
+  
+  // Skip LinkedIn job alerts (automated notifications)
+  if (from.includes("linkedin") || from.includes("jobalerts-noreply")) {
+    const jobAlertPatterns = [
+      "jobs match your preferences",
+      "job alert",
+      "new jobs",
+      "jobs for you",
+      "jobs in",
+      "who's hiring",
+      "is hiring",
+      "similar jobs",
+      "jobs at",
+      "apply now",
+      "recommended jobs"
+    ];
+    if (jobAlertPatterns.some(p => subject.includes(p))) {
+      return true;
+    }
+  }
+  
+  // Skip newsletters and marketing
+  const skipPatterns = [
+    "newsletter", "digest", "weekly roundup", "daily update",
+    "unsubscribe", "promotional", "special offer", "discount"
+  ];
+  if (skipPatterns.some(p => subject.includes(p))) {
+    return true;
+  }
+  
+  return false;
+}
+
 // Email signal extraction prompt based on JBTD taxonomy
 function buildEmailPrompt(email: any): string {
-  return `You are extracting ACTIONABLE LIFE SIGNALS from emails. Be selective - only extract signals that require user action or represent real opportunities.
+  return `You are extracting ACTIONABLE LIFE SIGNALS from emails. Be VERY selective - only extract signals that are personally directed to this user or represent CONFIRMED actions.
 
 EMAIL:
 Subject: ${email.subject || "N/A"}
@@ -62,55 +99,54 @@ Body: ${(email.body || "").slice(0, 4000)}
 
 SIGNAL CATEGORIES (extract signals matching these patterns):
 
-1. CAREER SIGNALS (HIGH PRIORITY):
-   - DIRECT_OUTREACH / RECRUITER_PERSONAL: Someone personally reaching out to hire (InMail, direct email). Look for: personal greeting, specific role mention, company intro. HIGH VALUE.
+1. CAREER SIGNALS (HIGH PRIORITY - must be PERSONAL):
+   - DIRECT_OUTREACH / RECRUITER_PERSONAL: Someone personally reaching out to hire (InMail, direct email). Look for: personal greeting using your name, specific role mention, company intro. HIGH VALUE.
    - CAREER_EVENT / INTERVIEW_CONFIRMED: "Interview scheduled", "Next round"
    - CAREER_EVENT / OFFER_STAGE: "Offer letter", "CTC", "Compensation"
    - DECISION_PRESSURE / TIME_BOUND_OFFER: "48 hours", "Please confirm"
    - NETWORK_HIRING_SIGNAL / KNOWN_CONTACT_HIRING: "We're hiring" from known contact
-   - CAREER_SWITCH_INTENT / ROLE_APPLICATION: "Thank you for applying", "Application received"
+   - CAREER_SWITCH_INTENT / ROLE_APPLICATION: "Thank you for applying", "Application received" - only for jobs YOU applied to
    
-   DO NOT EXTRACT (low value):
-   - Generic LinkedIn job alerts ("jobs match your preferences", "job alert for X")
+   CRITICAL - DO NOT EXTRACT (these are noise, not signals):
+   - ANY LinkedIn job alert emails (e.g. "X jobs match your preferences", "jobs for PM in Bangalore")
+   - "X is hiring" emails from LinkedIn - these are automated notifications
    - Mass recruiter emails without personal context
    - Newsletter job roundups
+   - Generic "we viewed your profile" messages
+   - "Start a conversation" prompts
+   - Job board digest emails
 
 2. TRAVEL SIGNALS:
-   - TRAVEL_CONFIRMED / UPCOMING_TRIP: Flight booking confirmation, airline, PNR
+   - TRAVEL_CONFIRMED / UPCOMING_TRIP: Flight booking confirmation with YOUR PNR/booking number
    - TRAVEL_CONFIRMED / IMMINENT_TRIP: Boarding pass, check-in complete
-   - STAY_CONTEXT / LOCATION_ANCHOR: Hotel/Airbnb booking with address
-   - ARRIVAL_CONTEXT / GROUND_TRANSPORT: Uber, airport transfer, pickup time
+   - STAY_CONTEXT / LOCATION_ANCHOR: Hotel/Airbnb booking with YOUR confirmation
+   - ARRIVAL_CONTEXT / GROUND_TRANSPORT: Uber receipt, airport transfer with pickup time
 
-3. EVENT SIGNALS (only REAL events user is attending):
-   - EVENT_ATTENDANCE / RSVP_CONFIRMED: Confirmed RSVP to Luma, Eventbrite, etc.
-   - EVENT_SCHEDULED / TIME_BOUND: Calendar invite (ICS) with location+time
-   - EVENT_INVITE / PRIVATE: Personal invitation to exclusive event
+3. EVENT SIGNALS (only REAL events user is personally attending):
+   - EVENT_ATTENDANCE / RSVP_CONFIRMED: Confirmed RSVP to Luma, Eventbrite with YOUR ticket
+   - EVENT_SCHEDULED / TIME_BOUND: Calendar invite (ICS) with YOUR name in attendees
+   - EVENT_INVITE / PRIVATE: Personal invitation addressed to YOU
    
    DO NOT EXTRACT:
-   - Course/bootcamp promotional emails (these are MARKETING, not events)
-   - Webinar promotions asking you to sign up
+   - Course/bootcamp promotional emails
+   - Webinar promotions asking to sign up
    - "Join our cohort" sales emails
+   - Event announcements not personally addressed
 
 4. SOCIAL SIGNALS:
-   - CONNECTION_REQUEST / PERSONAL: LinkedIn connection with personal note
-   - DIRECT_MESSAGE / OUTREACH: Someone reaching out to meet/chat
+   - CONNECTION_REQUEST / PERSONAL: LinkedIn connection with personal note mentioning YOU
+   - DIRECT_MESSAGE / OUTREACH: Someone specifically reaching out to meet/chat with YOU
    
    DO NOT EXTRACT:
-   - Generic "start a conversation" LinkedIn prompts
+   - Generic LinkedIn notifications
    - "X viewed your profile" notifications
-
-5. MEETING SIGNALS:
-   - UPCOMING_MEETING / EXTERNAL: External meeting with non-org attendees
-   - MEETING_CONTEXT / FIRST_MEETING: Meeting with unknown contact
+   - "People you may know" suggestions
 
 EXTRACTION RULES:
-1. BE SELECTIVE - only extract signals that are actionable or high-value
+1. BE EXTREMELY SELECTIVE - when in doubt, DO NOT extract
 2. Evidence MUST quote directly from the email
-3. Return [] for newsletters, promos, generic alerts
-4. Confidence levels:
-   - 0.9-1.0 = VERY_HIGH (explicit confirmation, direct outreach)
-   - 0.7-0.8 = HIGH (strong indicator)
-   - 0.5-0.6 = MEDIUM (suggestive but not certain)
+3. Return [] for: newsletters, promos, generic alerts, job digests, automated notifications
+4. Only extract if the email is PERSONALLY addressed and ACTIONABLE
 
 OUTPUT FORMAT (JSON array):
 [{
@@ -142,6 +178,12 @@ async function extractEmailSignals(
       body: rawInput.raw_text,
       messageId: rawInput.external_id,
     };
+
+    // Pre-filter to skip low-value emails
+    if (shouldSkipEmail(email)) {
+      console.log(`[signal-extract] Skipping low-value email: ${email.subject?.slice(0, 50)}`);
+      continue;
+    }
 
     const prompt = buildEmailPrompt(email);
 

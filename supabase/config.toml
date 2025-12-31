@@ -95,3 +95,15 @@ verify_jwt = false
 
 [functions.signal-nudge-orchestrator]
 verify_jwt = false
+
+[functions.linkedin-ingest]
+verify_jwt = false
+
+[functions.linkedin-signal-process]
+verify_jwt = false
+
+[functions.linkedin-match-hiring]
+verify_jwt = false
+
+[functions.linkedin-meeting-prep]
+verify_jwt = false

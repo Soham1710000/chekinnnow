@@ -1,7 +1,7 @@
 import { createClient } from "https://esm.sh/@supabase/supabase-js@2";
 
 /**
- * LAYER 5: JUDGMENT ENGINE (Claude 3.5 Sonnet - 99.7% rule adherence)
+ * LAYER 5: JUDGMENT ENGINE (Claude with Gemini fallback - 99.7% rule adherence)
  * 
  * Purpose: Decide WHEN to message and WHAT type of intervention
  * 
@@ -15,7 +15,8 @@ const corsHeaders = {
 
 const SUPABASE_URL = Deno.env.get('SUPABASE_URL')!;
 const SUPABASE_SERVICE_ROLE_KEY = Deno.env.get('SUPABASE_SERVICE_ROLE_KEY')!;
-const ANTHROPIC_API_KEY = Deno.env.get('ANTHROPIC_API_KEY')!;
+const ANTHROPIC_API_KEY = Deno.env.get('ANTHROPIC_API_KEY');
+const LOVABLE_API_KEY = Deno.env.get('LOVABLE_API_KEY');
 
 interface UserState {
   user_id: string;
@@ -92,7 +93,7 @@ function hasCriticalIntent(intents: InferredIntent[]): boolean {
   );
 }
 
-// ===== AI-POWERED JUDGMENT (Claude 3.5 Sonnet) =====
+// ===== AI-POWERED JUDGMENT =====
 async function judgeWithAI(state: UserState, intents: InferredIntent[], signals: Signal[]): Promise<Decision> {
   const systemPrompt = `You are the Judgment Engine for ChekInn, a professional networking platform. Your role is to decide IF and WHEN to message a user based on their current state and inferred intents.
 
@@ -160,61 +161,112 @@ Return ONLY a valid JSON object like:
   "actionable_signal_id": "signal-id-here"
 }`;
 
-  try {
-    const response = await fetch('https://api.anthropic.com/v1/messages', {
-      method: 'POST',
-      headers: {
-        'x-api-key': ANTHROPIC_API_KEY,
-        'anthropic-version': '2023-06-01',
-        'Content-Type': 'application/json',
-      },
-      body: JSON.stringify({
-        model: 'claude-3-5-sonnet-20241022',
-        max_tokens: 1024,
-        messages: [
-          { role: 'user', content: `${systemPrompt}\n\n${userPrompt}` }
-        ],
-      }),
-    });
+  // Try Claude first
+  if (ANTHROPIC_API_KEY) {
+    try {
+      const response = await fetch('https://api.anthropic.com/v1/messages', {
+        method: 'POST',
+        headers: {
+          'x-api-key': ANTHROPIC_API_KEY,
+          'anthropic-version': '2023-06-01',
+          'Content-Type': 'application/json',
+        },
+        body: JSON.stringify({
+          model: 'claude-sonnet-4-5',
+          max_tokens: 1024,
+          messages: [
+            { role: 'user', content: `${systemPrompt}\n\n${userPrompt}` }
+          ],
+        }),
+      });
 
-    if (!response.ok) {
-      const error = await response.text();
-      console.error('[judgment-engine] Claude API error:', error);
-      return judgeRuleBased(state, intents, signals);
+      if (response.ok) {
+        const data = await response.json();
+        const content = data.content?.[0]?.text || '{}';
+        
+        const jsonMatch = content.match(/\{[\s\S]*\}/);
+        if (jsonMatch) {
+          const decision = JSON.parse(jsonMatch[0]) as Decision;
+          console.log('[judgment-engine] Claude decision:', decision.reasoning);
+
+          // ENFORCE KILL SWITCHES
+          const silence = shouldSilence(state);
+          if (silence.silent && !hasCriticalIntent(intents)) {
+            return {
+              should_message: false,
+              timing: 'silent',
+              intervention_type: null,
+              priority: 'low',
+              context_needed: [],
+              reasoning: `Kill switch: ${silence.reason}. AI wanted: ${decision.reasoning}`,
+            };
+          }
+
+          return decision;
+        }
+      } else {
+        console.warn('[judgment-engine] Claude API failed, trying Gemini fallback');
+      }
+    } catch (error) {
+      console.warn('[judgment-engine] Claude error, trying Gemini fallback:', error);
     }
-
-    const data = await response.json();
-    const content = data.content?.[0]?.text || '{}';
-    
-    // Extract JSON from response
-    const jsonMatch = content.match(/\{[\s\S]*\}/);
-    if (!jsonMatch) {
-      console.error('[judgment-engine] Failed to parse Claude response');
-      return judgeRuleBased(state, intents, signals);
-    }
-
-    const decision = JSON.parse(jsonMatch[0]) as Decision;
-    console.log('[judgment-engine] Claude decision:', decision);
-
-    // ENFORCE KILL SWITCHES (AI cannot override these)
-    const silence = shouldSilence(state);
-    if (silence.silent && !hasCriticalIntent(intents)) {
-      return {
-        should_message: false,
-        timing: 'silent',
-        intervention_type: null,
-        priority: 'low',
-        context_needed: [],
-        reasoning: `Kill switch: ${silence.reason}. AI wanted: ${decision.reasoning}`,
-      };
-    }
-
-    return decision;
-
-  } catch (error) {
-    console.error('[judgment-engine] AI judgment failed, using rules:', error);
-    return judgeRuleBased(state, intents, signals);
   }
+
+  // Fallback to Gemini via Lovable AI
+  if (LOVABLE_API_KEY) {
+    try {
+      console.log('[judgment-engine] Using Gemini 2.5 Pro fallback');
+      
+      const response = await fetch('https://ai.gateway.lovable.dev/v1/chat/completions', {
+        method: 'POST',
+        headers: {
+          'Authorization': `Bearer ${LOVABLE_API_KEY}`,
+          'Content-Type': 'application/json',
+        },
+        body: JSON.stringify({
+          model: 'google/gemini-2.5-pro',
+          messages: [
+            { role: 'system', content: systemPrompt },
+            { role: 'user', content: userPrompt },
+          ],
+        }),
+      });
+
+      if (response.ok) {
+        const data = await response.json();
+        const content = data.choices?.[0]?.message?.content || '{}';
+        
+        const jsonMatch = content.match(/\{[\s\S]*\}/);
+        if (jsonMatch) {
+          const decision = JSON.parse(jsonMatch[0]) as Decision;
+          console.log('[judgment-engine] Gemini decision:', decision.reasoning);
+
+          // ENFORCE KILL SWITCHES
+          const silence = shouldSilence(state);
+          if (silence.silent && !hasCriticalIntent(intents)) {
+            return {
+              should_message: false,
+              timing: 'silent',
+              intervention_type: null,
+              priority: 'low',
+              context_needed: [],
+              reasoning: `Kill switch: ${silence.reason}. AI wanted: ${decision.reasoning}`,
+            };
+          }
+
+          return decision;
+        }
+      } else {
+        console.error('[judgment-engine] Gemini API also failed:', await response.text());
+      }
+    } catch (error) {
+      console.error('[judgment-engine] Gemini error:', error);
+    }
+  }
+
+  // Final fallback to rules
+  console.log('[judgment-engine] All AI failed, using rule-based judgment');
+  return judgeRuleBased(state, intents, signals);
 }
 
 // ===== FALLBACK: RULE-BASED JUDGMENT =====

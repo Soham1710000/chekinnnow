@@ -53,7 +53,7 @@ interface Introduction {
   };
 }
 
-const CHAT_URL = `${import.meta.env.VITE_SUPABASE_URL}/functions/v1/chat-ai`;
+const CHAT_URL = `${import.meta.env.VITE_SUPABASE_URL}/functions/v1/chat-orchestrator`;
 
 // Generate or get session ID
 const getSessionId = () => {
@@ -430,22 +430,9 @@ const Chat = () => {
   // Track if this is first message of current session
   const isFirstMessageOfSessionRef = useRef(true);
   
-  const getAIResponseStreaming = async (
-    conversationHistory: { role: string; content: string }[],
-    onDelta: (text: string) => void
-  ): Promise<string | null> => {
-    const isReturningUser = user && messages.length > 0;
-    const hasPendingIntros = introductions.some(i => 
-      i.status === "pending" || 
-      i.status === "accepted_a" || 
-      i.status === "accepted_b" ||
-      i.status === "active"
-    );
-    const isFirstMessageOfSession = isFirstMessageOfSessionRef.current;
-    
-    if (isFirstMessageOfSession) {
-      isFirstMessageOfSessionRef.current = false;
-    }
+  // Check for proactive messages from the new architecture
+  const checkProactiveMessage = useCallback(async () => {
+    if (!user) return;
     
     try {
       const response = await fetch(CHAT_URL, {
@@ -455,12 +442,50 @@ const Chat = () => {
           Authorization: `Bearer ${import.meta.env.VITE_SUPABASE_PUBLISHABLE_KEY}`,
         },
         body: JSON.stringify({
-          messages: conversationHistory,
+          userId: user.id,
+          action: "check_proactive",
+        }),
+      });
+      
+      if (response.ok) {
+        const data = await response.json();
+        if (data.proactive_message) {
+          console.log("[Chat] Received proactive message:", data.decision);
+          await sendBotMessage(data.proactive_message);
+        }
+      }
+    } catch (error) {
+      console.error("[Chat] Error checking proactive message:", error);
+    }
+  }, [user]);
+  
+  // Check for proactive messages on load
+  useEffect(() => {
+    if (user && messages.length > 0) {
+      // Check after a delay to not interrupt initial load
+      const timer = setTimeout(() => {
+        checkProactiveMessage();
+      }, 2000);
+      return () => clearTimeout(timer);
+    }
+  }, [user, checkProactiveMessage]);
+
+  const getAIResponseStreaming = async (
+    conversationHistory: { role: string; content: string }[],
+    onDelta: (text: string) => void
+  ): Promise<string | null> => {
+    const lastUserMessage = conversationHistory[conversationHistory.length - 1]?.content;
+    
+    try {
+      const response = await fetch(CHAT_URL, {
+        method: "POST",
+        headers: {
+          "Content-Type": "application/json",
+          Authorization: `Bearer ${import.meta.env.VITE_SUPABASE_PUBLISHABLE_KEY}`,
+        },
+        body: JSON.stringify({
           userId: user?.id || null,
-          isAuthenticated: true,
-          isReturningUser,
-          isFirstMessageOfSession,
-          hasPendingIntros,
+          message: lastUserMessage,
         }),
       });
 
@@ -469,6 +494,14 @@ const Chat = () => {
           toast({
             title: "Please wait",
             description: "Too many messages. Try again in a moment.",
+            variant: "destructive",
+          });
+          return null;
+        }
+        if (response.status === 402) {
+          toast({
+            title: "Usage limit",
+            description: "AI usage limit reached. Please try again later.",
             variant: "destructive",
           });
           return null;

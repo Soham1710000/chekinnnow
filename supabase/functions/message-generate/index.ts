@@ -216,6 +216,57 @@ INTERVENTION TYPE: ${decision.intervention_type}
 `;
   }
 
+  // === LINKEDIN CONTEXT: Hiring Matches ===
+  if (context?.linkedin?.hiring_matches?.length > 0) {
+    const matches = context.linkedin.hiring_matches;
+    prompt += `LINKEDIN HIRING OPPORTUNITIES IN YOUR NETWORK (for connect intervention):
+${matches.slice(0, 5).map((m: any, i: number) => 
+  `${i + 1}. ${m.author_name} (${m.author_headline || 'Unknown role'})
+   - Posted: "${(m.evidence || '').substring(0, 150)}..."
+   - Match score: ${m.match_score}% (matched: ${m.matched_keywords?.join(', ') || 'skills'})
+   - Is founder: ${m.is_founder ? 'Yes' : 'No'}
+   - 1st degree connection: ${m.is_1st_degree ? 'Yes (warm intro possible)' : 'No'}
+   - Profile: ${m.author_profile_url || 'N/A'}`
+).join('\n\n')}
+
+`;
+  }
+
+  // === LINKEDIN CONTEXT: Meeting Prep ===
+  if (context?.linkedin?.meeting_prep) {
+    const prep = context.linkedin.meeting_prep;
+    prompt += `MEETING CONTEXT (for prepare intervention):
+Meeting: ${prep.meeting_title || 'Upcoming meeting'} at ${prep.meeting_time || 'soon'}
+
+`;
+    
+    if (prep.attendees?.length > 0) {
+      prompt += `ATTENDEES:
+${prep.attendees.map((a: any, i: number) => 
+  `${i + 1}. ${a.name} - ${a.headline || a.role || 'Unknown role'} at ${a.company || 'Unknown company'}
+   - 1st degree connection: ${a.is_1st_degree ? 'Yes' : 'No'}
+   - Recent posts: ${a.recent_posts?.slice(0, 2).map((p: any) => `"${(p.text || '').substring(0, 80)}..."`).join('; ') || 'None visible'}`
+).join('\n\n')}
+
+`;
+    }
+
+    if (prep.shared_context?.companies?.length > 0) {
+      prompt += `SHARED CONTEXT:
+- Same company: ${prep.shared_context.companies.join(', ')}
+- Shared skills/topics: ${prep.shared_context.skills?.join(', ') || 'None found'}
+
+`;
+    }
+
+    if (prep.talking_points?.length > 0) {
+      prompt += `AI-SUGGESTED TALKING POINTS:
+${prep.talking_points.map((t: string, i: number) => `${i + 1}. ${t}`).join('\n')}
+
+`;
+    }
+  }
+
   // Add specific people/events if available (for connect/discover interventions)
   if (context?.connections_in_location) {
     prompt += `PEOPLE IN THIS LOCATION (for connect intervention):

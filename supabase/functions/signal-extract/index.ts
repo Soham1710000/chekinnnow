@@ -188,14 +188,21 @@ async function extractEmailSignals(
     const prompt = buildEmailPrompt(email);
 
     try {
-      const response = await fetch("https://api.openai.com/v1/chat/completions", {
+      const LOVABLE_API_KEY = Deno.env.get("LOVABLE_API_KEY");
+      const apiKey = LOVABLE_API_KEY || openaiKey;
+      const apiUrl = LOVABLE_API_KEY 
+        ? "https://ai.gateway.lovable.dev/v1/chat/completions"
+        : "https://api.openai.com/v1/chat/completions";
+      const model = LOVABLE_API_KEY ? "google/gemini-2.5-flash" : "gpt-4o-mini";
+
+      const response = await fetch(apiUrl, {
         method: "POST",
         headers: {
-          Authorization: `Bearer ${openaiKey}`,
+          Authorization: `Bearer ${apiKey}`,
           "Content-Type": "application/json",
         },
         body: JSON.stringify({
-          model: "gpt-4o-mini",
+          model: model,
           messages: [
             { role: "system", content: "You extract life signals from emails. Return only valid JSON arrays. Be conservative - only extract clear signals." },
             { role: "user", content: prompt }
@@ -205,7 +212,7 @@ async function extractEmailSignals(
       });
 
       if (!response.ok) {
-        console.error("[signal-extract] OpenAI error:", await response.text());
+        console.error("[signal-extract] AI error:", await response.text());
         continue;
       }
 
@@ -239,7 +246,7 @@ async function extractEmailSignals(
             subtype: s.subtype || "general",
             confidence: mapConfidenceToEnum(s.confidence),
             evidence: s.evidence,
-            extraction_method: "ai_gpt4o_mini",
+            extraction_method: "ai_lovable_gemini",
             ai_reasoning: s.reasoning || "",
             occurred_at: rawInput.occurred_at || new Date().toISOString(),
             metadata: {
@@ -289,14 +296,21 @@ async function extractLinkedInSignals(
       : buildMeetingPrepPrompt(profile, postsText, aboutText);
 
     try {
-      const response = await fetch("https://api.openai.com/v1/chat/completions", {
+      const LOVABLE_API_KEY = Deno.env.get("LOVABLE_API_KEY");
+      const apiKey = LOVABLE_API_KEY || openaiKey;
+      const apiUrl = LOVABLE_API_KEY 
+        ? "https://ai.gateway.lovable.dev/v1/chat/completions"
+        : "https://api.openai.com/v1/chat/completions";
+      const model = LOVABLE_API_KEY ? "google/gemini-2.5-flash" : "gpt-4o-mini";
+
+      const response = await fetch(apiUrl, {
         method: "POST",
         headers: {
-          Authorization: `Bearer ${openaiKey}`,
+          Authorization: `Bearer ${apiKey}`,
           "Content-Type": "application/json",
         },
         body: JSON.stringify({
-          model: "gpt-4o-mini",
+          model: model,
           messages: [
             { role: "system", content: "You extract LinkedIn signals. Return only valid JSON arrays." },
             { role: "user", content: prompt }
@@ -306,7 +320,7 @@ async function extractLinkedInSignals(
       });
 
       if (!response.ok) {
-        console.error("[signal-extract] LinkedIn OpenAI error:", await response.text());
+        console.error("[signal-extract] LinkedIn AI error:", await response.text());
         continue;
       }
 
@@ -331,7 +345,7 @@ async function extractLinkedInSignals(
             subtype: s.subtype || "general",
             confidence: mapConfidenceToEnum(s.confidence),
             evidence: s.evidence,
-            extraction_method: "ai_gpt4o_mini",
+            extraction_method: "ai_lovable_gemini",
             ai_reasoning: s.reasoning || "",
             occurred_at: rawInput.occurred_at,
             metadata: {

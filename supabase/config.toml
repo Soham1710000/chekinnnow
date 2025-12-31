@@ -74,3 +74,6 @@ verify_jwt = false
 
 [functions.chat-orchestrator]
 verify_jwt = false
+
+[functions.linkedin-scrape]
+verify_jwt = false

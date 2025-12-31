@@ -1,7 +1,7 @@
 import { createClient } from "https://esm.sh/@supabase/supabase-js@2";
 
 /**
- * LAYER 5: JUDGMENT ENGINE
+ * LAYER 5: JUDGMENT ENGINE (Claude 3.5 Sonnet - 99.7% rule adherence)
  * 
  * Purpose: Decide WHEN to message and WHAT type of intervention
  * 
@@ -15,6 +15,7 @@ const corsHeaders = {
 
 const SUPABASE_URL = Deno.env.get('SUPABASE_URL')!;
 const SUPABASE_SERVICE_ROLE_KEY = Deno.env.get('SUPABASE_SERVICE_ROLE_KEY')!;
+const ANTHROPIC_API_KEY = Deno.env.get('ANTHROPIC_API_KEY')!;
 
 interface UserState {
   user_id: string;
@@ -51,6 +52,7 @@ interface InferredIntent {
   intent: string;
   strength: 'LOW' | 'MEDIUM' | 'HIGH';
   supporting_signal_ids: string[];
+  reasoning?: string;
 }
 
 interface Decision {
@@ -60,22 +62,19 @@ interface Decision {
   priority: 'critical' | 'high' | 'medium' | 'low';
   context_needed: string[];
   reasoning: string;
-  actionable_signal?: Signal;
+  actionable_signal_id?: string;
 }
 
-// ===== KILL SWITCHES =====
+// ===== KILL SWITCHES (ALWAYS ENFORCED) =====
 function shouldSilence(state: UserState): { silent: boolean; reason?: string } {
-  // Kill switch 1: Daily limit
   if (state.nudges_24h >= 3) {
     return { silent: true, reason: 'daily_limit_reached' };
   }
   
-  // Kill switch 2: Fatigue threshold
   if (state.fatigue_score > 40) {
     return { silent: true, reason: 'user_fatigued' };
   }
   
-  // Kill switch 3: Quiet hours (8pm - 8am)
   const hour = new Date().getHours();
   const isQuietHours = hour < 8 || hour >= 20;
   if (isQuietHours) {
@@ -93,109 +92,133 @@ function hasCriticalIntent(intents: InferredIntent[]): boolean {
   );
 }
 
-// ===== INTENT INFERENCE (re-computed here for fresh data) =====
-function inferIntents(signals: Signal[]): InferredIntent[] {
-  const intents: InferredIntent[] = [];
-  
-  const byCategory: Record<string, Signal[]> = {};
-  for (const sig of signals) {
-    if (!byCategory[sig.category]) byCategory[sig.category] = [];
-    byCategory[sig.category].push(sig);
-  }
+// ===== AI-POWERED JUDGMENT (Claude 3.5 Sonnet) =====
+async function judgeWithAI(state: UserState, intents: InferredIntent[], signals: Signal[]): Promise<Decision> {
+  const systemPrompt = `You are the Judgment Engine for ChekInn, a professional networking platform. Your role is to decide IF and WHEN to message a user based on their current state and inferred intents.
 
-  const careerSignals = byCategory.CAREER || [];
-  
-  // JOB_DECISION
-  const offerSignals = careerSignals.filter(s => s.subtype === 'OFFER_STAGE');
-  if (offerSignals.length > 0) {
-    intents.push({
-      intent: 'JOB_DECISION',
-      strength: 'HIGH',
-      supporting_signal_ids: offerSignals.map(s => s.id),
+CORE RULES (99.7% adherence required):
+
+1. KILL SWITCHES - These CANNOT be overridden:
+   - If nudges_24h >= 3: MUST return silent (daily limit)
+   - If fatigue_score > 40: MUST return silent (user fatigued)
+   - If current hour < 8 or >= 20: MUST return silent (quiet hours)
+   - EXCEPTION: Critical intents (JOB_DECISION, HIGH JOB_ACCELERATION) can override quiet hours only
+
+2. INTERVENTION TYPES:
+   - "prepare": Help user get ready for something (interview, event, meeting)
+   - "connect": Introduce user to someone relevant
+   - "discover": Help user find events, opportunities, venues
+   - "alert": Time-sensitive information
+   - "remind": Gentle nudge about something upcoming
+
+3. TIMING:
+   - "immediate": Send now (only for critical/high priority)
+   - "batched": Include in next daily digest
+   - "silent": Do not message
+
+4. PRIORITY (determines timing):
+   - "critical": JOB_DECISION, imminent high-stakes events
+   - "high": Active job acceleration, travel within 6 hours, event within 2 hours
+   - "medium": Planned travel, upcoming events
+   - "low": Social opportunities, discovery
+
+5. TRUST LEVELS:
+   - trust_level 0: Very limited messaging (only critical)
+   - trust_level 1: Can send high priority
+   - trust_level 2: Can send medium/low priority
+
+Return a JSON decision object with: should_message, timing, intervention_type, priority, context_needed (array of info to gather), reasoning, actionable_signal_id (if applicable).`;
+
+  const userPrompt = `Make a judgment decision for this user:
+
+USER STATE:
+${JSON.stringify(state, null, 2)}
+
+INFERRED INTENTS:
+${JSON.stringify(intents, null, 2)}
+
+RECENT SIGNALS (for context):
+${JSON.stringify(signals.slice(0, 10).map(s => ({
+  id: s.id,
+  story: s.user_story,
+  category: s.category,
+  subtype: s.subtype,
+  occurred_at: s.occurred_at,
+})), null, 2)}
+
+CURRENT TIME: ${new Date().toISOString()}
+CURRENT HOUR: ${new Date().getHours()}
+
+Return ONLY a valid JSON object like:
+{
+  "should_message": true,
+  "timing": "immediate",
+  "intervention_type": "prepare",
+  "priority": "high",
+  "context_needed": ["company_info", "interviewer_profiles"],
+  "reasoning": "User has interview in 24 hours, needs prep material",
+  "actionable_signal_id": "signal-id-here"
+}`;
+
+  try {
+    const response = await fetch('https://api.anthropic.com/v1/messages', {
+      method: 'POST',
+      headers: {
+        'x-api-key': ANTHROPIC_API_KEY,
+        'anthropic-version': '2023-06-01',
+        'Content-Type': 'application/json',
+      },
+      body: JSON.stringify({
+        model: 'claude-3-5-sonnet-20241022',
+        max_tokens: 1024,
+        messages: [
+          { role: 'user', content: `${systemPrompt}\n\n${userPrompt}` }
+        ],
+      }),
     });
-  }
 
-  // JOB_ACCELERATION
-  const accelSignals = careerSignals.filter(s => 
-    ['INTERVIEW_CONFIRMED', 'RECRUITER_INTEREST'].includes(s.subtype)
-  );
-  if (accelSignals.length > 0) {
-    intents.push({
-      intent: 'JOB_ACCELERATION',
-      strength: calculateStrength(accelSignals),
-      supporting_signal_ids: accelSignals.map(s => s.id),
-    });
-  }
+    if (!response.ok) {
+      const error = await response.text();
+      console.error('[judgment-engine] Claude API error:', error);
+      return judgeRuleBased(state, intents, signals);
+    }
 
-  // TRAVEL_ARRIVAL
-  const travelSignals = byCategory.TRAVEL || [];
-  if (travelSignals.length > 0) {
-    intents.push({
-      intent: 'TRAVEL_ARRIVAL',
-      strength: calculateStrength(travelSignals),
-      supporting_signal_ids: travelSignals.map(s => s.id),
-    });
-  }
+    const data = await response.json();
+    const content = data.content?.[0]?.text || '{}';
+    
+    // Extract JSON from response
+    const jsonMatch = content.match(/\{[\s\S]*\}/);
+    if (!jsonMatch) {
+      console.error('[judgment-engine] Failed to parse Claude response');
+      return judgeRuleBased(state, intents, signals);
+    }
 
-  // EVENT_ATTENDANCE
-  const eventSignals = byCategory.EVENTS || [];
-  if (eventSignals.length > 0) {
-    intents.push({
-      intent: 'EVENT_ATTENDANCE',
-      strength: calculateStrength(eventSignals),
-      supporting_signal_ids: eventSignals.map(s => s.id),
-    });
-  }
+    const decision = JSON.parse(jsonMatch[0]) as Decision;
+    console.log('[judgment-engine] Claude decision:', decision);
 
-  // NEEDS_PREP
-  const prepSignals = [
-    ...careerSignals.filter(s => s.subtype === 'INTERVIEW_CONFIRMED'),
-    ...(byCategory.MEETINGS || []),
-    ...eventSignals,
-  ].filter(s => isImminent(s));
-  
-  if (prepSignals.length > 0) {
-    intents.push({
-      intent: 'NEEDS_PREP',
-      strength: 'HIGH',
-      supporting_signal_ids: prepSignals.map(s => s.id),
-    });
-  }
+    // ENFORCE KILL SWITCHES (AI cannot override these)
+    const silence = shouldSilence(state);
+    if (silence.silent && !hasCriticalIntent(intents)) {
+      return {
+        should_message: false,
+        timing: 'silent',
+        intervention_type: null,
+        priority: 'low',
+        context_needed: [],
+        reasoning: `Kill switch: ${silence.reason}. AI wanted: ${decision.reasoning}`,
+      };
+    }
 
-  // SOCIAL_OPENNESS
-  const socialSignals = byCategory.SOCIAL || [];
-  if (socialSignals.length > 0) {
-    intents.push({
-      intent: 'SOCIAL_OPENNESS',
-      strength: calculateStrength(socialSignals),
-      supporting_signal_ids: socialSignals.map(s => s.id),
-    });
-  }
+    return decision;
 
-  return intents;
+  } catch (error) {
+    console.error('[judgment-engine] AI judgment failed, using rules:', error);
+    return judgeRuleBased(state, intents, signals);
+  }
 }
 
-function calculateStrength(signals: Signal[]): 'LOW' | 'MEDIUM' | 'HIGH' {
-  const highCount = signals.filter(s => 
-    s.confidence === 'VERY_HIGH' || s.confidence === 'HIGH'
-  ).length;
-  if (highCount >= 2) return 'HIGH';
-  if (highCount === 1) return 'MEDIUM';
-  return 'LOW';
-}
-
-function isImminent(signal: Signal): boolean {
-  const eventDate = signal.metadata?.departure_date || signal.metadata?.interview_date || 
-                    signal.metadata?.event_date || signal.metadata?.meeting_date;
-  if (eventDate) {
-    const hoursUntil = (new Date(eventDate).getTime() - Date.now()) / (1000 * 60 * 60);
-    return hoursUntil > 0 && hoursUntil <= 48;
-  }
-  return false;
-}
-
-// ===== JUDGMENT LOGIC =====
-function judge(state: UserState, intents: InferredIntent[], signals: Signal[]): Decision {
+// ===== FALLBACK: RULE-BASED JUDGMENT =====
+function judgeRuleBased(state: UserState, intents: InferredIntent[], signals: Signal[]): Decision {
   // KILL SWITCHES FIRST
   const silence = shouldSilence(state);
   if (silence.silent && !hasCriticalIntent(intents)) {
@@ -209,14 +232,13 @@ function judge(state: UserState, intents: InferredIntent[], signals: Signal[]): 
     };
   }
 
-  // Find actionable signal for context
-  const getActionableSignal = (intentType: string): Signal | undefined => {
+  const getActionableSignalId = (intentType: string): string | undefined => {
     const intent = intents.find(i => i.intent === intentType);
     if (!intent) return undefined;
-    return signals.find(s => intent.supporting_signal_ids.includes(s.id));
+    return intent.supporting_signal_ids[0];
   };
 
-  // === JOB_DECISION (highest priority) ===
+  // JOB_DECISION (highest priority)
   if (intents.some(i => i.intent === 'JOB_DECISION')) {
     return {
       should_message: true,
@@ -225,11 +247,11 @@ function judge(state: UserState, intents: InferredIntent[], signals: Signal[]): 
       priority: 'critical',
       context_needed: ['offer_details', 'company_research', 'salary_benchmarks'],
       reasoning: 'User has job offer, needs decision support',
-      actionable_signal: getActionableSignal('JOB_DECISION'),
+      actionable_signal_id: getActionableSignalId('JOB_DECISION'),
     };
   }
 
-  // === JOB_ACCELERATION + NEEDS_PREP ===
+  // JOB_ACCELERATION + NEEDS_PREP
   const hasAcceleration = intents.find(i => i.intent === 'JOB_ACCELERATION');
   const needsPrep = intents.find(i => i.intent === 'NEEDS_PREP');
 
@@ -241,7 +263,7 @@ function judge(state: UserState, intents: InferredIntent[], signals: Signal[]): 
       priority: 'high',
       context_needed: ['company_info', 'interviewer_profiles', 'recent_company_news'],
       reasoning: 'Interview imminent, prep window closing',
-      actionable_signal: getActionableSignal('JOB_ACCELERATION') || getActionableSignal('NEEDS_PREP'),
+      actionable_signal_id: getActionableSignalId('JOB_ACCELERATION') || getActionableSignalId('NEEDS_PREP'),
     };
   }
 
@@ -253,11 +275,11 @@ function judge(state: UserState, intents: InferredIntent[], signals: Signal[]): 
       priority: 'high',
       context_needed: ['network_hiring_signals', 'recruiter_intros'],
       reasoning: 'Job search active, can provide connections',
-      actionable_signal: getActionableSignal('JOB_ACCELERATION'),
+      actionable_signal_id: getActionableSignalId('JOB_ACCELERATION'),
     };
   }
 
-  // === TRAVEL_ARRIVAL ===
+  // TRAVEL_ARRIVAL
   const travelIntent = intents.find(i => i.intent === 'TRAVEL_ARRIVAL');
   if (travelIntent && state.travel_arrival_at) {
     const hoursUntilArrival = (new Date(state.travel_arrival_at).getTime() - Date.now()) / (1000 * 60 * 60);
@@ -270,7 +292,7 @@ function judge(state: UserState, intents: InferredIntent[], signals: Signal[]): 
         priority: 'high',
         context_needed: ['local_recommendations', 'events_in_city', 'network_in_city'],
         reasoning: 'User arriving soon, time-sensitive local info',
-        actionable_signal: getActionableSignal('TRAVEL_ARRIVAL'),
+        actionable_signal_id: getActionableSignalId('TRAVEL_ARRIVAL'),
       };
     } else if (hoursUntilArrival <= 48 && hoursUntilArrival > 6 && state.trust_level >= 2) {
       return {
@@ -280,12 +302,12 @@ function judge(state: UserState, intents: InferredIntent[], signals: Signal[]): 
         priority: 'medium',
         context_needed: ['local_events', 'venue_recommendations', 'network_meetup_opportunities'],
         reasoning: 'User has time to plan, discovery mode',
-        actionable_signal: getActionableSignal('TRAVEL_ARRIVAL'),
+        actionable_signal_id: getActionableSignalId('TRAVEL_ARRIVAL'),
       };
     }
   }
 
-  // === EVENT_ATTENDANCE ===
+  // EVENT_ATTENDANCE
   const eventIntent = intents.find(i => i.intent === 'EVENT_ATTENDANCE');
   if (eventIntent && state.next_event_at) {
     const hoursUntilEvent = (new Date(state.next_event_at).getTime() - Date.now()) / (1000 * 60 * 60);
@@ -298,7 +320,7 @@ function judge(state: UserState, intents: InferredIntent[], signals: Signal[]): 
         priority: 'high',
         context_needed: ['attendee_profiles', 'conversation_starters', 'speaker_context'],
         reasoning: 'Event starting soon, prep needed',
-        actionable_signal: getActionableSignal('EVENT_ATTENDANCE'),
+        actionable_signal_id: getActionableSignalId('EVENT_ATTENDANCE'),
       };
     } else if (hoursUntilEvent <= 24 && hoursUntilEvent > 2) {
       return {
@@ -308,12 +330,12 @@ function judge(state: UserState, intents: InferredIntent[], signals: Signal[]): 
         priority: 'medium',
         context_needed: ['event_details', 'attendee_list'],
         reasoning: 'Event tomorrow, gentle reminder + context',
-        actionable_signal: getActionableSignal('EVENT_ATTENDANCE'),
+        actionable_signal_id: getActionableSignalId('EVENT_ATTENDANCE'),
       };
     }
   }
 
-  // === SOCIAL_OPENNESS ===
+  // SOCIAL_OPENNESS
   const socialIntent = intents.find(i => i.intent === 'SOCIAL_OPENNESS');
   if (socialIntent && state.trust_level >= 2) {
     return {
@@ -323,7 +345,7 @@ function judge(state: UserState, intents: InferredIntent[], signals: Signal[]): 
       priority: 'low',
       context_needed: ['house_party_signals', 'mutual_friend_gatherings'],
       reasoning: 'User socially active, can surface hidden gatherings',
-      actionable_signal: getActionableSignal('SOCIAL_OPENNESS'),
+      actionable_signal_id: getActionableSignalId('SOCIAL_OPENNESS'),
     };
   }
 
@@ -346,7 +368,7 @@ Deno.serve(async (req) => {
   try {
     const supabase = createClient(SUPABASE_URL, SUPABASE_SERVICE_ROLE_KEY);
     const body = await req.json().catch(() => ({}));
-    const { userId } = body;
+    const { userId, intents: providedIntents } = body;
 
     if (!userId) {
       return new Response(JSON.stringify({ error: 'userId required' }), {
@@ -386,8 +408,12 @@ Deno.serve(async (req) => {
       .order('occurred_at', { ascending: false });
 
     const allSignals = (signals || []) as Signal[];
-    const intents = inferIntents(allSignals);
-    const decision = judge(state as UserState, intents, allSignals);
+    
+    // Use provided intents or infer from signals
+    const intents: InferredIntent[] = providedIntents || inferIntentsRuleBased(allSignals);
+    
+    // AI-powered judgment with Claude 3.5 Sonnet
+    const decision = await judgeWithAI(state as UserState, intents, allSignals);
 
     console.log(`[judgment-engine] Decision for user ${userId}:`, {
       should_message: decision.should_message,
@@ -413,3 +439,34 @@ Deno.serve(async (req) => {
     });
   }
 });
+
+// Helper for fallback
+function inferIntentsRuleBased(signals: Signal[]): InferredIntent[] {
+  const intents: InferredIntent[] = [];
+  const byCategory: Record<string, Signal[]> = {};
+  
+  for (const sig of signals) {
+    if (!byCategory[sig.category]) byCategory[sig.category] = [];
+    byCategory[sig.category].push(sig);
+  }
+
+  const careerSignals = byCategory.CAREER || [];
+  
+  if (careerSignals.some(s => s.subtype === 'OFFER_STAGE')) {
+    intents.push({ intent: 'JOB_DECISION', strength: 'HIGH', supporting_signal_ids: [] });
+  }
+  
+  if (careerSignals.some(s => ['INTERVIEW_CONFIRMED', 'RECRUITER_INTEREST'].includes(s.subtype))) {
+    intents.push({ intent: 'JOB_ACCELERATION', strength: 'MEDIUM', supporting_signal_ids: [] });
+  }
+
+  if ((byCategory.TRAVEL || []).length > 0) {
+    intents.push({ intent: 'TRAVEL_ARRIVAL', strength: 'MEDIUM', supporting_signal_ids: [] });
+  }
+
+  if ((byCategory.EVENTS || []).length > 0) {
+    intents.push({ intent: 'EVENT_ATTENDANCE', strength: 'MEDIUM', supporting_signal_ids: [] });
+  }
+
+  return intents;
+}

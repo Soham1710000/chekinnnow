@@ -52,7 +52,7 @@ function mapConfidenceToEnum(confidence: string | number): string {
 
 // Email signal extraction prompt based on JBTD taxonomy
 function buildEmailPrompt(email: any): string {
-  return `You are extracting LIFE SIGNALS from emails using a comprehensive taxonomy.
+  return `You are extracting ACTIONABLE LIFE SIGNALS from emails. Be selective - only extract signals that require user action or represent real opportunities.
 
 EMAIL:
 Subject: ${email.subject || "N/A"}
@@ -62,15 +62,18 @@ Body: ${(email.body || "").slice(0, 4000)}
 
 SIGNAL CATEGORIES (extract signals matching these patterns):
 
-1. CAREER SIGNALS:
-   - CAREER_SWITCH_INTENT / ROLE_APPLICATION: "Thank you for applying", "Application received"
-   - CAREER_INTENSITY / APPLICATION_SPIKE: Multiple applications in short window
+1. CAREER SIGNALS (HIGH PRIORITY):
+   - DIRECT_OUTREACH / RECRUITER_PERSONAL: Someone personally reaching out to hire (InMail, direct email). Look for: personal greeting, specific role mention, company intro. HIGH VALUE.
    - CAREER_EVENT / INTERVIEW_CONFIRMED: "Interview scheduled", "Next round"
-   - CAREER_FRICTION / PROCESS_DELAY: "Rescheduled", "Pushed"
-   - MARKET_DEMAND_SIGNAL / RECRUITER_INTERESTED: "Came across your profile", "Quick chat"
    - CAREER_EVENT / OFFER_STAGE: "Offer letter", "CTC", "Compensation"
    - DECISION_PRESSURE / TIME_BOUND_OFFER: "48 hours", "Please confirm"
    - NETWORK_HIRING_SIGNAL / KNOWN_CONTACT_HIRING: "We're hiring" from known contact
+   - CAREER_SWITCH_INTENT / ROLE_APPLICATION: "Thank you for applying", "Application received"
+   
+   DO NOT EXTRACT (low value):
+   - Generic LinkedIn job alerts ("jobs match your preferences", "job alert for X")
+   - Mass recruiter emails without personal context
+   - Newsletter job roundups
 
 2. TRAVEL SIGNALS:
    - TRAVEL_CONFIRMED / UPCOMING_TRIP: Flight booking confirmation, airline, PNR
@@ -78,49 +81,49 @@ SIGNAL CATEGORIES (extract signals matching these patterns):
    - STAY_CONTEXT / LOCATION_ANCHOR: Hotel/Airbnb booking with address
    - ARRIVAL_CONTEXT / GROUND_TRANSPORT: Uber, airport transfer, pickup time
 
-3. EVENT SIGNALS:
-   - EVENT_ATTENDANCE / RSVP_CONFIRMED: Luma, Eventbrite RSVP
+3. EVENT SIGNALS (only REAL events user is attending):
+   - EVENT_ATTENDANCE / RSVP_CONFIRMED: Confirmed RSVP to Luma, Eventbrite, etc.
    - EVENT_SCHEDULED / TIME_BOUND: Calendar invite (ICS) with location+time
-   - EVENT_INVITE / PRIVATE: "You're invited" to exclusive event
-   - EVENT_SIGNAL / SPEAKER_EVENT: "Speaking at" mention
+   - EVENT_INVITE / PRIVATE: Personal invitation to exclusive event
+   
+   DO NOT EXTRACT:
+   - Course/bootcamp promotional emails (these are MARKETING, not events)
+   - Webinar promotions asking you to sign up
+   - "Join our cohort" sales emails
 
-4. MEETING SIGNALS:
+4. SOCIAL SIGNALS:
+   - CONNECTION_REQUEST / PERSONAL: LinkedIn connection with personal note
+   - DIRECT_MESSAGE / OUTREACH: Someone reaching out to meet/chat
+   
+   DO NOT EXTRACT:
+   - Generic "start a conversation" LinkedIn prompts
+   - "X viewed your profile" notifications
+
+5. MEETING SIGNALS:
    - UPCOMING_MEETING / EXTERNAL: External meeting with non-org attendees
    - MEETING_CONTEXT / FIRST_MEETING: Meeting with unknown contact
-   - MEETING_CONTEXT / COMPLEX_THREAD: Long email threads (>5 replies)
-   - MEETING_CONTEXT / MATERIAL_REVIEW: Decks, docs attachments
-
-5. LIFESTYLE SIGNALS:
-   - TASTE_PROFILE / FOOD: Food delivery, restaurant bookings
-   - TASTE_PROFILE / VENUE: Cafe, venue photos
-   - BEHAVIORAL_SIGNAL / CONSUMPTION: Subscriptions (Zomato, BookMyShow)
-
-6. LIFE_OPS SIGNALS:
-   - FOLLOW_UP_GAP / MISSED_REPLY: Important unreplied mail (5-7 days)
-   - DECISION_DELAY / STALLED_CHOICE: "Will get back", no follow-up
 
 EXTRACTION RULES:
-1. Only extract signals with confidence >= 0.5
+1. BE SELECTIVE - only extract signals that are actionable or high-value
 2. Evidence MUST quote directly from the email
-3. Return [] if no signals found
-4. Do NOT hallucinate - only extract what's clearly in the email
-5. Confidence levels:
-   - 0.9-1.0 = VERY_HIGH (explicit confirmation)
+3. Return [] for newsletters, promos, generic alerts
+4. Confidence levels:
+   - 0.9-1.0 = VERY_HIGH (explicit confirmation, direct outreach)
    - 0.7-0.8 = HIGH (strong indicator)
    - 0.5-0.6 = MEDIUM (suggestive but not certain)
 
 OUTPUT FORMAT (JSON array):
 [{
   "user_story": "One sentence describing what this signal means",
-  "category": "CAREER|TRAVEL|EVENTS|MEETINGS|LIFESTYLE|LIFE_OPS|SOCIAL",
+  "category": "CAREER|TRAVEL|EVENTS|SOCIAL|MEETINGS",
   "type": "SIGNAL_TYPE from above",
   "subtype": "SIGNAL_SUBTYPE from above",
   "confidence": "0.5-1.0",
   "evidence": "exact quote from email",
-  "reasoning": "why this indicates the signal"
+  "reasoning": "why this is actionable"
 }]
 
-If no meaningful signals, return [].`;
+If no actionable signals, return [].`;
 }
 
 // Process emails from raw_inputs

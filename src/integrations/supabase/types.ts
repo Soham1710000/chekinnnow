@@ -542,6 +542,132 @@ export type Database = {
         }
         Relationships: []
       }
+      linkedin_connections: {
+        Row: {
+          company: string | null
+          email: string | null
+          extracted_at: string | null
+          headline: string | null
+          id: string
+          last_seen_at: string | null
+          name: string
+          profile_url: string
+          user_id: string
+        }
+        Insert: {
+          company?: string | null
+          email?: string | null
+          extracted_at?: string | null
+          headline?: string | null
+          id?: string
+          last_seen_at?: string | null
+          name: string
+          profile_url: string
+          user_id: string
+        }
+        Update: {
+          company?: string | null
+          email?: string | null
+          extracted_at?: string | null
+          headline?: string | null
+          id?: string
+          last_seen_at?: string | null
+          name?: string
+          profile_url?: string
+          user_id?: string
+        }
+        Relationships: []
+      }
+      linkedin_posts: {
+        Row: {
+          author_headline: string | null
+          author_name: string
+          author_profile_url: string | null
+          extracted_at: string | null
+          id: string
+          post_text: string
+          post_type: string | null
+          posted_at: string | null
+          processed: boolean | null
+          user_id: string
+        }
+        Insert: {
+          author_headline?: string | null
+          author_name: string
+          author_profile_url?: string | null
+          extracted_at?: string | null
+          id?: string
+          post_text: string
+          post_type?: string | null
+          posted_at?: string | null
+          processed?: boolean | null
+          user_id: string
+        }
+        Update: {
+          author_headline?: string | null
+          author_name?: string
+          author_profile_url?: string | null
+          extracted_at?: string | null
+          id?: string
+          post_text?: string
+          post_type?: string | null
+          posted_at?: string | null
+          processed?: boolean | null
+          user_id?: string
+        }
+        Relationships: []
+      }
+      linkedin_profiles: {
+        Row: {
+          current_company: string | null
+          education: Json | null
+          first_fetched: string | null
+          headline: string | null
+          id: string
+          last_fetched: string | null
+          location: string | null
+          name: string
+          past_experiences: Json | null
+          profile_url: string
+          recent_posts: Json | null
+          role_title: string | null
+          skills: Json | null
+          user_id: string
+        }
+        Insert: {
+          current_company?: string | null
+          education?: Json | null
+          first_fetched?: string | null
+          headline?: string | null
+          id?: string
+          last_fetched?: string | null
+          location?: string | null
+          name: string
+          past_experiences?: Json | null
+          profile_url: string
+          recent_posts?: Json | null
+          role_title?: string | null
+          skills?: Json | null
+          user_id: string
+        }
+        Update: {
+          current_company?: string | null
+          education?: Json | null
+          first_fetched?: string | null
+          headline?: string | null
+          id?: string
+          last_fetched?: string | null
+          location?: string | null
+          name?: string
+          past_experiences?: Json | null
+          profile_url?: string
+          recent_posts?: Json | null
+          role_title?: string | null
+          skills?: Json | null
+          user_id?: string
+        }
+        Relationships: []
+      }
       oauth_tokens: {
         Row: {
           access_token_encrypted: string
@@ -582,6 +708,39 @@ export type Database = {
             referencedColumns: ["id"]
           },
         ]
+      }
+      profile_fetch_log: {
+        Row: {
+          context: Json | null
+          created_at: string | null
+          error_message: string | null
+          id: string
+          profile_url: string
+          reason: string
+          success: boolean | null
+          user_id: string
+        }
+        Insert: {
+          context?: Json | null
+          created_at?: string | null
+          error_message?: string | null
+          id?: string
+          profile_url: string
+          reason: string
+          success?: boolean | null
+          user_id: string
+        }
+        Update: {
+          context?: Json | null
+          created_at?: string | null
+          error_message?: string | null
+          id?: string
+          profile_url?: string
+          reason?: string
+          success?: boolean | null
+          user_id?: string
+        }
+        Relationships: []
       }
       profiles: {
         Row: {
@@ -928,6 +1087,51 @@ export type Database = {
             referencedColumns: ["id"]
           },
         ]
+      }
+      user_linkedin_profile: {
+        Row: {
+          created_at: string | null
+          current_company: string | null
+          education: Json | null
+          headline: string | null
+          id: string
+          location: string | null
+          name: string | null
+          profile_url: string | null
+          role_title: string | null
+          skills: Json | null
+          synced_at: string | null
+          user_id: string
+        }
+        Insert: {
+          created_at?: string | null
+          current_company?: string | null
+          education?: Json | null
+          headline?: string | null
+          id?: string
+          location?: string | null
+          name?: string | null
+          profile_url?: string | null
+          role_title?: string | null
+          skills?: Json | null
+          synced_at?: string | null
+          user_id: string
+        }
+        Update: {
+          created_at?: string | null
+          current_company?: string | null
+          education?: Json | null
+          headline?: string | null
+          id?: string
+          location?: string | null
+          name?: string | null
+          profile_url?: string | null
+          role_title?: string | null
+          skills?: Json | null
+          synced_at?: string | null
+          user_id?: string
+        }
+        Relationships: []
       }
       user_messages: {
         Row: {

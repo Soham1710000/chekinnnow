@@ -1,0 +1,177 @@
+<!DOCTYPE html>
+<html>
+<head>
+  <meta charset="UTF-8">
+  <style>
+    * {
+      box-sizing: border-box;
+      margin: 0;
+      padding: 0;
+    }
+    body {
+      width: 320px;
+      padding: 20px;
+      font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif;
+      background: linear-gradient(135deg, #1a1a2e 0%, #16213e 100%);
+      color: #fff;
+    }
+    .logo {
+      text-align: center;
+      margin-bottom: 20px;
+    }
+    .logo h1 {
+      font-size: 24px;
+      font-weight: 700;
+      color: #fff;
+    }
+    .logo span {
+      color: #6366f1;
+    }
+    .status {
+      text-align: center;
+      padding: 10px;
+      border-radius: 8px;
+      margin-bottom: 20px;
+      font-size: 14px;
+    }
+    .status.connected {
+      background: rgba(34, 197, 94, 0.2);
+      color: #22c55e;
+    }
+    .status.disconnected {
+      background: rgba(239, 68, 68, 0.2);
+      color: #ef4444;
+    }
+    .form-group {
+      margin-bottom: 15px;
+    }
+    label {
+      display: block;
+      font-size: 12px;
+      color: #94a3b8;
+      margin-bottom: 5px;
+    }
+    input {
+      width: 100%;
+      padding: 10px 12px;
+      border: 1px solid #334155;
+      border-radius: 8px;
+      background: #1e293b;
+      color: #fff;
+      font-size: 14px;
+    }
+    input:focus {
+      outline: none;
+      border-color: #6366f1;
+    }
+    button {
+      width: 100%;
+      padding: 12px;
+      border: none;
+      border-radius: 8px;
+      font-size: 14px;
+      font-weight: 600;
+      cursor: pointer;
+      transition: all 0.2s;
+    }
+    button.primary {
+      background: #6366f1;
+      color: #fff;
+    }
+    button.primary:hover {
+      background: #4f46e5;
+    }
+    button.secondary {
+      background: #334155;
+      color: #fff;
+      margin-top: 10px;
+    }
+    button.secondary:hover {
+      background: #475569;
+    }
+    .info {
+      font-size: 12px;
+      color: #64748b;
+      text-align: center;
+      margin-top: 15px;
+    }
+    #auth-form, #logged-in-view {
+      display: none;
+    }
+    #auth-form.active, #logged-in-view.active {
+      display: block;
+    }
+    .user-email {
+      text-align: center;
+      font-size: 14px;
+      color: #94a3b8;
+      margin-bottom: 15px;
+    }
+    .stats {
+      background: #1e293b;
+      border-radius: 8px;
+      padding: 15px;
+      margin-bottom: 15px;
+    }
+    .stat-row {
+      display: flex;
+      justify-content: space-between;
+      font-size: 13px;
+      margin-bottom: 8px;
+    }
+    .stat-row:last-child {
+      margin-bottom: 0;
+    }
+    .stat-value {
+      color: #6366f1;
+      font-weight: 600;
+    }
+  </style>
+</head>
+<body>
+  <div class="logo">
+    <h1>Chek<span>Inn</span></h1>
+  </div>
+
+  <div id="status" class="status disconnected">
+    Not connected
+  </div>
+
+  <div id="auth-form">
+    <div class="form-group">
+      <label for="email">Email</label>
+      <input type="email" id="email" placeholder="your@email.com" />
+    </div>
+    <div class="form-group">
+      <label for="password">Password</label>
+      <input type="password" id="password" placeholder="••••••••" />
+    </div>
+    <button type="button" id="login-btn" class="primary">Connect Account</button>
+    <p class="info">
+      Use your ChekInn credentials to sync LinkedIn data automatically.
+    </p>
+  </div>
+
+  <div id="logged-in-view">
+    <p class="user-email" id="user-email"></p>
+    <div class="stats">
+      <div class="stat-row">
+        <span>Connections synced</span>
+        <span class="stat-value" id="stat-connections">-</span>
+      </div>
+      <div class="stat-row">
+        <span>Posts captured</span>
+        <span class="stat-value" id="stat-posts">-</span>
+      </div>
+      <div class="stat-row">
+        <span>Last sync</span>
+        <span class="stat-value" id="stat-last-sync">-</span>
+      </div>
+    </div>
+    <button type="button" id="sync-now-btn" class="primary">Sync Now</button>
+    <button type="button" id="logout-btn" class="secondary">Disconnect</button>
+  </div>
+
+  <script src="popup.js"></script>
+</body>
+</html>

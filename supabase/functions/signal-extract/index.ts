@@ -166,13 +166,22 @@ async function extractEmailSignals(
 
       const data = await response.json();
       let content = data.choices?.[0]?.message?.content || "[]";
+      
+      console.log(`[signal-extract] Email: ${email.subject?.slice(0, 50)} | AI response length: ${content.length}`);
 
       content = content.trim();
       if (content.startsWith("```")) {
         content = content.replace(/^```(?:json)?\n?/, "").replace(/\n?```$/, "");
       }
 
-      const extracted = JSON.parse(content);
+      let extracted = [];
+      try {
+        extracted = JSON.parse(content);
+        console.log(`[signal-extract] Parsed ${extracted.length} signals from email`);
+      } catch (parseErr) {
+        console.error(`[signal-extract] JSON parse failed for email ${email.subject}:`, content.slice(0, 200));
+        continue;
+      }
 
       for (const s of extracted) {
         if (parseFloat(s.confidence) >= 0.5) {

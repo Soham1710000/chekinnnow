@@ -128,16 +128,57 @@ async function runPipeline(supabase: any, userId: string): Promise<PipelineResul
     
     console.log(`[orchestrator] User profile: ${userProfile ? `${userProfile.full_name} - ${userProfile.role} @ ${userProfile.industry}` : 'none'}`);
     
+    // === LINKEDIN INTEGRATION: Fetch context based on decision.context_needed ===
+    let linkedinContext: any = {};
+    const contextNeeded = judgmentResult.decision?.context_needed || [];
+    
+    // Hiring matches (for job-related nudges)
+    if (contextNeeded.includes('linkedin_hiring_matches') || contextNeeded.includes('network_warm_intros')) {
+      console.log(`[orchestrator] Fetching LinkedIn hiring matches for ${userId}`);
+      const hiringResult = await callEdgeFunction('linkedin-match-hiring', { userId });
+      
+      if (hiringResult?.matches?.length > 0) {
+        linkedinContext.hiring_matches = hiringResult.matches;
+        console.log(`[orchestrator] Found ${hiringResult.matches.length} hiring matches`);
+      }
+    }
+    
+    // Meeting prep (for meeting/event related nudges)
+    if (contextNeeded.includes('linkedin_meeting_prep') || contextNeeded.includes('attendee_context')) {
+      console.log(`[orchestrator] Fetching LinkedIn meeting prep for ${userId}`);
+      
+      // Get meeting details from the actionable signal metadata
+      const meetingTitle = actionableSignal?.metadata?.event_name || stateResult.state?.next_event_name || 'Upcoming meeting';
+      const meetingTime = actionableSignal?.metadata?.event_date || stateResult.state?.next_event_at;
+      const attendeeNames = actionableSignal?.metadata?.attendees || [];
+      
+      if (meetingTime) {
+        const prepResult = await callEdgeFunction('linkedin-meeting-prep', {
+          userId,
+          attendeeNames,
+          meetingTitle,
+          meetingTime
+        });
+        
+        if (prepResult?.prep) {
+          linkedinContext.meeting_prep = prepResult.prep;
+          console.log(`[orchestrator] Meeting prep: ${prepResult.prep.attendees?.length || 0} attendees found`);
+        }
+      }
+    }
+    
     const messageResult = await callEdgeFunction('message-generate', { 
       userId,
       decision: {
         ...judgmentResult.decision,
         actionable_signal: actionableSignal,
+        linkedin_context: linkedinContext,
       },
       context: {
         intents: stateResult.intents,
         state: stateResult.state,
-        profile: userProfile, // Include user profile for personalization
+        profile: userProfile,
+        linkedin: linkedinContext,
       },
     });
     result.messageResult = messageResult;

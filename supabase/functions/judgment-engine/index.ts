@@ -6,6 +6,10 @@ import { createClient } from "https://esm.sh/@supabase/supabase-js@2";
  * Purpose: Decide WHEN to message and WHAT type of intervention
  * 
  * Output: Decision objects (should_message, timing, intervention_type, priority)
+ * 
+ * LinkedIn Integration:
+ * - Hiring signals: When JOB_SWITCH/JOB_ACCELERATION detected, check for network hiring matches
+ * - Meeting prep: When NEEDS_PREP detected with calendar signals, prepare meeting context
  */
 
 const corsHeaders = {
@@ -17,6 +21,56 @@ const SUPABASE_URL = Deno.env.get('SUPABASE_URL')!;
 const SUPABASE_SERVICE_ROLE_KEY = Deno.env.get('SUPABASE_SERVICE_ROLE_KEY')!;
 const ANTHROPIC_API_KEY = Deno.env.get('ANTHROPIC_API_KEY');
 const LOVABLE_API_KEY = Deno.env.get('LOVABLE_API_KEY');
+
+// ===== LINKEDIN INTEGRATION HELPERS =====
+async function fetchLinkedInHiringMatches(userId: string): Promise<any> {
+  try {
+    const response = await fetch(`${SUPABASE_URL}/functions/v1/linkedin-match-hiring`, {
+      method: 'POST',
+      headers: {
+        'Authorization': `Bearer ${SUPABASE_SERVICE_ROLE_KEY}`,
+        'Content-Type': 'application/json',
+      },
+      body: JSON.stringify({ userId }),
+    });
+    
+    if (response.ok) {
+      return await response.json();
+    }
+    console.warn('[judgment-engine] LinkedIn hiring match failed:', response.status);
+    return null;
+  } catch (error) {
+    console.error('[judgment-engine] LinkedIn hiring match error:', error);
+    return null;
+  }
+}
+
+async function fetchLinkedInMeetingPrep(
+  userId: string, 
+  attendeeNames: string[], 
+  meetingTitle: string, 
+  meetingTime: string
+): Promise<any> {
+  try {
+    const response = await fetch(`${SUPABASE_URL}/functions/v1/linkedin-meeting-prep`, {
+      method: 'POST',
+      headers: {
+        'Authorization': `Bearer ${SUPABASE_SERVICE_ROLE_KEY}`,
+        'Content-Type': 'application/json',
+      },
+      body: JSON.stringify({ userId, attendeeNames, meetingTitle, meetingTime }),
+    });
+    
+    if (response.ok) {
+      return await response.json();
+    }
+    console.warn('[judgment-engine] LinkedIn meeting prep failed:', response.status);
+    return null;
+  } catch (error) {
+    console.error('[judgment-engine] LinkedIn meeting prep error:', error);
+    return null;
+  }
+}
 
 interface UserState {
   user_id: string;
@@ -64,6 +118,10 @@ interface Decision {
   context_needed: string[];
   reasoning: string;
   actionable_signal_id?: string;
+  linkedin_context?: {
+    hiring_matches?: any[];
+    meeting_prep?: any;
+  };
 }
 
 // ===== KILL SWITCHES (ALWAYS ENFORCED) =====
@@ -303,7 +361,7 @@ function judgeRuleBased(state: UserState, intents: InferredIntent[], signals: Si
     };
   }
 
-  // JOB_ACCELERATION + NEEDS_PREP
+  // JOB_ACCELERATION + NEEDS_PREP (interview imminent)
   const hasAcceleration = intents.find(i => i.intent === 'JOB_ACCELERATION');
   const needsPrep = intents.find(i => i.intent === 'NEEDS_PREP');
 
@@ -319,16 +377,20 @@ function judgeRuleBased(state: UserState, intents: InferredIntent[], signals: Si
     };
   }
 
-  if (hasAcceleration && hasAcceleration.strength === 'HIGH' && state.trust_level >= 1) {
-    return {
-      should_message: true,
-      timing: 'batched',
-      intervention_type: 'connect',
-      priority: 'high',
-      context_needed: ['network_hiring_signals', 'recruiter_intros'],
-      reasoning: 'Job search active, can provide connections',
-      actionable_signal_id: getActionableSignalId('JOB_ACCELERATION'),
-    };
+  // JOB_ACCELERATION or JOB_SWITCH without immediate prep need -> check LinkedIn hiring matches
+  const hasJobSwitch = intents.find(i => i.intent === 'JOB_SWITCH');
+  if ((hasAcceleration && hasAcceleration.strength === 'HIGH') || hasJobSwitch) {
+    if (state.trust_level >= 1) {
+      return {
+        should_message: true,
+        timing: 'batched',
+        intervention_type: 'connect',
+        priority: 'high',
+        context_needed: ['linkedin_hiring_matches', 'network_warm_intros'],
+        reasoning: 'Job search active, checking network for relevant hiring signals',
+        actionable_signal_id: getActionableSignalId('JOB_ACCELERATION') || getActionableSignalId('JOB_SWITCH'),
+      };
+    }
   }
 
   // TRAVEL_ARRIVAL
@@ -359,7 +421,7 @@ function judgeRuleBased(state: UserState, intents: InferredIntent[], signals: Si
     }
   }
 
-  // EVENT_ATTENDANCE
+  // EVENT_ATTENDANCE - check for meeting prep opportunities
   const eventIntent = intents.find(i => i.intent === 'EVENT_ATTENDANCE');
   if (eventIntent && state.next_event_at) {
     const hoursUntilEvent = (new Date(state.next_event_at).getTime() - Date.now()) / (1000 * 60 * 60);
@@ -370,8 +432,8 @@ function judgeRuleBased(state: UserState, intents: InferredIntent[], signals: Si
         timing: 'immediate',
         intervention_type: 'prepare',
         priority: 'high',
-        context_needed: ['attendee_profiles', 'conversation_starters', 'speaker_context'],
-        reasoning: 'Event starting soon, prep needed',
+        context_needed: ['linkedin_meeting_prep', 'attendee_profiles', 'conversation_starters'],
+        reasoning: 'Event starting soon, LinkedIn prep available',
         actionable_signal_id: getActionableSignalId('EVENT_ATTENDANCE'),
       };
     } else if (hoursUntilEvent <= 24 && hoursUntilEvent > 2) {
@@ -380,11 +442,24 @@ function judgeRuleBased(state: UserState, intents: InferredIntent[], signals: Si
         timing: 'batched',
         intervention_type: 'alert',
         priority: 'medium',
-        context_needed: ['event_details', 'attendee_list'],
-        reasoning: 'Event tomorrow, gentle reminder + context',
+        context_needed: ['linkedin_meeting_prep', 'event_details', 'attendee_list'],
+        reasoning: 'Event tomorrow, can provide LinkedIn context on attendees',
         actionable_signal_id: getActionableSignalId('EVENT_ATTENDANCE'),
       };
     }
+  }
+  
+  // NEEDS_PREP without JOB_ACCELERATION - could be a meeting prep scenario
+  if (needsPrep && !hasAcceleration) {
+    return {
+      should_message: true,
+      timing: 'immediate',
+      intervention_type: 'prepare',
+      priority: 'high',
+      context_needed: ['linkedin_meeting_prep', 'attendee_context', 'talking_points'],
+      reasoning: 'Meeting prep needed, checking LinkedIn for attendee context',
+      actionable_signal_id: getActionableSignalId('NEEDS_PREP'),
+    };
   }
 
   // SOCIAL_OPENNESS
@@ -511,6 +586,11 @@ function inferIntentsRuleBased(signals: Signal[]): InferredIntent[] {
   if (careerSignals.some(s => ['INTERVIEW_CONFIRMED', 'RECRUITER_INTEREST'].includes(s.subtype))) {
     intents.push({ intent: 'JOB_ACCELERATION', strength: 'MEDIUM', supporting_signal_ids: [] });
   }
+  
+  // JOB_SWITCH: Detected from browsing/applying signals or LinkedIn network hiring signals
+  if (careerSignals.some(s => ['JOB_SEARCH_ACTIVE', 'APPLICATION_SUBMITTED', 'NETWORK_HIRING_SIGNAL'].includes(s.subtype))) {
+    intents.push({ intent: 'JOB_SWITCH', strength: 'MEDIUM', supporting_signal_ids: [] });
+  }
 
   if ((byCategory.TRAVEL || []).length > 0) {
     intents.push({ intent: 'TRAVEL_ARRIVAL', strength: 'MEDIUM', supporting_signal_ids: [] });
@@ -518,6 +598,12 @@ function inferIntentsRuleBased(signals: Signal[]): InferredIntent[] {
 
   if ((byCategory.EVENTS || []).length > 0) {
     intents.push({ intent: 'EVENT_ATTENDANCE', strength: 'MEDIUM', supporting_signal_ids: [] });
+  }
+  
+  // NEEDS_PREP: Calendar meetings with external attendees or interview prep signals
+  const eventSignals = byCategory.EVENTS || [];
+  if (eventSignals.some(s => s.subtype === 'MEETING_WITH_EXTERNAL' || s.subtype === 'CALENDAR_MEETING')) {
+    intents.push({ intent: 'NEEDS_PREP', strength: 'MEDIUM', supporting_signal_ids: [] });
   }
 
   return intents;

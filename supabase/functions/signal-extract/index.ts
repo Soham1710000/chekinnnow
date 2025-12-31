@@ -41,6 +41,15 @@ function parseEmailDate(dateStr: string): string {
   }
 }
 
+// Convert numeric confidence to enum value
+function mapConfidenceToEnum(confidence: string | number): string {
+  const numConf = typeof confidence === 'string' ? parseFloat(confidence) : confidence;
+  if (numConf >= 0.9) return 'VERY_HIGH';
+  if (numConf >= 0.7) return 'HIGH';
+  if (numConf >= 0.5) return 'MEDIUM';
+  return 'LOW';
+}
+
 // Email signal extraction prompt based on JBTD taxonomy
 function buildEmailPrompt(email: any): string {
   return `You are extracting LIFE SIGNALS from emails using a comprehensive taxonomy.
@@ -174,7 +183,7 @@ async function extractEmailSignals(
             category: s.category,
             type: s.type,
             subtype: s.subtype || "general",
-            confidence: s.confidence,
+            confidence: mapConfidenceToEnum(s.confidence),
             evidence: s.evidence,
             extraction_method: "ai_gpt4o_mini",
             ai_reasoning: s.reasoning || "",
@@ -266,7 +275,7 @@ async function extractLinkedInSignals(
             category: s.category || "CAREER",
             type: s.type,
             subtype: s.subtype || "general",
-            confidence: s.confidence,
+            confidence: mapConfidenceToEnum(s.confidence),
             evidence: s.evidence,
             extraction_method: "ai_gpt4o_mini",
             ai_reasoning: s.reasoning || "",

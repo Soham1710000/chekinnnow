@@ -1,0 +1,415 @@
+import { createClient } from "https://esm.sh/@supabase/supabase-js@2";
+
+/**
+ * LAYER 5: JUDGMENT ENGINE
+ * 
+ * Purpose: Decide WHEN to message and WHAT type of intervention
+ * 
+ * Output: Decision objects (should_message, timing, intervention_type, priority)
+ */
+
+const corsHeaders = {
+  'Access-Control-Allow-Origin': '*',
+  'Access-Control-Allow-Headers': 'authorization, x-client-info, apikey, content-type',
+};
+
+const SUPABASE_URL = Deno.env.get('SUPABASE_URL')!;
+const SUPABASE_SERVICE_ROLE_KEY = Deno.env.get('SUPABASE_SERVICE_ROLE_KEY')!;
+
+interface UserState {
+  user_id: string;
+  career_state: string;
+  career_state_since: string;
+  travel_state: string;
+  travel_destination: string;
+  travel_arrival_at: string;
+  event_state: string;
+  next_event_at: string;
+  next_event_name: string;
+  trust_level: number;
+  fatigue_score: number;
+  responses_30d: number;
+  nudges_24h: number;
+  ignored_nudges: number;
+  last_interaction_at: string;
+}
+
+interface Signal {
+  id: string;
+  user_id: string;
+  user_story: string;
+  category: string;
+  type: string;
+  subtype: string;
+  confidence: string;
+  evidence: string;
+  metadata: any;
+  occurred_at: string;
+}
+
+interface InferredIntent {
+  intent: string;
+  strength: 'LOW' | 'MEDIUM' | 'HIGH';
+  supporting_signal_ids: string[];
+}
+
+interface Decision {
+  should_message: boolean;
+  timing: 'immediate' | 'batched' | 'silent';
+  intervention_type: 'prepare' | 'connect' | 'discover' | 'alert' | 'remind' | null;
+  priority: 'critical' | 'high' | 'medium' | 'low';
+  context_needed: string[];
+  reasoning: string;
+  actionable_signal?: Signal;
+}
+
+// ===== KILL SWITCHES =====
+function shouldSilence(state: UserState): { silent: boolean; reason?: string } {
+  // Kill switch 1: Daily limit
+  if (state.nudges_24h >= 3) {
+    return { silent: true, reason: 'daily_limit_reached' };
+  }
+  
+  // Kill switch 2: Fatigue threshold
+  if (state.fatigue_score > 40) {
+    return { silent: true, reason: 'user_fatigued' };
+  }
+  
+  // Kill switch 3: Quiet hours (8pm - 8am)
+  const hour = new Date().getHours();
+  const isQuietHours = hour < 8 || hour >= 20;
+  if (isQuietHours) {
+    return { silent: true, reason: 'quiet_hours' };
+  }
+  
+  return { silent: false };
+}
+
+function hasCriticalIntent(intents: InferredIntent[]): boolean {
+  return intents.some(i => 
+    i.intent === 'JOB_DECISION' || 
+    (i.intent === 'JOB_ACCELERATION' && i.strength === 'HIGH') ||
+    (i.intent === 'NEEDS_PREP' && i.strength === 'HIGH')
+  );
+}
+
+// ===== INTENT INFERENCE (re-computed here for fresh data) =====
+function inferIntents(signals: Signal[]): InferredIntent[] {
+  const intents: InferredIntent[] = [];
+  
+  const byCategory: Record<string, Signal[]> = {};
+  for (const sig of signals) {
+    if (!byCategory[sig.category]) byCategory[sig.category] = [];
+    byCategory[sig.category].push(sig);
+  }
+
+  const careerSignals = byCategory.CAREER || [];
+  
+  // JOB_DECISION
+  const offerSignals = careerSignals.filter(s => s.subtype === 'OFFER_STAGE');
+  if (offerSignals.length > 0) {
+    intents.push({
+      intent: 'JOB_DECISION',
+      strength: 'HIGH',
+      supporting_signal_ids: offerSignals.map(s => s.id),
+    });
+  }
+
+  // JOB_ACCELERATION
+  const accelSignals = careerSignals.filter(s => 
+    ['INTERVIEW_CONFIRMED', 'RECRUITER_INTEREST'].includes(s.subtype)
+  );
+  if (accelSignals.length > 0) {
+    intents.push({
+      intent: 'JOB_ACCELERATION',
+      strength: calculateStrength(accelSignals),
+      supporting_signal_ids: accelSignals.map(s => s.id),
+    });
+  }
+
+  // TRAVEL_ARRIVAL
+  const travelSignals = byCategory.TRAVEL || [];
+  if (travelSignals.length > 0) {
+    intents.push({
+      intent: 'TRAVEL_ARRIVAL',
+      strength: calculateStrength(travelSignals),
+      supporting_signal_ids: travelSignals.map(s => s.id),
+    });
+  }
+
+  // EVENT_ATTENDANCE
+  const eventSignals = byCategory.EVENTS || [];
+  if (eventSignals.length > 0) {
+    intents.push({
+      intent: 'EVENT_ATTENDANCE',
+      strength: calculateStrength(eventSignals),
+      supporting_signal_ids: eventSignals.map(s => s.id),
+    });
+  }
+
+  // NEEDS_PREP
+  const prepSignals = [
+    ...careerSignals.filter(s => s.subtype === 'INTERVIEW_CONFIRMED'),
+    ...(byCategory.MEETINGS || []),
+    ...eventSignals,
+  ].filter(s => isImminent(s));
+  
+  if (prepSignals.length > 0) {
+    intents.push({
+      intent: 'NEEDS_PREP',
+      strength: 'HIGH',
+      supporting_signal_ids: prepSignals.map(s => s.id),
+    });
+  }
+
+  // SOCIAL_OPENNESS
+  const socialSignals = byCategory.SOCIAL || [];
+  if (socialSignals.length > 0) {
+    intents.push({
+      intent: 'SOCIAL_OPENNESS',
+      strength: calculateStrength(socialSignals),
+      supporting_signal_ids: socialSignals.map(s => s.id),
+    });
+  }
+
+  return intents;
+}
+
+function calculateStrength(signals: Signal[]): 'LOW' | 'MEDIUM' | 'HIGH' {
+  const highCount = signals.filter(s => 
+    s.confidence === 'VERY_HIGH' || s.confidence === 'HIGH'
+  ).length;
+  if (highCount >= 2) return 'HIGH';
+  if (highCount === 1) return 'MEDIUM';
+  return 'LOW';
+}
+
+function isImminent(signal: Signal): boolean {
+  const eventDate = signal.metadata?.departure_date || signal.metadata?.interview_date || 
+                    signal.metadata?.event_date || signal.metadata?.meeting_date;
+  if (eventDate) {
+    const hoursUntil = (new Date(eventDate).getTime() - Date.now()) / (1000 * 60 * 60);
+    return hoursUntil > 0 && hoursUntil <= 48;
+  }
+  return false;
+}
+
+// ===== JUDGMENT LOGIC =====
+function judge(state: UserState, intents: InferredIntent[], signals: Signal[]): Decision {
+  // KILL SWITCHES FIRST
+  const silence = shouldSilence(state);
+  if (silence.silent && !hasCriticalIntent(intents)) {
+    return {
+      should_message: false,
+      timing: 'silent',
+      intervention_type: null,
+      priority: 'low',
+      context_needed: [],
+      reasoning: silence.reason || 'silent',
+    };
+  }
+
+  // Find actionable signal for context
+  const getActionableSignal = (intentType: string): Signal | undefined => {
+    const intent = intents.find(i => i.intent === intentType);
+    if (!intent) return undefined;
+    return signals.find(s => intent.supporting_signal_ids.includes(s.id));
+  };
+
+  // === JOB_DECISION (highest priority) ===
+  if (intents.some(i => i.intent === 'JOB_DECISION')) {
+    return {
+      should_message: true,
+      timing: 'immediate',
+      intervention_type: 'prepare',
+      priority: 'critical',
+      context_needed: ['offer_details', 'company_research', 'salary_benchmarks'],
+      reasoning: 'User has job offer, needs decision support',
+      actionable_signal: getActionableSignal('JOB_DECISION'),
+    };
+  }
+
+  // === JOB_ACCELERATION + NEEDS_PREP ===
+  const hasAcceleration = intents.find(i => i.intent === 'JOB_ACCELERATION');
+  const needsPrep = intents.find(i => i.intent === 'NEEDS_PREP');
+
+  if (hasAcceleration && needsPrep) {
+    return {
+      should_message: true,
+      timing: 'immediate',
+      intervention_type: 'prepare',
+      priority: 'high',
+      context_needed: ['company_info', 'interviewer_profiles', 'recent_company_news'],
+      reasoning: 'Interview imminent, prep window closing',
+      actionable_signal: getActionableSignal('JOB_ACCELERATION') || getActionableSignal('NEEDS_PREP'),
+    };
+  }
+
+  if (hasAcceleration && hasAcceleration.strength === 'HIGH' && state.trust_level >= 1) {
+    return {
+      should_message: true,
+      timing: 'batched',
+      intervention_type: 'connect',
+      priority: 'high',
+      context_needed: ['network_hiring_signals', 'recruiter_intros'],
+      reasoning: 'Job search active, can provide connections',
+      actionable_signal: getActionableSignal('JOB_ACCELERATION'),
+    };
+  }
+
+  // === TRAVEL_ARRIVAL ===
+  const travelIntent = intents.find(i => i.intent === 'TRAVEL_ARRIVAL');
+  if (travelIntent && state.travel_arrival_at) {
+    const hoursUntilArrival = (new Date(state.travel_arrival_at).getTime() - Date.now()) / (1000 * 60 * 60);
+
+    if (hoursUntilArrival <= 6 && hoursUntilArrival > 0) {
+      return {
+        should_message: true,
+        timing: 'immediate',
+        intervention_type: 'alert',
+        priority: 'high',
+        context_needed: ['local_recommendations', 'events_in_city', 'network_in_city'],
+        reasoning: 'User arriving soon, time-sensitive local info',
+        actionable_signal: getActionableSignal('TRAVEL_ARRIVAL'),
+      };
+    } else if (hoursUntilArrival <= 48 && hoursUntilArrival > 6 && state.trust_level >= 2) {
+      return {
+        should_message: true,
+        timing: 'batched',
+        intervention_type: 'discover',
+        priority: 'medium',
+        context_needed: ['local_events', 'venue_recommendations', 'network_meetup_opportunities'],
+        reasoning: 'User has time to plan, discovery mode',
+        actionable_signal: getActionableSignal('TRAVEL_ARRIVAL'),
+      };
+    }
+  }
+
+  // === EVENT_ATTENDANCE ===
+  const eventIntent = intents.find(i => i.intent === 'EVENT_ATTENDANCE');
+  if (eventIntent && state.next_event_at) {
+    const hoursUntilEvent = (new Date(state.next_event_at).getTime() - Date.now()) / (1000 * 60 * 60);
+
+    if (hoursUntilEvent <= 2 && hoursUntilEvent > 0) {
+      return {
+        should_message: true,
+        timing: 'immediate',
+        intervention_type: 'prepare',
+        priority: 'high',
+        context_needed: ['attendee_profiles', 'conversation_starters', 'speaker_context'],
+        reasoning: 'Event starting soon, prep needed',
+        actionable_signal: getActionableSignal('EVENT_ATTENDANCE'),
+      };
+    } else if (hoursUntilEvent <= 24 && hoursUntilEvent > 2) {
+      return {
+        should_message: true,
+        timing: 'batched',
+        intervention_type: 'alert',
+        priority: 'medium',
+        context_needed: ['event_details', 'attendee_list'],
+        reasoning: 'Event tomorrow, gentle reminder + context',
+        actionable_signal: getActionableSignal('EVENT_ATTENDANCE'),
+      };
+    }
+  }
+
+  // === SOCIAL_OPENNESS ===
+  const socialIntent = intents.find(i => i.intent === 'SOCIAL_OPENNESS');
+  if (socialIntent && state.trust_level >= 2) {
+    return {
+      should_message: true,
+      timing: 'batched',
+      intervention_type: 'discover',
+      priority: 'low',
+      context_needed: ['house_party_signals', 'mutual_friend_gatherings'],
+      reasoning: 'User socially active, can surface hidden gatherings',
+      actionable_signal: getActionableSignal('SOCIAL_OPENNESS'),
+    };
+  }
+
+  // DEFAULT: No message
+  return {
+    should_message: false,
+    timing: 'silent',
+    intervention_type: null,
+    priority: 'low',
+    context_needed: [],
+    reasoning: 'No clear intervention opportunity',
+  };
+}
+
+Deno.serve(async (req) => {
+  if (req.method === 'OPTIONS') {
+    return new Response(null, { headers: corsHeaders });
+  }
+
+  try {
+    const supabase = createClient(SUPABASE_URL, SUPABASE_SERVICE_ROLE_KEY);
+    const body = await req.json().catch(() => ({}));
+    const { userId } = body;
+
+    if (!userId) {
+      return new Response(JSON.stringify({ error: 'userId required' }), {
+        status: 400,
+        headers: { ...corsHeaders, 'Content-Type': 'application/json' },
+      });
+    }
+
+    // Fetch user state
+    const { data: state } = await supabase
+      .from('user_state')
+      .select('*')
+      .eq('user_id', userId)
+      .maybeSingle();
+
+    if (!state) {
+      return new Response(JSON.stringify({ 
+        decision: {
+          should_message: false,
+          timing: 'silent',
+          intervention_type: null,
+          priority: 'low',
+          context_needed: [],
+          reasoning: 'No user state found',
+        }
+      }), {
+        headers: { ...corsHeaders, 'Content-Type': 'application/json' },
+      });
+    }
+
+    // Fetch recent signals
+    const { data: signals } = await supabase
+      .from('signals_raw')
+      .select('*')
+      .eq('user_id', userId)
+      .gte('occurred_at', new Date(Date.now() - 7 * 24 * 60 * 60 * 1000).toISOString())
+      .order('occurred_at', { ascending: false });
+
+    const allSignals = (signals || []) as Signal[];
+    const intents = inferIntents(allSignals);
+    const decision = judge(state as UserState, intents, allSignals);
+
+    console.log(`[judgment-engine] Decision for user ${userId}:`, {
+      should_message: decision.should_message,
+      intervention_type: decision.intervention_type,
+      priority: decision.priority,
+      reasoning: decision.reasoning,
+    });
+
+    return new Response(JSON.stringify({ 
+      decision,
+      intents: intents.map(i => ({ intent: i.intent, strength: i.strength })),
+    }), {
+      headers: { ...corsHeaders, 'Content-Type': 'application/json' },
+    });
+
+  } catch (error) {
+    console.error('[judgment-engine] Error:', error);
+    return new Response(JSON.stringify({ 
+      error: error instanceof Error ? error.message : 'Unknown error' 
+    }), {
+      status: 500,
+      headers: { ...corsHeaders, 'Content-Type': 'application/json' },
+    });
+  }
+});

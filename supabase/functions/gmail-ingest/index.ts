@@ -44,22 +44,30 @@ async function getAccessToken(supabase: any, userId: string): Promise<string | n
   return data.accessToken;
 }
 
-async function ingestUserEmails(supabase: any, userId: string, accessToken: string): Promise<{ ingested: number }> {
+async function ingestUserEmails(supabase: any, userId: string, accessToken: string, options?: { lookbackDays?: number, forceRefresh?: boolean }): Promise<{ ingested: number }> {
   console.log('[gmail-ingest] Ingesting raw emails for user:', userId);
   
-  // Get last sync point
-  const { data: lastInput } = await supabase
-    .from('raw_inputs')
-    .select('occurred_at')
-    .eq('user_id', userId)
-    .eq('source', 'gmail')
-    .order('occurred_at', { ascending: false })
-    .limit(1)
-    .maybeSingle();
+  let afterDate: Date;
+  
+  if (options?.forceRefresh && options?.lookbackDays) {
+    // Force lookback from current date
+    afterDate = new Date(Date.now() - options.lookbackDays * 24 * 60 * 60 * 1000);
+    console.log(`[gmail-ingest] Force refresh: looking back ${options.lookbackDays} days`);
+  } else {
+    // Get last sync point
+    const { data: lastInput } = await supabase
+      .from('raw_inputs')
+      .select('occurred_at')
+      .eq('user_id', userId)
+      .eq('source', 'gmail')
+      .order('occurred_at', { ascending: false })
+      .limit(1)
+      .maybeSingle();
 
-  const afterDate = lastInput?.occurred_at 
-    ? new Date(lastInput.occurred_at)
-    : new Date(Date.now() - 30 * 24 * 60 * 60 * 1000); // Default 30 days
+    afterDate = lastInput?.occurred_at 
+      ? new Date(lastInput.occurred_at)
+      : new Date(Date.now() - (options?.lookbackDays || 30) * 24 * 60 * 60 * 1000);
+  }
   
   const afterTimestamp = Math.floor(afterDate.getTime() / 1000);
   const query = `after:${afterTimestamp}`;
@@ -185,11 +193,18 @@ Deno.serve(async (req) => {
     const supabase = createClient(SUPABASE_URL, SUPABASE_SERVICE_ROLE_KEY);
 
     let userIds: string[] = [];
+    let ingestOptions: { lookbackDays?: number, forceRefresh?: boolean } = {};
 
     if (req.method === 'POST') {
       const body = await req.json().catch(() => ({}));
       if (body.userId) {
         userIds = [body.userId];
+      }
+      if (body.lookbackDays) {
+        ingestOptions.lookbackDays = body.lookbackDays;
+      }
+      if (body.forceRefresh) {
+        ingestOptions.forceRefresh = body.forceRefresh;
       }
     }
 
@@ -239,7 +254,7 @@ Deno.serve(async (req) => {
           continue;
         }
 
-        const { ingested } = await ingestUserEmails(supabase, userId, accessToken);
+        const { ingested } = await ingestUserEmails(supabase, userId, accessToken, ingestOptions);
 
         // Trigger signal extraction for this user (async, don't wait)
         fetch(`${SUPABASE_URL}/functions/v1/signal-extract`, {

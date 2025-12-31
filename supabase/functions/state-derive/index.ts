@@ -3,7 +3,7 @@ import { createClient } from "https://esm.sh/@supabase/supabase-js@2";
 /**
  * LAYERS 3-4: INTENT INFERENCE + STATE DERIVATION
  * 
- * Layer 3: Intent Inference (AI-powered, Claude 3.5 Sonnet)
+ * Layer 3: Intent Inference (AI-powered, Claude 3.5 Sonnet with Gemini fallback)
  * Layer 4: State Derivation (stable summaries, stored)
  * 
  * Output: user_state table
@@ -16,7 +16,8 @@ const corsHeaders = {
 
 const SUPABASE_URL = Deno.env.get('SUPABASE_URL')!;
 const SUPABASE_SERVICE_ROLE_KEY = Deno.env.get('SUPABASE_SERVICE_ROLE_KEY')!;
-const ANTHROPIC_API_KEY = Deno.env.get('ANTHROPIC_API_KEY')!;
+const ANTHROPIC_API_KEY = Deno.env.get('ANTHROPIC_API_KEY');
+const LOVABLE_API_KEY = Deno.env.get('LOVABLE_API_KEY');
 
 // ===== INTENT VOCABULARY (LOCKED) =====
 type Intent =
@@ -49,7 +50,7 @@ interface Signal {
   occurred_at: string;
 }
 
-// ===== LAYER 3: INTENT INFERENCE (Claude 3.5 Sonnet) =====
+// ===== LAYER 3: INTENT INFERENCE (AI-powered) =====
 async function inferIntentsWithAI(signals: Signal[]): Promise<InferredIntent[]> {
   if (signals.length === 0) {
     return [];
@@ -105,54 +106,96 @@ Return ONLY a valid JSON array like this:
   }
 ]`;
 
-  try {
-    const response = await fetch('https://api.anthropic.com/v1/messages', {
-      method: 'POST',
-      headers: {
-        'x-api-key': ANTHROPIC_API_KEY,
-        'anthropic-version': '2023-06-01',
-        'Content-Type': 'application/json',
-      },
-      body: JSON.stringify({
-        model: 'claude-3-5-sonnet-20241022',
-        max_tokens: 2048,
-        messages: [
-          { role: 'user', content: `${systemPrompt}\n\n${userPrompt}` }
-        ],
-      }),
-    });
+  // Try Claude first
+  if (ANTHROPIC_API_KEY) {
+    try {
+      const response = await fetch('https://api.anthropic.com/v1/messages', {
+        method: 'POST',
+        headers: {
+          'x-api-key': ANTHROPIC_API_KEY,
+          'anthropic-version': '2023-06-01',
+          'Content-Type': 'application/json',
+        },
+        body: JSON.stringify({
+          model: 'claude-sonnet-4-5',
+          max_tokens: 2048,
+          messages: [
+            { role: 'user', content: `${systemPrompt}\n\n${userPrompt}` }
+          ],
+        }),
+      });
 
-    if (!response.ok) {
-      const error = await response.text();
-      console.error('[state-derive] Claude API error:', error);
-      // Fallback to rule-based inference
-      return inferIntentsRuleBased(signals);
+      if (response.ok) {
+        const data = await response.json();
+        const content = data.content?.[0]?.text || '[]';
+        
+        const jsonMatch = content.match(/\[[\s\S]*\]/);
+        if (jsonMatch) {
+          const parsed = JSON.parse(jsonMatch[0]);
+          console.log('[state-derive] Claude inferred intents:', parsed.map((p: any) => p.intent));
+          
+          return parsed.map((p: any) => ({
+            intent: p.intent,
+            strength: p.strength,
+            supporting_signal_ids: p.supporting_signal_ids || [],
+            reasoning: p.reasoning,
+          }));
+        }
+      } else {
+        console.warn('[state-derive] Claude API failed, trying Gemini fallback');
+      }
+    } catch (error) {
+      console.warn('[state-derive] Claude error, trying Gemini fallback:', error);
     }
-
-    const data = await response.json();
-    const content = data.content?.[0]?.text || '[]';
-    
-    // Extract JSON from response
-    const jsonMatch = content.match(/\[[\s\S]*\]/);
-    if (!jsonMatch) {
-      console.error('[state-derive] Failed to parse Claude response');
-      return inferIntentsRuleBased(signals);
-    }
-
-    const parsed = JSON.parse(jsonMatch[0]);
-    console.log('[state-derive] Claude inferred intents:', parsed);
-    
-    return parsed.map((p: any) => ({
-      intent: p.intent,
-      strength: p.strength,
-      supporting_signal_ids: p.supporting_signal_ids || [],
-      reasoning: p.reasoning,
-    }));
-
-  } catch (error) {
-    console.error('[state-derive] AI inference failed, using rules:', error);
-    return inferIntentsRuleBased(signals);
   }
+
+  // Fallback to Gemini via Lovable AI
+  if (LOVABLE_API_KEY) {
+    try {
+      console.log('[state-derive] Using Gemini 2.5 Pro fallback');
+      
+      const response = await fetch('https://ai.gateway.lovable.dev/v1/chat/completions', {
+        method: 'POST',
+        headers: {
+          'Authorization': `Bearer ${LOVABLE_API_KEY}`,
+          'Content-Type': 'application/json',
+        },
+        body: JSON.stringify({
+          model: 'google/gemini-2.5-pro',
+          messages: [
+            { role: 'system', content: systemPrompt },
+            { role: 'user', content: userPrompt },
+          ],
+        }),
+      });
+
+      if (response.ok) {
+        const data = await response.json();
+        const content = data.choices?.[0]?.message?.content || '[]';
+        
+        const jsonMatch = content.match(/\[[\s\S]*\]/);
+        if (jsonMatch) {
+          const parsed = JSON.parse(jsonMatch[0]);
+          console.log('[state-derive] Gemini inferred intents:', parsed.map((p: any) => p.intent));
+          
+          return parsed.map((p: any) => ({
+            intent: p.intent,
+            strength: p.strength,
+            supporting_signal_ids: p.supporting_signal_ids || [],
+            reasoning: p.reasoning,
+          }));
+        }
+      } else {
+        console.error('[state-derive] Gemini API also failed:', await response.text());
+      }
+    } catch (error) {
+      console.error('[state-derive] Gemini error:', error);
+    }
+  }
+
+  // Final fallback to rules
+  console.log('[state-derive] All AI failed, using rule-based inference');
+  return inferIntentsRuleBased(signals);
 }
 
 // ===== FALLBACK: RULE-BASED INFERENCE =====

@@ -63,7 +63,7 @@ const COOLDOWN_HOURS = {
   SIMILAR_SIGNAL: 48,  // Don't nudge for same signal type within this window
 };
 
-const MAX_NUDGES_24H = 2;  // Hard cap on daily nudges
+const MAX_NUDGES_24H = 4;  // Hard cap on daily nudges
 const MAX_IGNORED_BEFORE_SILENCE = 3;  // Stop nudging after this many ignores
 
 // =============================================================================

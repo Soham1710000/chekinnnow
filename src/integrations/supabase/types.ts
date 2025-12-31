@@ -14,6 +14,44 @@ export type Database = {
   }
   public: {
     Tables: {
+      ai_extraction_log: {
+        Row: {
+          created_at: string | null
+          extraction_time_ms: number | null
+          id: string
+          model_used: string | null
+          raw_input_id: string | null
+          signals_extracted: number | null
+          tokens_used: number | null
+        }
+        Insert: {
+          created_at?: string | null
+          extraction_time_ms?: number | null
+          id?: string
+          model_used?: string | null
+          raw_input_id?: string | null
+          signals_extracted?: number | null
+          tokens_used?: number | null
+        }
+        Update: {
+          created_at?: string | null
+          extraction_time_ms?: number | null
+          id?: string
+          model_used?: string | null
+          raw_input_id?: string | null
+          signals_extracted?: number | null
+          tokens_used?: number | null
+        }
+        Relationships: [
+          {
+            foreignKeyName: "ai_extraction_log_raw_input_id_fkey"
+            columns: ["raw_input_id"]
+            isOneToOne: false
+            referencedRelation: "raw_inputs"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
       chat_debriefs: {
         Row: {
           ai_summary: string | null
@@ -391,6 +429,41 @@ export type Database = {
         }
         Relationships: []
       }
+      interaction_log: {
+        Row: {
+          created_at: string | null
+          id: string
+          intent: string | null
+          interaction_type: string
+          metadata: Json | null
+          user_id: string
+        }
+        Insert: {
+          created_at?: string | null
+          id?: string
+          intent?: string | null
+          interaction_type: string
+          metadata?: Json | null
+          user_id: string
+        }
+        Update: {
+          created_at?: string | null
+          id?: string
+          intent?: string | null
+          interaction_type?: string
+          metadata?: Json | null
+          user_id?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "interaction_log_user_id_fkey"
+            columns: ["user_id"]
+            isOneToOne: false
+            referencedRelation: "chekinn_users"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
       introductions: {
         Row: {
           created_at: string | null
@@ -575,6 +648,167 @@ export type Database = {
           updated_at?: string | null
         }
         Relationships: []
+      }
+      raw_inputs: {
+        Row: {
+          created_at: string | null
+          external_id: string
+          id: string
+          occurred_at: string
+          processed: boolean | null
+          raw_metadata: Json | null
+          raw_text: string | null
+          source: string
+          user_id: string
+        }
+        Insert: {
+          created_at?: string | null
+          external_id: string
+          id?: string
+          occurred_at: string
+          processed?: boolean | null
+          raw_metadata?: Json | null
+          raw_text?: string | null
+          source: string
+          user_id: string
+        }
+        Update: {
+          created_at?: string | null
+          external_id?: string
+          id?: string
+          occurred_at?: string
+          processed?: boolean | null
+          raw_metadata?: Json | null
+          raw_text?: string | null
+          source?: string
+          user_id?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "raw_inputs_user_id_fkey"
+            columns: ["user_id"]
+            isOneToOne: false
+            referencedRelation: "chekinn_users"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      signal_extraction_rules: {
+        Row: {
+          active: boolean | null
+          ai_fallback: boolean | null
+          category: string
+          created_at: string | null
+          default_confidence: string
+          id: string
+          pattern_definition: Json
+          pattern_type: string
+          rule_name: string
+          source: string
+          subtype: string
+          type: string
+          user_story: string
+          version: number | null
+        }
+        Insert: {
+          active?: boolean | null
+          ai_fallback?: boolean | null
+          category: string
+          created_at?: string | null
+          default_confidence: string
+          id?: string
+          pattern_definition: Json
+          pattern_type: string
+          rule_name: string
+          source: string
+          subtype: string
+          type: string
+          user_story: string
+          version?: number | null
+        }
+        Update: {
+          active?: boolean | null
+          ai_fallback?: boolean | null
+          category?: string
+          created_at?: string | null
+          default_confidence?: string
+          id?: string
+          pattern_definition?: Json
+          pattern_type?: string
+          rule_name?: string
+          source?: string
+          subtype?: string
+          type?: string
+          user_story?: string
+          version?: number | null
+        }
+        Relationships: []
+      }
+      signals_raw: {
+        Row: {
+          ai_reasoning: string | null
+          category: string
+          confidence: string
+          created_at: string | null
+          evidence: string | null
+          extraction_method: string | null
+          id: string
+          metadata: Json | null
+          occurred_at: string
+          raw_input_id: string | null
+          subtype: string
+          type: string
+          user_id: string
+          user_story: string
+        }
+        Insert: {
+          ai_reasoning?: string | null
+          category: string
+          confidence: string
+          created_at?: string | null
+          evidence?: string | null
+          extraction_method?: string | null
+          id?: string
+          metadata?: Json | null
+          occurred_at: string
+          raw_input_id?: string | null
+          subtype: string
+          type: string
+          user_id: string
+          user_story: string
+        }
+        Update: {
+          ai_reasoning?: string | null
+          category?: string
+          confidence?: string
+          created_at?: string | null
+          evidence?: string | null
+          extraction_method?: string | null
+          id?: string
+          metadata?: Json | null
+          occurred_at?: string
+          raw_input_id?: string | null
+          subtype?: string
+          type?: string
+          user_id?: string
+          user_story?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "signals_raw_raw_input_id_fkey"
+            columns: ["raw_input_id"]
+            isOneToOne: false
+            referencedRelation: "raw_inputs"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "signals_raw_user_id_fkey"
+            columns: ["user_id"]
+            isOneToOne: false
+            referencedRelation: "chekinn_users"
+            referencedColumns: ["id"]
+          },
+        ]
       }
       social_signals: {
         Row: {
@@ -805,6 +1039,71 @@ export type Database = {
           user_id?: string
         }
         Relationships: []
+      }
+      user_state: {
+        Row: {
+          career_state: string | null
+          career_state_since: string | null
+          event_state: string | null
+          fatigue_score: number | null
+          ignored_nudges: number | null
+          last_interaction_at: string | null
+          next_event_at: string | null
+          next_event_name: string | null
+          nudges_24h: number | null
+          responses_30d: number | null
+          travel_arrival_at: string | null
+          travel_destination: string | null
+          travel_state: string | null
+          trust_level: number | null
+          updated_at: string | null
+          user_id: string
+        }
+        Insert: {
+          career_state?: string | null
+          career_state_since?: string | null
+          event_state?: string | null
+          fatigue_score?: number | null
+          ignored_nudges?: number | null
+          last_interaction_at?: string | null
+          next_event_at?: string | null
+          next_event_name?: string | null
+          nudges_24h?: number | null
+          responses_30d?: number | null
+          travel_arrival_at?: string | null
+          travel_destination?: string | null
+          travel_state?: string | null
+          trust_level?: number | null
+          updated_at?: string | null
+          user_id: string
+        }
+        Update: {
+          career_state?: string | null
+          career_state_since?: string | null
+          event_state?: string | null
+          fatigue_score?: number | null
+          ignored_nudges?: number | null
+          last_interaction_at?: string | null
+          next_event_at?: string | null
+          next_event_name?: string | null
+          nudges_24h?: number | null
+          responses_30d?: number | null
+          travel_arrival_at?: string | null
+          travel_destination?: string | null
+          travel_state?: string | null
+          trust_level?: number | null
+          updated_at?: string | null
+          user_id?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "user_state_user_id_fkey"
+            columns: ["user_id"]
+            isOneToOne: true
+            referencedRelation: "chekinn_users"
+            referencedColumns: ["id"]
+          },
+        ]
       }
       user_undercurrent_interactions: {
         Row: {

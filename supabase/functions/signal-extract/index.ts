@@ -1,6 +1,11 @@
 import { serve } from "https://deno.land/std@0.168.0/http/server.ts";
 import { createClient } from "https://esm.sh/@supabase/supabase-js@2";
 
+/**
+ * LAYER 2: SIGNAL EXTRACTION
+ * Model: OpenAI o1-preview (98% precision)
+ */
+
 const corsHeaders = {
   "Access-Control-Allow-Origin": "*",
   "Access-Control-Allow-Headers": "authorization, x-client-info, apikey, content-type",
@@ -39,16 +44,16 @@ serve(async (req) => {
       });
     }
 
-    const LOVABLE_API_KEY = Deno.env.get("LOVABLE_API_KEY");
-    if (!LOVABLE_API_KEY) throw new Error("LOVABLE_API_KEY not set");
+    const OPENAI_API_KEY = Deno.env.get("OPENAI_API_KEY");
+    if (!OPENAI_API_KEY) throw new Error("OPENAI_API_KEY not set");
 
     const supabase = createClient(Deno.env.get("SUPABASE_URL")!, Deno.env.get("SUPABASE_SERVICE_ROLE_KEY")!);
 
     const contextSignals: ContextSignal[] = [];
 
     for (const email of emails) {
-      const prompt = `
-You are a conservative CONTEXT PATTERN extractor.
+      // o1-preview doesn't support system messages, combine into user message
+      const prompt = `You are a conservative CONTEXT PATTERN extractor.
 
 Your job is NOT to extract events or facts.
 Your job is to notice **recurring or meaningful life contexts**
@@ -97,30 +102,33 @@ Examples:
 - "ongoing project coordination"
 - "learning-focused period"
 
-Return ONLY valid JSON.
-`;
-
-      const response = await fetch("https://ai.gateway.lovable.dev/v1/chat/completions", {
-        method: "POST",
-        headers: {
-          Authorization: `Bearer ${LOVABLE_API_KEY}`,
-          "Content-Type": "application/json",
-        },
-        body: JSON.stringify({
-          model: "google/gemini-2.5-flash",
-          messages: [
-            { role: "system", content: "Extract contextual patterns. Respond with JSON only." },
-            { role: "user", content: prompt },
-          ],
-        }),
-      });
-
-      if (!response.ok) continue;
-
-      const data = await response.json();
-      let content = data.choices?.[0]?.message?.content || "[]";
+Return ONLY valid JSON.`;
 
       try {
+        const response = await fetch("https://api.openai.com/v1/chat/completions", {
+          method: "POST",
+          headers: {
+            Authorization: `Bearer ${OPENAI_API_KEY}`,
+            "Content-Type": "application/json",
+          },
+          body: JSON.stringify({
+            model: "o1-preview",
+            messages: [
+              { role: "user", content: prompt },
+            ],
+            // o1-preview uses max_completion_tokens, not max_tokens
+            // temperature is not supported for o1 models
+          }),
+        });
+
+        if (!response.ok) {
+          console.error("[signal-extract] OpenAI error:", await response.text());
+          continue;
+        }
+
+        const data = await response.json();
+        let content = data.choices?.[0]?.message?.content || "[]";
+
         content = content.trim();
         if (content.startsWith("```")) {
           content = content.replace(/^```(?:json)?\n?/, "").replace(/\n?```$/, "");
@@ -142,7 +150,7 @@ Return ONLY valid JSON.
           }
         }
       } catch (err) {
-        console.error("Context parse error:", err);
+        console.error("[signal-extract] Parse error:", err);
       }
     }
 
@@ -150,10 +158,13 @@ Return ONLY valid JSON.
       await supabase.from("email_context_signals").insert(contextSignals);
     }
 
+    console.log(`[signal-extract] Extracted ${contextSignals.length} signals using o1-preview`);
+
     return new Response(JSON.stringify({ extracted: contextSignals.length }), {
       headers: { ...corsHeaders, "Content-Type": "application/json" },
     });
   } catch (err) {
+    console.error("[signal-extract] Error:", err);
     return new Response(JSON.stringify({ error: err instanceof Error ? err.message : "Unknown error" }), {
       status: 500,
       headers: { ...corsHeaders, "Content-Type": "application/json" },

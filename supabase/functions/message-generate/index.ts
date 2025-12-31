@@ -2,11 +2,10 @@ import { createClient } from "https://esm.sh/@supabase/supabase-js@2";
 
 /**
  * LAYERS 6-7: PROMPT POLICY + MESSAGE GENERATION
+ * Model: GPT-4o-mini ($0.15/1M tokens)
  * 
  * Layer 6: Convert decision → structured prompt constraints
  * Layer 7: Use LLM to craft message within strict policy constraints
- * 
- * Output: Formatted message ready for delivery
  */
 
 const corsHeaders = {
@@ -16,7 +15,7 @@ const corsHeaders = {
 
 const SUPABASE_URL = Deno.env.get('SUPABASE_URL')!;
 const SUPABASE_SERVICE_ROLE_KEY = Deno.env.get('SUPABASE_SERVICE_ROLE_KEY')!;
-const LOVABLE_API_KEY = Deno.env.get('LOVABLE_API_KEY')!;
+const OPENAI_API_KEY = Deno.env.get('OPENAI_API_KEY')!;
 
 interface Decision {
   should_message: boolean;
@@ -237,14 +236,14 @@ async function generateMessage(
   const userPrompt = buildUserPrompt(decision, context);
 
   try {
-    const response = await fetch('https://ai.gateway.lovable.dev/v1/chat/completions', {
+    const response = await fetch('https://api.openai.com/v1/chat/completions', {
       method: 'POST',
       headers: {
-        'Authorization': `Bearer ${LOVABLE_API_KEY}`,
+        'Authorization': `Bearer ${OPENAI_API_KEY}`,
         'Content-Type': 'application/json',
       },
       body: JSON.stringify({
-        model: 'google/gemini-2.5-flash',
+        model: 'gpt-4o-mini',
         temperature: 0.7,
         max_tokens: 500,
         messages: [
@@ -255,7 +254,7 @@ async function generateMessage(
     });
 
     if (!response.ok) {
-      console.error('[message-generate] AI API error:', await response.text());
+      console.error('[message-generate] OpenAI API error:', await response.text());
       return null;
     }
 
@@ -268,6 +267,7 @@ async function generateMessage(
       return null;
     }
 
+    console.log('[message-generate] Generated message using gpt-4o-mini');
     return message;
   } catch (e) {
     console.error('[message-generate] Error:', e);
@@ -324,6 +324,7 @@ Deno.serve(async (req) => {
         metadata: {
           intervention_type: decision.intervention_type,
           priority: decision.priority,
+          model: 'gpt-4o-mini',
         },
       });
     }

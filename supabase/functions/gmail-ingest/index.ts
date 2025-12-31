@@ -179,7 +179,7 @@ async function ingestUserEmails(supabase: any, userId: string, accessToken: stri
 
     await new Promise(resolve => setTimeout(resolve, 50));
     
-  } while (pageToken && ingested < 200);
+  } while (pageToken); // No limit - fetch all emails in range
 
   return { ingested };
 }

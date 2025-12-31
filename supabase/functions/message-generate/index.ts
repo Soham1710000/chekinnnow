@@ -49,7 +49,7 @@ function compilePromptPolicy(decision: Decision, state: UserState): PromptPolicy
   const basePolicies: Record<string, Partial<PromptPolicy>> = {
     prepare: {
       tone: 'friendly',
-      max_sentences: 4,
+      max_sentences: 6,
       must_include: ['specific_prep_item'],
       must_avoid: ['generic_advice', 'overwhelming_info'],
       call_to_action: 'review_material',
@@ -57,7 +57,7 @@ function compilePromptPolicy(decision: Decision, state: UserState): PromptPolicy
     },
     connect: {
       tone: 'casual',
-      max_sentences: 3,
+      max_sentences: 6,
       must_include: ['connection_name', 'relevance'],
       must_avoid: ['pushy_language', 'spam_feel'],
       call_to_action: 'view_profile',
@@ -65,7 +65,7 @@ function compilePromptPolicy(decision: Decision, state: UserState): PromptPolicy
     },
     discover: {
       tone: 'friendly',
-      max_sentences: 3,
+      max_sentences: 6,
       must_include: ['discovery_hook'],
       must_avoid: ['fomo', 'pressure'],
       call_to_action: null,
@@ -73,7 +73,7 @@ function compilePromptPolicy(decision: Decision, state: UserState): PromptPolicy
     },
     alert: {
       tone: 'urgent',
-      max_sentences: 2,
+      max_sentences: 4,
       must_include: ['time_sensitivity'],
       must_avoid: ['anxiety_inducing'],
       call_to_action: 'acknowledge',
@@ -81,7 +81,7 @@ function compilePromptPolicy(decision: Decision, state: UserState): PromptPolicy
     },
     remind: {
       tone: 'casual',
-      max_sentences: 2,
+      max_sentences: 4,
       must_include: ['gentle_nudge'],
       must_avoid: ['guilt', 'judgment'],
       call_to_action: null,

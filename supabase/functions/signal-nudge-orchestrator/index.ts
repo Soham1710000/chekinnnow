@@ -135,15 +135,37 @@ async function runPipeline(supabase: any, userId: string): Promise<PipelineResul
     if (messageResult.message) {
       console.log(`[orchestrator] Message generated: "${messageResult.message.slice(0, 50)}..."`);
       
-      // Store the generated message for delivery
-      await supabase.from('user_messages').insert({
+      // Store the generated message in chat_messages for the chat UI
+      const { error: chatError } = await supabase.from('chat_messages').insert({
         user_id: userId,
-        message_content: messageResult.message,
-        decision_state: 'NUDGE',
-        signal_id: judgmentResult.decision?.actionable_signal_id || null,
+        role: 'assistant',
+        content: messageResult.message,
+        message_type: 'nudge',
+        metadata: {
+          intervention_type: judgmentResult.decision?.intervention_type,
+          priority: judgmentResult.decision?.priority,
+          timing: judgmentResult.decision?.timing,
+          generated_by: 'signal-nudge-orchestrator',
+          actionable_signal_id: judgmentResult.decision?.actionable_signal_id,
+        },
       });
       
-      // Update interaction log
+      if (chatError) {
+        console.error(`[orchestrator] Failed to insert chat message:`, chatError);
+      } else {
+        console.log(`[orchestrator] Chat message stored successfully`);
+      }
+      
+      // Update user_state nudges count
+      await supabase
+        .from('user_state')
+        .update({ 
+          nudges_24h: (stateResult.state?.nudges_24h || 0) + 1,
+          last_interaction_at: new Date().toISOString(),
+        })
+        .eq('user_id', userId);
+      
+      // Log interaction
       await supabase.from('interaction_log').insert({
         user_id: userId,
         interaction_type: 'message_queued',

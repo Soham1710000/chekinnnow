@@ -3,7 +3,7 @@ import { useAuth } from "@/hooks/useAuth";
 import { supabase } from "@/integrations/supabase/client";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
-import { Send, ArrowLeft, MessageCircle, Users, Clock, Sparkles, Mic, Keyboard, Shield } from "lucide-react";
+import { Send, ArrowLeft, MessageCircle, Users, Clock, Sparkles, Mic, Keyboard, Shield, Target } from "lucide-react";
 import { motion, AnimatePresence } from "framer-motion";
 import { useNavigate } from "react-router-dom";
 import { useToast } from "@/hooks/use-toast";
@@ -19,6 +19,7 @@ const SaveProgressNudge = lazy(() => import("@/components/chat/SaveProgressNudge
 const WhatsAppCommunityNudge = lazy(() => import("@/components/chat/WhatsAppCommunityNudge"));
 const VoiceInput = lazy(() => import("@/components/chat/VoiceInput"));
 const FindingMatchCard = lazy(() => import("@/components/chat/FindingMatchCard"));
+const MatchView = lazy(() => import("@/components/match/MatchView"));
 
 // Lazy load undercurrents - only needed for authenticated users with access
 const UndercurrentCard = lazy(() => import("@/components/undercurrents/UndercurrentCard").then(m => ({ default: m.UndercurrentCard })));
@@ -143,7 +144,7 @@ const Chat = () => {
   const [loading, setLoading] = useState(false); // Start false for instant render
   const [sending, setSending] = useState(false);
   const [activeChat, setActiveChat] = useState<Introduction | null>(null);
-  const [view, setView] = useState<"chekinn" | "connections">("chekinn");
+  const [view, setView] = useState<"chekinn" | "connections" | "match">("chekinn");
   const [learningComplete, setLearningComplete] = useState(false);
   const [userProfile, setUserProfile] = useState<any>(null);
   const [showLoginNudge, setShowLoginNudge] = useState(false);
@@ -1059,7 +1060,7 @@ const Chat = () => {
               }`}
             >
               <MessageCircle className="w-4 h-4" />
-              Chat with ChekInn
+              Chat
             </button>
             <button
               onClick={() => setView("connections")}
@@ -1077,11 +1078,26 @@ const Chat = () => {
                 </span>
               )}
             </button>
+            <button
+              onClick={() => setView("match")}
+              className={`flex-1 py-3 text-sm font-medium transition-colors flex items-center justify-center gap-2 ${
+                view === "match" 
+                  ? "text-primary border-b-2 border-primary" 
+                  : "text-muted-foreground hover:text-foreground"
+              }`}
+            >
+              <Target className="w-4 h-4" />
+              Match
+            </button>
           </div>
         )}
       </header>
 
-      {view === "chekinn" || !user ? (
+      {view === "match" && user ? (
+        <Suspense fallback={<div className="flex-1 flex items-center justify-center"><div className="animate-spin w-8 h-8 border-2 border-primary border-t-transparent rounded-full" /></div>}>
+          <MatchView />
+        </Suspense>
+      ) : view === "chekinn" || !user ? (
         <>
           {/* Learning Progress or Profile Card */}
           {learningComplete && userProfile ? (

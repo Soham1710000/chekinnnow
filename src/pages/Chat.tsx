@@ -18,6 +18,7 @@ const UserProfileCard = lazy(() => import("@/components/chat/UserProfileCard"));
 const SaveProgressNudge = lazy(() => import("@/components/chat/SaveProgressNudge"));
 const WhatsAppCommunityNudge = lazy(() => import("@/components/chat/WhatsAppCommunityNudge"));
 const VoiceInput = lazy(() => import("@/components/chat/VoiceInput"));
+const FindingMatchCard = lazy(() => import("@/components/chat/FindingMatchCard"));
 
 // Lazy load undercurrents - only needed for authenticated users with access
 const UndercurrentCard = lazy(() => import("@/components/undercurrents/UndercurrentCard").then(m => ({ default: m.UndercurrentCard })));
@@ -149,6 +150,7 @@ const Chat = () => {
   const [showSaveProgress, setShowSaveProgress] = useState(false);
   const [sessionId] = useState(() => getSessionId());
   const [showWACommunity, setShowWACommunity] = useState(false);
+  const [showFindingMatch, setShowFindingMatch] = useState(false);
   const evaluatedIntros = useRef<Set<string>>(new Set());
   
   const messagesEndRef = useRef<HTMLDivElement>(null);
@@ -462,7 +464,13 @@ const Chat = () => {
           
           if (response.ok) {
             const result = await response.json();
-            await sendBotMessage(result.greeting || "Hey! A few quick questions and I'll find you the right person. What brings you here?");
+            const greeting = result.greeting || "Hey! A few quick questions and I'll find you the right person. What brings you here?";
+            await sendBotMessage(greeting);
+            
+            // Show finding match card if user completed onboarding (personalized greeting was generated)
+            if (result.greeting && learningComplete) {
+              setTimeout(() => setShowFindingMatch(true), 800);
+            }
           } else {
             await sendBotMessage("Hey! A few quick questions and I'll find you the right person. What brings you here?");
           }
@@ -1146,6 +1154,23 @@ const Chat = () => {
               ))}
 
               {/* Progress Indicator - DISABLED for now */}
+            </AnimatePresence>
+
+            {/* Finding Match Card - shown for authenticated users after personalized greeting */}
+            <AnimatePresence>
+              {showFindingMatch && user && learningComplete && (
+                <motion.div key="finding-match" layout={false}>
+                  <Suspense fallback={null}>
+                    <FindingMatchCard 
+                      userName={userProfile?.full_name?.split(' ')[0]}
+                      onComplete={() => {
+                        // Card animation completed
+                        console.log("Match finding animation complete");
+                      }}
+                    />
+                  </Suspense>
+                </motion.div>
+              )}
             </AnimatePresence>
 
             {/* Nudges OUTSIDE of AnimatePresence to prevent layout/refresh issues */}

@@ -33,6 +33,15 @@ interface ProfileContext {
   industry?: string;
   goals?: string[];
   interests?: string[];
+  ai_insights?: {
+    contrarian_belief?: string;
+    career_inflection?: string;
+    motivation?: string;
+    motivation_explanation?: string;
+    constraint?: string;
+  };
+  connection_intent?: string;
+  learning_complete?: boolean;
 }
 
 // =============================================================================
@@ -183,7 +192,7 @@ async function assembleContext(
     
     const { data: profile, error } = await supabase
       .from("profiles")
-      .select("full_name, role, industry, goals, interests")
+      .select("full_name, role, industry, goals, interests, ai_insights, connection_intent, learning_complete")
       .eq("id", userId)
       .single();
 
@@ -194,6 +203,145 @@ async function assembleContext(
     console.error("Context assembly error:", error);
     return null;
   }
+}
+
+// =============================================================================
+// PERSONALIZED GREETING GENERATOR
+// =============================================================================
+
+async function generatePersonalizedGreeting(
+  profileContext: ProfileContext,
+  apiKey: string
+): Promise<string> {
+  const insights = profileContext.ai_insights || {};
+  const intent = profileContext.connection_intent;
+  const name = profileContext.full_name;
+  
+  // Build context summary for AI
+  const contextParts: string[] = [];
+  
+  if (insights.motivation) {
+    const motivationLabels: Record<string, string> = {
+      "building": "building something meaningful",
+      "recognition": "gaining recognition & status",
+      "financial": "achieving financial freedom",
+      "mastery": "mastery & learning",
+      "stability": "finding stability",
+      "impact": "making an impact on others"
+    };
+    contextParts.push(`They're driven by: ${motivationLabels[insights.motivation] || insights.motivation}`);
+  }
+  
+  if (insights.constraint) {
+    contextParts.push(`Their biggest constraint: ${insights.constraint}`);
+  }
+  
+  if (insights.career_inflection) {
+    contextParts.push(`Career inflection point: "${insights.career_inflection.slice(0, 200)}"`);
+  }
+  
+  if (insights.contrarian_belief) {
+    contextParts.push(`Contrarian belief: "${insights.contrarian_belief.slice(0, 200)}"`);
+  }
+  
+  const intentLabels: Record<string, string> = {
+    "clarity": "seeking clarity between multiple options",
+    "direction": "needs to decide what to do next",
+    "opportunity": "exploring what's possible",
+    "pressure-testing": "wants to validate a decision",
+    "help-others": "wants to help others who are earlier in the journey"
+  };
+  
+  if (intent) {
+    contextParts.push(`Current intent: ${intentLabels[intent] || intent}`);
+  }
+  
+  if (contextParts.length === 0) {
+    // No onboarding context, return default
+    return "Hey! I'm Chek. We'll soon help you find the right folks. What's on your mind today?";
+  }
+  
+  const systemPrompt = `You are Chek, a friendly AI that helps connect people with others who've been through similar journeys.
+
+Generate a SHORT, warm, personalized greeting (2-3 sentences max) based on what we know about this user.
+
+RULES:
+- Start with "Hey! I'm Chek."
+- Reference their specific situation or what they're working through
+- Be empathetic but NOT cheesy
+- End with a teaser about matching them with the right people
+- Keep it UNDER 40 words total
+- Don't be generic - make it feel like you actually know them
+
+Example format:
+"Hey! I'm Chek. I see you're navigating [specific thing]. We'll soon help you find folks who've been exactly here."`;
+
+  const userPrompt = `User context:
+${name ? `Name: ${name}` : 'No name provided'}
+${contextParts.join('\n')}
+
+Generate a personalized greeting.`;
+
+  try {
+    const response = await fetch("https://ai.gateway.lovable.dev/v1/chat/completions", {
+      method: "POST",
+      headers: {
+        Authorization: `Bearer ${apiKey}`,
+        "Content-Type": "application/json",
+      },
+      body: JSON.stringify({
+        model: "google/gemini-2.5-flash-lite",
+        messages: [
+          { role: "system", content: systemPrompt },
+          { role: "user", content: userPrompt }
+        ],
+      }),
+    });
+
+    if (!response.ok) {
+      console.error("Greeting generation failed:", response.status);
+      return getDefaultGreeting(profileContext);
+    }
+
+    const data = await response.json();
+    const greeting = data.choices?.[0]?.message?.content?.trim();
+    
+    if (!greeting) return getDefaultGreeting(profileContext);
+    
+    // Clean up any quotes the AI might have added
+    return greeting.replace(/^["']|["']$/g, '');
+  } catch (error) {
+    console.error("Error generating greeting:", error);
+    return getDefaultGreeting(profileContext);
+  }
+}
+
+function getDefaultGreeting(profileContext: ProfileContext): string {
+  const insights = profileContext.ai_insights || {};
+  const intent = profileContext.connection_intent;
+  
+  // Build a simpler rule-based greeting as fallback
+  let greeting = "Hey! I'm Chek.";
+  
+  if (insights.constraint) {
+    greeting += ` I know ${insights.constraint.toLowerCase()} feels limiting right now.`;
+  } else if (intent === "clarity") {
+    greeting += ` I see you're weighing multiple paths.`;
+  } else if (intent === "direction") {
+    greeting += ` I see you're figuring out what's next.`;
+  } else if (intent === "opportunity") {
+    greeting += ` I see you're exploring what's possible.`;
+  } else if (intent === "pressure-testing") {
+    greeting += ` I see you want to validate a decision.`;
+  } else if (intent === "help-others") {
+    greeting += ` Great to have someone who's been through it.`;
+  } else {
+    greeting += ` Good to meet you.`;
+  }
+  
+  greeting += " We'll soon help you find the right folks.";
+  
+  return greeting;
 }
 
 // =============================================================================
@@ -674,6 +822,7 @@ serve(async (req) => {
   }
 
   try {
+    const body = await req.json();
     const { 
       messages, 
       userId, 
@@ -681,12 +830,38 @@ serve(async (req) => {
       source, 
       isReturningUser, 
       isFirstMessageOfSession, 
-      hasPendingIntros 
-    } = await req.json();
+      hasPendingIntros,
+      generateGreeting // New flag to request personalized greeting
+    } = body;
     
     const LOVABLE_API_KEY = Deno.env.get("LOVABLE_API_KEY");
     if (!LOVABLE_API_KEY) {
       throw new Error("LOVABLE_API_KEY is not configured");
+    }
+
+    // ========================================
+    // PERSONALIZED GREETING MODE
+    // ========================================
+    if (generateGreeting && userId) {
+      console.log(`Generating personalized greeting for user: ${userId}`);
+      
+      const profileContext = await assembleContext(userId, LOVABLE_API_KEY);
+      
+      if (profileContext?.learning_complete) {
+        const greeting = await generatePersonalizedGreeting(profileContext, LOVABLE_API_KEY);
+        console.log(`Generated greeting: ${greeting}`);
+        
+        return new Response(
+          JSON.stringify({ greeting }),
+          { status: 200, headers: { ...corsHeaders, "Content-Type": "application/json" } }
+        );
+      } else {
+        // User hasn't completed onboarding, return default greeting
+        return new Response(
+          JSON.stringify({ greeting: "Hey! A few quick questions and I'll find you the right person. What brings you here?" }),
+          { status: 200, headers: { ...corsHeaders, "Content-Type": "application/json" } }
+        );
+      }
     }
 
     // ========================================

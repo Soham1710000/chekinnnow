@@ -446,8 +446,30 @@ const Chat = () => {
       if (localMessages.length > 0) {
         await migrateLocalMessages();
       } else {
-        // Send welcome message for new authenticated users
-        await sendBotMessage("Hey! A few quick questions and I'll find you the right person. What brings you here?");
+        // Fetch personalized greeting for users who completed onboarding
+        try {
+          const response = await fetch(CHAT_URL, {
+            method: "POST",
+            headers: {
+              "Content-Type": "application/json",
+              Authorization: `Bearer ${import.meta.env.VITE_SUPABASE_PUBLISHABLE_KEY}`,
+            },
+            body: JSON.stringify({
+              generateGreeting: true,
+              userId: user.id,
+            }),
+          });
+          
+          if (response.ok) {
+            const result = await response.json();
+            await sendBotMessage(result.greeting || "Hey! A few quick questions and I'll find you the right person. What brings you here?");
+          } else {
+            await sendBotMessage("Hey! A few quick questions and I'll find you the right person. What brings you here?");
+          }
+        } catch (err) {
+          console.error("Error fetching personalized greeting:", err);
+          await sendBotMessage("Hey! A few quick questions and I'll find you the right person. What brings you here?");
+        }
       }
     } else {
       setMessages(data as Message[]);

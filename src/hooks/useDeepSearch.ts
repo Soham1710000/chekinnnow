@@ -10,6 +10,27 @@ export interface UserAsk {
   linkedinUrl?: string;
 }
 
+// Context data from onboarding flow
+export interface ContextData {
+  contrarianBelief?: string;
+  careerInflection?: string;
+  motivation?: string;
+  motivationExplanation?: string;
+  constraint?: string;
+}
+
+// User profile data from DB
+export interface UserProfile {
+  full_name?: string;
+  role?: string;
+  industry?: string;
+  looking_for?: string;
+  skills?: string[];
+  interests?: string[];
+  ai_insights?: any;
+  linkedin_url?: string;
+}
+
 export interface Match {
   name: string;
   title: string;
@@ -56,7 +77,8 @@ export function useDeepSearch() {
   const [result, setResult] = useState<SearchResult | null>(null);
   const [error, setError] = useState<string | null>(null);
 
-  const buildSearchQuery = (ask: UserAsk): string => {
+  // Build search query from manual UserAsk form
+  const buildSearchQueryFromAsk = (ask: UserAsk): string => {
     const typeQueries: Record<string, string> = {
       fundraising: `early-stage angel investors seed investors ${ask.intent}`,
       hiring: `engineers developers designers ${ask.intent}`,
@@ -69,6 +91,163 @@ export function useDeepSearch() {
     return typeQueries[ask.askType] || ask.intent;
   };
 
+  // Build search query from user's profile context (reverse of context earning)
+  const buildSearchQueryFromProfile = (profile: UserProfile, context?: ContextData): string => {
+    const parts: string[] = [];
+    
+    // Use looking_for as primary intent
+    if (profile.looking_for) {
+      parts.push(profile.looking_for);
+    }
+    
+    // Add industry context
+    if (profile.industry) {
+      parts.push(profile.industry);
+    }
+    
+    // Add skills for complementary matches
+    if (profile.skills?.length) {
+      parts.push(profile.skills.slice(0, 3).join(" "));
+    }
+    
+    // Add interests for shared ground
+    if (profile.interests?.length) {
+      parts.push(profile.interests.slice(0, 3).join(" "));
+    }
+    
+    // Add context from onboarding if available
+    if (context?.motivation) {
+      const motivationKeywords: Record<string, string> = {
+        building: "founders builders entrepreneurs",
+        recognition: "thought leaders influencers",
+        financial: "investors startup founders",
+        mastery: "experts mentors specialists",
+        stability: "established professionals",
+        impact: "social entrepreneurs changemakers",
+      };
+      parts.push(motivationKeywords[context.motivation] || "");
+    }
+    
+    // Add constraint context for targeted matching
+    if (context?.constraint) {
+      // If time-constrained, look for efficient connectors
+      // If money-constrained, look for bootstrappers
+      // etc.
+    }
+    
+    return parts.filter(Boolean).join(" ") || "professionals startup founders";
+  };
+
+  // Convert profile context to UserAsk format for the API
+  const profileToUserAsk = (profile: UserProfile, context?: ContextData): UserAsk => {
+    const motivationToAskType: Record<string, string> = {
+      building: "peer",
+      recognition: "mentorship",
+      financial: "fundraising",
+      mastery: "mentorship",
+      stability: "career",
+      impact: "partnerships",
+    };
+    
+    return {
+      askType: context?.motivation ? (motivationToAskType[context.motivation] || "peer") : "peer",
+      intent: profile.looking_for || `Connect with ${profile.industry || "relevant"} professionals`,
+      outcome: "Find meaningful connections who can provide value",
+      credibility: profile.role ? `${profile.role}${profile.industry ? ` in ${profile.industry}` : ""}` : "",
+      constraints: context?.constraint || "",
+      linkedinUrl: profile.linkedin_url,
+    };
+  };
+
+  // Search using profile context (auto-triggered)
+  const initiateSearchFromProfile = useCallback(async (profile: UserProfile, context?: ContextData) => {
+    setStatus("initiating");
+    setProgress(10);
+    setError(null);
+    setResult(null);
+
+    try {
+      const query = buildSearchQueryFromProfile(profile, context);
+      const userAsk = profileToUserAsk(profile, context);
+      
+      console.log("Initiating profile-based search:", query);
+      
+      const { data: initData, error: initError } = await supabase.functions.invoke(
+        "initiate-search",
+        { body: { query, limit: 30 } }
+      );
+
+      if (initError || initData?.error) {
+        throw new Error(initData?.error || initError?.message || "Failed to initiate search");
+      }
+
+      const jobId = initData.job_id;
+      if (!jobId) throw new Error("No job ID returned from search");
+
+      setStatus("searching");
+      setProgress(30);
+
+      // Poll for results
+      let attempts = 0;
+      const maxAttempts = 120;
+      let candidates = null;
+
+      while (attempts < maxAttempts) {
+        await new Promise((r) => setTimeout(r, 5000));
+        attempts++;
+        setProgress(30 + Math.min(attempts * 0.5, 50));
+
+        const { data: statusData, error: statusError } = await supabase.functions.invoke(
+          "get-search-status",
+          { body: { jobId } }
+        );
+
+        if (statusError) {
+          console.warn("Status check failed, retrying...", statusError);
+          continue;
+        }
+
+        if (statusData?.status === "completed") {
+          candidates = statusData.results || statusData.profiles || [];
+          break;
+        } else if (statusData?.status === "failed") {
+          throw new Error("Search failed on Clado's end");
+        }
+      }
+
+      if (!candidates) throw new Error("Search timed out - please try again");
+
+      setStatus("processing");
+      setProgress(85);
+
+      // Generate context and matches with AI
+      const { data: contextData, error: contextError } = await supabase.functions.invoke(
+        "generate-match-context",
+        { 
+          body: { 
+            userAsk, 
+            candidates,
+            userProfile: profile,
+            onboardingContext: context,
+          } 
+        }
+      );
+
+      if (contextError || contextData?.error) {
+        throw new Error(contextData?.error || contextError?.message || "Failed to generate matches");
+      }
+
+      setResult(contextData);
+      setStatus("complete");
+      setProgress(100);
+    } catch (err) {
+      console.error("Search error:", err);
+      setError(err instanceof Error ? err.message : "An error occurred");
+      setStatus("error");
+    }
+  }, []);
+
+  // Original manual search
   const initiateSearch = useCallback(async (ask: UserAsk) => {
     setStatus("initiating");
     setProgress(10);
@@ -76,8 +255,7 @@ export function useDeepSearch() {
     setResult(null);
 
     try {
-      // Step 1: Initiate Clado deep research
-      const query = buildSearchQuery(ask);
+      const query = buildSearchQueryFromAsk(ask);
       console.log("Initiating search with query:", query);
       
       const { data: initData, error: initError } = await supabase.functions.invoke(
@@ -95,13 +273,12 @@ export function useDeepSearch() {
       setStatus("searching");
       setProgress(30);
 
-      // Step 2: Poll for results
       let attempts = 0;
-      const maxAttempts = 120; // 10 minutes max
+      const maxAttempts = 120;
       let candidates = null;
 
       while (attempts < maxAttempts) {
-        await new Promise((r) => setTimeout(r, 5000)); // Poll every 5 seconds
+        await new Promise((r) => setTimeout(r, 5000));
         attempts++;
         setProgress(30 + Math.min(attempts * 0.5, 50));
 
@@ -115,8 +292,6 @@ export function useDeepSearch() {
           continue;
         }
 
-        console.log("Search status:", statusData?.status);
-
         if (statusData?.status === "completed") {
           candidates = statusData.results || statusData.profiles || [];
           break;
@@ -127,12 +302,9 @@ export function useDeepSearch() {
 
       if (!candidates) throw new Error("Search timed out - please try again");
 
-      console.log("Found candidates:", candidates.length);
-
       setStatus("processing");
       setProgress(85);
 
-      // Step 3: Generate context and matches with AI
       const { data: contextData, error: contextError } = await supabase.functions.invoke(
         "generate-match-context",
         { body: { userAsk: ask, candidates } }
@@ -159,5 +331,13 @@ export function useDeepSearch() {
     setError(null);
   }, []);
 
-  return { status, progress, result, error, initiateSearch, reset };
+  return { 
+    status, 
+    progress, 
+    result, 
+    error, 
+    initiateSearch, 
+    initiateSearchFromProfile,
+    reset 
+  };
 }

@@ -253,9 +253,20 @@ const IPhoneMockup = memo(({ currentIndex }: { currentIndex: number }) => {
                         className="w-7 h-7 sm:w-9 sm:h-9 md:w-11 md:h-11 rounded-full object-cover object-top border-2 border-gray-200 shadow-sm"
                       />
                     ) : (
-                      <div className="w-7 h-7 sm:w-9 sm:h-9 md:w-11 md:h-11 rounded-full bg-gradient-to-br from-primary/20 to-primary/40 border-2 border-primary/30 shadow-sm flex items-center justify-center text-base sm:text-lg md:text-xl">
+                      <motion.div 
+                        className="w-7 h-7 sm:w-9 sm:h-9 md:w-11 md:h-11 rounded-full bg-gradient-to-br from-primary/20 to-primary/40 border-2 border-primary/30 shadow-sm flex items-center justify-center text-base sm:text-lg md:text-xl"
+                        initial={{ rotate: 0 }}
+                        animate={{ 
+                          rotate: [0, 14, -8, 14, -4, 10, 0],
+                        }}
+                        transition={{ 
+                          duration: 1.2, 
+                          delay: 0.5,
+                          ease: "easeInOut"
+                        }}
+                      >
                         👋
-                      </div>
+                      </motion.div>
                     )}
                   </div>
                   {/* Message bubble */}

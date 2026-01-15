@@ -103,22 +103,22 @@ const ContextEarningFlow = ({ onComplete }: ContextEarningFlowProps) => {
           >
             <div className="space-y-4">
               <h1 className="text-2xl font-semibold">
-                Before ChekInn connects you to others,<br />
-                it needs to understand how you think.
+                Before connecting you to others,<br />
+                we learn how you think.
               </h1>
               <p className="text-muted-foreground">
-                "I'll ask you a few things.<br />
-                There are no right answers — only context."
+                A few questions.<br />
+                Only context — no right answers.
               </p>
             </div>
 
             <div className="space-y-3 text-left bg-muted/50 rounded-xl p-5">
               <h3 className="text-sm font-medium text-muted-foreground">
-                Earning Your Context Layer
+                Your context layer
               </h3>
               <p className="text-sm text-muted-foreground">
-                Context isn't a profile.<br />
-                It's how decisions make sense to you.
+                Not a profile.<br />
+                A thinking map.
               </p>
               <p className="text-xs text-muted-foreground/70 pt-2">
                 This takes ~4 minutes.<br />

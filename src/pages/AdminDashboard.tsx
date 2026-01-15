@@ -36,6 +36,17 @@ import {
   DialogDescription,
 } from "@/components/ui/dialog";
 
+interface OnboardingContext {
+  lookingFor?: string;
+  whyOpportunity?: string;
+  constraint?: string;
+  motivation?: string;
+  motivationExplanation?: string;
+  contrarianBelief?: string;
+  careerInflection?: string;
+  completedAt?: string;
+}
+
 interface Profile {
   id: string;
   email: string;
@@ -51,6 +62,8 @@ interface Profile {
   learning_complete: boolean;
   learning_messages_count: number;
   ai_insights: any;
+  onboarding_context?: OnboardingContext;
+  linkedin_url?: string;
   created_at: string;
   chat_messages?: any[];
   message_count?: number;
@@ -1716,7 +1729,25 @@ const AdminDashboard = () => {
                       </Button>
                     </div>
 
-                    {/* AI Summary - highlighted */}
+                    {/* Onboarding Context - most important for matching */}
+                    {profile.onboarding_context?.lookingFor && (
+                      <div className="bg-emerald-500/10 border border-emerald-500/30 rounded-lg p-3 mb-3">
+                        <p className="text-xs font-medium text-emerald-600 mb-1">🎯 Looking For</p>
+                        <p className="text-sm font-medium">{profile.onboarding_context.lookingFor}</p>
+                        {profile.onboarding_context.whyOpportunity && (
+                          <p className="text-xs text-muted-foreground mt-1">
+                            <span className="font-medium">Why:</span> {profile.onboarding_context.whyOpportunity}
+                          </p>
+                        )}
+                        {profile.onboarding_context.constraint && (
+                          <p className="text-xs text-muted-foreground mt-1">
+                            <span className="font-medium">Constraints:</span> {profile.onboarding_context.constraint}
+                          </p>
+                        )}
+                      </div>
+                    )}
+
+                    {/* AI Summary */}
                     {profile.ai_insights?.summary && (
                       <div className="bg-primary/5 border border-primary/20 rounded-lg p-3 mb-3">
                         <p className="text-xs font-medium text-primary mb-1">AI Summary</p>
@@ -1737,7 +1768,8 @@ const AdminDashboard = () => {
                           {profile.industry}
                         </p>
                       )}
-                      {profile.looking_for && (
+                      {/* Fallback to looking_for if no onboarding context */}
+                      {!profile.onboarding_context?.lookingFor && profile.looking_for && (
                         <p>
                           <span className="text-muted-foreground">Looking for:</span>{" "}
                           {profile.looking_for}
@@ -2003,6 +2035,64 @@ const AdminDashboard = () => {
 
           {viewUser && (
             <div className="space-y-4">
+              {/* Onboarding Context - Primary matching info */}
+              {viewUser.onboarding_context?.lookingFor && (
+                <div className="bg-emerald-500/10 border border-emerald-500/30 rounded-lg p-4">
+                  <h4 className="font-semibold text-emerald-700 mb-3">🎯 Match Context</h4>
+                  <div className="space-y-3">
+                    <div>
+                      <p className="text-xs font-medium text-muted-foreground">Looking For</p>
+                      <p className="font-medium">{viewUser.onboarding_context.lookingFor}</p>
+                    </div>
+                    {viewUser.onboarding_context.whyOpportunity && (
+                      <div>
+                        <p className="text-xs font-medium text-muted-foreground">Why This Opportunity</p>
+                        <p>{viewUser.onboarding_context.whyOpportunity}</p>
+                      </div>
+                    )}
+                    {viewUser.onboarding_context.constraint && (
+                      <div>
+                        <p className="text-xs font-medium text-muted-foreground">Constraints</p>
+                        <p>{viewUser.onboarding_context.constraint}</p>
+                      </div>
+                    )}
+                    {viewUser.onboarding_context.motivation && (
+                      <div>
+                        <p className="text-xs font-medium text-muted-foreground">Motivation</p>
+                        <p>{viewUser.onboarding_context.motivation}</p>
+                      </div>
+                    )}
+                  </div>
+                </div>
+              )}
+
+              {/* AI Insights */}
+              {viewUser.ai_insights && (
+                <div className="bg-primary/5 border border-primary/20 rounded-lg p-4">
+                  <h4 className="font-semibold text-primary mb-3">✨ AI Insights</h4>
+                  <div className="space-y-2 text-sm">
+                    {viewUser.ai_insights.summary && (
+                      <div>
+                        <p className="text-xs font-medium text-muted-foreground">Summary</p>
+                        <p>{viewUser.ai_insights.summary}</p>
+                      </div>
+                    )}
+                    {viewUser.onboarding_context?.contrarianBelief && (
+                      <div>
+                        <p className="text-xs font-medium text-muted-foreground">Contrarian Belief</p>
+                        <p>{viewUser.onboarding_context.contrarianBelief}</p>
+                      </div>
+                    )}
+                    {viewUser.onboarding_context?.careerInflection && (
+                      <div>
+                        <p className="text-xs font-medium text-muted-foreground">Career Inflection</p>
+                        <p>{viewUser.onboarding_context.careerInflection}</p>
+                      </div>
+                    )}
+                  </div>
+                </div>
+              )}
+
               <div className="grid grid-cols-2 gap-4 text-sm">
                 <div>
                   <p className="text-muted-foreground">Email</p>
@@ -2017,7 +2107,7 @@ const AdminDashboard = () => {
                   <p>{viewUser.industry || "—"}</p>
                 </div>
                 <div>
-                  <p className="text-muted-foreground">Looking For</p>
+                  <p className="text-muted-foreground">Looking For (legacy)</p>
                   <p>{viewUser.looking_for || "—"}</p>
                 </div>
                 <div>

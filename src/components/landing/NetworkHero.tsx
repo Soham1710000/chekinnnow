@@ -446,11 +446,11 @@ export const NetworkHero = () => {
               initial={{ opacity: 0, y: 20 }}
               animate={{ opacity: 1, y: 0 }}
               transition={{ duration: 0.8, delay: 0.1 }}
-              className="text-xl sm:text-2xl md:text-3xl lg:text-4xl xl:text-5xl font-medium text-foreground leading-tight mb-6 sm:mb-8 md:mb-10"
+              className="font-medium text-foreground leading-tight mb-6 sm:mb-8 md:mb-10"
             >
-              <span className="font-semibold">chek knows everyone.</span>
+              <span className="font-semibold text-xl sm:text-2xl md:text-3xl lg:text-4xl xl:text-5xl">chek knows everyone.</span>
               <br />
-              <span className="font-normal text-muted-foreground">It talks to millions, so you don't need to.</span>
+              <span className="font-normal text-muted-foreground text-base sm:text-lg md:text-2xl lg:text-3xl xl:text-4xl">It talks to millions, so you don't need to.</span>
             </motion.h1>
 
             {/* CTA Button */}

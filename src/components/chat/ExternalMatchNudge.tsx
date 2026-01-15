@@ -1,5 +1,5 @@
 import { motion } from "framer-motion";
-import { Sparkles, ExternalLink, Users } from "lucide-react";
+import { Sparkles, Users } from "lucide-react";
 import { Button } from "@/components/ui/button";
 
 interface ExternalMatchNudgeProps {
@@ -21,11 +21,11 @@ const ExternalMatchNudge = ({ matchCount = 0, onViewMatches }: ExternalMatchNudg
         <div className="flex-1 min-w-0">
           <h4 className="font-semibold text-sm text-foreground mb-1">
             {matchCount > 0 
-              ? `Found ${matchCount} potential matches outside ChekInn!`
-              : "We found some matches for you on LinkedIn!"}
+              ? `Found ${matchCount} potential connections!`
+              : "We found some matches for you!"}
           </h4>
           <p className="text-xs text-muted-foreground mb-3">
-            While we match you with relevant ChekInn members (usually within 24 hours), 
+            While we match you with ChekInn members (usually within 24 hours), 
             here are some people outside our network who might be great to connect with.
           </p>
           <Button 
@@ -34,8 +34,8 @@ const ExternalMatchNudge = ({ matchCount = 0, onViewMatches }: ExternalMatchNudg
             onClick={onViewMatches}
             className="bg-background/50 hover:bg-background"
           >
-            <ExternalLink className="w-3.5 h-3.5 mr-1.5" />
-            View LinkedIn Matches
+            <Users className="w-3.5 h-3.5 mr-1.5" />
+            View Matches
           </Button>
         </div>
       </div>

@@ -33,17 +33,30 @@ export function MatchView({ userProfile, onboardingContext, autoSearch = false }
     outcome: "",
     credibility: "",
     constraints: "",
-    linkedinUrl: "",
   });
   const [copiedMessage, setCopiedMessage] = useState<string | null>(null);
   const [hasAutoSearched, setHasAutoSearched] = useState(false);
   const [showManualForm, setShowManualForm] = useState(false);
 
-  // Auto-trigger search from profile if enabled
+  // Check if we have enough info for auto-search
+  const hasEnoughInfoForSearch = (): boolean => {
+    // Check onboarding context first (new flow)
+    if (onboardingContext?.lookingFor) return true;
+    // Fallback to profile data
+    if (userProfile?.looking_for) return true;
+    return false;
+  };
+
+  // Auto-trigger search from profile if enabled AND we have enough info
   useEffect(() => {
-    if (autoSearch && userProfile && !hasAutoSearched && status === "idle") {
-      setHasAutoSearched(true);
-      initiateSearchFromProfile(userProfile, onboardingContext || undefined);
+    if (autoSearch && !hasAutoSearched && status === "idle") {
+      if (hasEnoughInfoForSearch()) {
+        setHasAutoSearched(true);
+        initiateSearchFromProfile(userProfile || {}, onboardingContext || undefined);
+      } else {
+        // Not enough info - show manual form
+        setShowManualForm(true);
+      }
     }
   }, [autoSearch, userProfile, hasAutoSearched, status, initiateSearchFromProfile, onboardingContext]);
 
@@ -71,7 +84,7 @@ export function MatchView({ userProfile, onboardingContext, autoSearch = false }
     setTimeout(() => setCopiedMessage(null), 2000);
   };
 
-  if ((status === "idle" && (!autoSearch || showManualForm)) || status === "error") {
+  if ((status === "idle" && (!autoSearch || showManualForm || !hasEnoughInfoForSearch())) || status === "error") {
     return (
       <div className="flex-1 overflow-y-auto p-4 space-y-6">
         <motion.div
@@ -84,7 +97,7 @@ export function MatchView({ userProfile, onboardingContext, autoSearch = false }
           </div>
           <h2 className="text-xl font-semibold mb-2">Find Your Perfect Match</h2>
           <p className="text-muted-foreground text-sm max-w-sm mx-auto">
-            Tell us what you're looking for and we'll find the right people using LinkedIn deep search
+            Tell us what you're looking for and we'll find the right people for you
           </p>
         </motion.div>
 
@@ -154,13 +167,13 @@ export function MatchView({ userProfile, onboardingContext, autoSearch = false }
             />
           </div>
 
-          {/* LinkedIn URL */}
+          {/* Constraints */}
           <div>
-            <label className="text-sm font-medium mb-2 block">Your LinkedIn URL (optional)</label>
+            <label className="text-sm font-medium mb-2 block">Any constraints? (optional)</label>
             <Input
-              placeholder="https://linkedin.com/in/yourprofile"
-              value={formData.linkedinUrl}
-              onChange={(e) => setFormData({ ...formData, linkedinUrl: e.target.value })}
+              placeholder="e.g., Must be based in India, no agencies"
+              value={formData.constraints}
+              onChange={(e) => setFormData({ ...formData, constraints: e.target.value })}
             />
           </div>
 
@@ -261,7 +274,7 @@ export function MatchView({ userProfile, onboardingContext, autoSearch = false }
         {/* Note about external matches */}
         <div className="bg-amber-500/10 border border-amber-500/20 rounded-lg p-3">
           <p className="text-xs text-amber-700 dark:text-amber-400">
-            💡 These are potential connections found on LinkedIn outside the ChekInn network. 
+            💡 These are potential connections outside the ChekInn network. 
             We're also matching you with verified ChekInn members — expect that within 24 hours!
           </p>
         </div>
@@ -269,7 +282,7 @@ export function MatchView({ userProfile, onboardingContext, autoSearch = false }
         {/* Matches */}
         <div className="space-y-4">
           <div className="flex items-center justify-between">
-            <h3 className="font-semibold">LinkedIn Matches ({result.matches?.length || 0})</h3>
+            <h3 className="font-semibold">Matches ({result.matches?.length || 0})</h3>
             <Button variant="outline" size="sm" onClick={handleNewSearch}>
               <RefreshCw className="w-3.5 h-3.5 mr-1.5" />
               New Search

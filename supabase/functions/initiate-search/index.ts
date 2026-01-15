@@ -18,9 +18,17 @@ serve(async (req) => {
       throw new Error('CLADO_API_KEY is not configured');
     }
 
-    console.log('Initiating Clado deep research:', { query, limit });
+    // Add India geography to the query
+    const searchQuery = `${query} India`;
+    console.log('Initiating search:', { query: searchQuery, limit });
 
-    const body: Record<string, unknown> = { query, limit };
+    const body: Record<string, unknown> = { 
+      query: searchQuery, 
+      limit,
+      // Hard filter to India geography
+      hard_filter_locations: ["India"],
+    };
+    
     if (hardFilterCompanyUrls?.length > 0) {
       body.hard_filter_company_urls = hardFilterCompanyUrls;
     }
@@ -36,7 +44,7 @@ serve(async (req) => {
 
     if (!response.ok) {
       const errorText = await response.text();
-      console.error('Clado API error:', response.status, errorText);
+      console.error('API error:', response.status, errorText);
       
       if (response.status === 401) {
         return new Response(JSON.stringify({ error: 'Invalid API key' }),
@@ -52,7 +60,7 @@ serve(async (req) => {
     }
 
     const data = await response.json();
-    console.log('Clado search initiated:', data);
+    console.log('Search initiated:', data);
     
     return new Response(JSON.stringify(data),
       { headers: { ...corsHeaders, 'Content-Type': 'application/json' } });

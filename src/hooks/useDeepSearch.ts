@@ -7,16 +7,17 @@ export interface UserAsk {
   outcome: string;
   credibility: string;
   constraints: string;
-  linkedinUrl?: string;
 }
 
 // Context data from onboarding flow
 export interface ContextData {
+  lookingFor?: string;
+  whyOpportunity?: string;
+  constraint?: string;
   contrarianBelief?: string;
   careerInflection?: string;
   motivation?: string;
   motivationExplanation?: string;
-  constraint?: string;
 }
 
 // User profile data from DB
@@ -95,9 +96,18 @@ export function useDeepSearch() {
   const buildSearchQueryFromProfile = (profile: UserProfile, context?: ContextData): string => {
     const parts: string[] = [];
     
-    // Use looking_for as primary intent
-    if (profile.looking_for) {
+    // Use lookingFor from onboarding as primary intent (new flow)
+    if (context?.lookingFor) {
+      parts.push(context.lookingFor);
+    }
+    // Fallback to profile looking_for
+    else if (profile.looking_for) {
       parts.push(profile.looking_for);
+    }
+    
+    // Add why context for better matching
+    if (context?.whyOpportunity) {
+      parts.push(context.whyOpportunity);
     }
     
     // Add industry context
@@ -110,12 +120,7 @@ export function useDeepSearch() {
       parts.push(profile.skills.slice(0, 3).join(" "));
     }
     
-    // Add interests for shared ground
-    if (profile.interests?.length) {
-      parts.push(profile.interests.slice(0, 3).join(" "));
-    }
-    
-    // Add context from onboarding if available
+    // Add context from onboarding motivation if available
     if (context?.motivation) {
       const motivationKeywords: Record<string, string> = {
         building: "founders builders entrepreneurs",
@@ -128,14 +133,7 @@ export function useDeepSearch() {
       parts.push(motivationKeywords[context.motivation] || "");
     }
     
-    // Add constraint context for targeted matching
-    if (context?.constraint) {
-      // If time-constrained, look for efficient connectors
-      // If money-constrained, look for bootstrappers
-      // etc.
-    }
-    
-    return parts.filter(Boolean).join(" ") || "professionals startup founders";
+    return parts.filter(Boolean).join(" ") || "professionals founders";
   };
 
   // Convert profile context to UserAsk format for the API
@@ -151,11 +149,10 @@ export function useDeepSearch() {
     
     return {
       askType: context?.motivation ? (motivationToAskType[context.motivation] || "peer") : "peer",
-      intent: profile.looking_for || `Connect with ${profile.industry || "relevant"} professionals`,
-      outcome: "Find meaningful connections who can provide value",
+      intent: context?.lookingFor || profile.looking_for || `Connect with ${profile.industry || "relevant"} professionals`,
+      outcome: context?.whyOpportunity || "Find meaningful connections who can provide value",
       credibility: profile.role ? `${profile.role}${profile.industry ? ` in ${profile.industry}` : ""}` : "",
       constraints: context?.constraint || "",
-      linkedinUrl: profile.linkedin_url,
     };
   };
 

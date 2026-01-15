@@ -14,7 +14,6 @@ import LearningProgress from "@/components/chat/LearningProgress";
 
 // Lazy load heavy components that aren't needed immediately
 const UserChatView = lazy(() => import("@/components/chat/UserChatView"));
-const OnboardingOverlay = lazy(() => import("@/components/chat/OnboardingOverlay"));
 const UserProfileCard = lazy(() => import("@/components/chat/UserProfileCard"));
 const SaveProgressNudge = lazy(() => import("@/components/chat/SaveProgressNudge"));
 const WhatsAppCommunityNudge = lazy(() => import("@/components/chat/WhatsAppCommunityNudge"));
@@ -149,7 +148,6 @@ const Chat = () => {
   const [showLoginNudge, setShowLoginNudge] = useState(false);
   const [showSaveProgress, setShowSaveProgress] = useState(false);
   const [sessionId] = useState(() => getSessionId());
-  const [showOnboarding, setShowOnboarding] = useState(false);
   const [showWACommunity, setShowWACommunity] = useState(false);
   const evaluatedIntros = useRef<Set<string>>(new Set());
   
@@ -176,10 +174,6 @@ const Chat = () => {
   // Stable no-op handler for compact WA nudge that can't be dismissed
   const noopHandler = useCallback(() => {}, []);
 
-  const handleOnboardingComplete = () => {
-    sessionStorage.setItem("chekinn_onboarding_seen", "true");
-    setShowOnboarding(false);
-  };
 
   // Track chat page loaded
   useEffect(() => {
@@ -963,14 +957,6 @@ const Chat = () => {
       </Suspense>
 
 
-      {/* Onboarding overlay for new users (lazy loaded) */}
-      <Suspense fallback={null}>
-        <AnimatePresence>
-          {showOnboarding && (
-            <OnboardingOverlay onStart={handleOnboardingComplete} />
-          )}
-        </AnimatePresence>
-      </Suspense>
 
       {/* Login nudge banner for non-authenticated users */}
       {!user && (

@@ -21,8 +21,6 @@ const prefetchRoutes = () => {
   }
 };
 
-// Lazy load overlays - only needed on click
-const OnboardingOverlay = lazy(() => import("@/components/chat/OnboardingOverlay"));
 
 // Lazy load the modal - only needed on click
 const WaitlistModal = lazy(() => import("@/components/waitlist/WaitlistModal").then(m => ({ default: m.WaitlistModal })));
@@ -300,7 +298,6 @@ export const NetworkHero = () => {
   const [searchParams] = useSearchParams();
   const navigate = useNavigate();
   const [isModalOpen, setIsModalOpen] = useState(false);
-  const [showExplainer, setShowExplainer] = useState(false);
   const [currentIndex, setCurrentIndex] = useState(0);
   const [waitlistCount, setWaitlistCount] = useState<number>(BASE_WAITLIST_COUNT);
   const referralCode = searchParams.get("ref");
@@ -315,14 +312,9 @@ export const NetworkHero = () => {
       // Already logged in, go straight to chat
       navigate("/chat");
     } else {
-      // Not logged in, show explainer first
-      setShowExplainer(true);
+      // Go directly to auth
+      navigate("/auth");
     }
-  };
-
-  const handleExplainerContinue = () => {
-    setShowExplainer(false);
-    navigate("/auth");
   };
 
   // Fetch waitlist count and subscribe to real-time updates
@@ -514,16 +506,6 @@ export const NetworkHero = () => {
         </Suspense>
       )}
 
-      {/* Explainer Overlay - lazy loaded */}
-      <AnimatePresence>
-        {showExplainer && (
-          <Suspense fallback={<div className="fixed inset-0 z-50 bg-background" />}>
-            <div className="fixed inset-0 z-50 bg-background">
-              <OnboardingOverlay onStart={handleExplainerContinue} />
-            </div>
-          </Suspense>
-        )}
-      </AnimatePresence>
     </section>
   );
 };

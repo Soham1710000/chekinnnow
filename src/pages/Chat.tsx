@@ -419,7 +419,7 @@ const Chat = () => {
     if (!user) return;
     const { data } = await supabase
       .from("profiles")
-      .select("learning_complete, full_name, role, industry, looking_for, skills, interests, ai_insights")
+      .select("learning_complete, full_name, role, industry, looking_for, skills, interests, ai_insights, onboarding_context")
       .eq("id", user.id)
       .maybeSingle();
     
@@ -1100,6 +1100,7 @@ const Chat = () => {
         <Suspense fallback={<div className="flex-1 flex items-center justify-center"><div className="animate-spin w-8 h-8 border-2 border-primary border-t-transparent rounded-full" /></div>}>
           <MatchView 
             userProfile={userProfile} 
+            onboardingContext={userProfile?.onboarding_context as any}
             autoSearch={learningComplete && !!userProfile}
           />
         </Suspense>

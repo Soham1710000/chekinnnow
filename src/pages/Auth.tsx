@@ -1,20 +1,28 @@
-import { useState, useEffect, useRef, memo, useCallback } from "react";
+import { useState, useEffect, useRef, lazy, Suspense } from "react";
 import { useNavigate } from "react-router-dom";
 import { useAuth } from "@/hooks/useAuth";
 import { supabase } from "@/integrations/supabase/client";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { useToast } from "@/hooks/use-toast";
-import { motion } from "framer-motion";
-import { Loader2, ArrowLeft, Sparkles } from "lucide-react";
+import { motion, AnimatePresence } from "framer-motion";
+import { Loader2, ArrowLeft, Shield, Linkedin } from "lucide-react";
 import { z } from "zod";
 import { useFunnelTracking } from "@/hooks/useFunnelTracking";
-import { LinkedInStep } from "@/components/auth/LinkedInStep";
+
+// Lazy load onboarding components
+const ContextEarningFlow = lazy(() => import("@/components/onboarding/ContextEarningFlow"));
+const IntentDeclaration = lazy(() => import("@/components/onboarding/IntentDeclaration"));
+const OnboardingComplete = lazy(() => import("@/components/onboarding/OnboardingComplete"));
 
 const emailSchema = z.string().email("Please enter a valid email");
 const passwordSchema = z.string().min(6, "Password must be at least 6 characters");
+const linkedinUrlSchema = z.string()
+  .refine(val => val === '' || val.includes('linkedin.com'), {
+    message: "Please enter a valid LinkedIn profile URL"
+  });
 
-type AuthStep = "credentials" | "linkedin";
+type AuthStep = "credentials" | "context" | "intent" | "complete";
 
 const Auth = () => {
   const { user, loading: authLoading } = useAuth();
@@ -30,10 +38,52 @@ const Auth = () => {
   const [forgotStep, setForgotStep] = useState<"request" | "reset">("request");
   const [email, setEmail] = useState("");
   const [password, setPassword] = useState("");
+  const [linkedinUrl, setLinkedinUrl] = useState("");
   const [tempPassword, setTempPassword] = useState("");
   const [newPassword, setNewPassword] = useState("");
   const [newPasswordConfirm, setNewPasswordConfirm] = useState("");
   const [loading, setLoading] = useState(false);
+
+  // Track page view
+  useEffect(() => {
+    trackPageView();
+  }, [trackPageView]);
+
+  // Track auth_start when user begins typing
+  useEffect(() => {
+    if ((email || password) && !hasTrackedAuthStart.current) {
+      hasTrackedAuthStart.current = true;
+      trackEvent("auth_start", { mode: isSignUp ? "signup" : "signin" });
+    }
+  }, [email, password, isSignUp, trackEvent]);
+
+  // Redirect logged-in users (but not during onboarding steps)
+  useEffect(() => {
+    if (!authLoading && user && step === "credentials" && !newUserId) {
+      // Check if user has completed onboarding
+      checkOnboardingStatus();
+    }
+  }, [user, authLoading, step, newUserId]);
+
+  const checkOnboardingStatus = async () => {
+    if (!user) return;
+    
+    const { data } = await supabase
+      .from("profiles")
+      .select("learning_complete, connection_intent")
+      .eq("id", user.id)
+      .maybeSingle();
+    
+    if (data?.learning_complete && data?.connection_intent) {
+      navigate("/chat");
+    } else if (data && !data.learning_complete) {
+      // User exists but hasn't completed onboarding
+      setNewUserId(user.id);
+      setStep("context");
+    } else {
+      navigate("/chat");
+    }
+  };
 
   const handleForgotPassword = async (e: React.FormEvent) => {
     e.preventDefault();
@@ -133,27 +183,6 @@ const Auth = () => {
     setLoading(false);
   };
 
-
-  // Track page view
-  useEffect(() => {
-    trackPageView();
-  }, [trackPageView]);
-
-  // Track auth_start when user begins typing
-  useEffect(() => {
-    if ((email || password) && !hasTrackedAuthStart.current) {
-      hasTrackedAuthStart.current = true;
-      trackEvent("auth_start", { mode: isSignUp ? "signup" : "signin" });
-    }
-  }, [email, password, isSignUp, trackEvent]);
-
-  // Redirect logged-in users (but not during LinkedIn step)
-  useEffect(() => {
-    if (!authLoading && user && step === "credentials" && !newUserId) {
-      navigate("/chat");
-    }
-  }, [user, authLoading, navigate, step, newUserId]);
-
   const handleAuth = async (e: React.FormEvent) => {
     e.preventDefault();
     setLoading(true);
@@ -161,6 +190,9 @@ const Auth = () => {
     try {
       emailSchema.parse(email);
       passwordSchema.parse(password);
+      if (isSignUp && linkedinUrl) {
+        linkedinUrlSchema.parse(linkedinUrl);
+      }
     } catch (err) {
       if (err instanceof z.ZodError) {
         toast({
@@ -178,7 +210,10 @@ const Auth = () => {
         email,
         password,
         options: {
-          emailRedirectTo: `${window.location.origin}/chat`,
+          emailRedirectTo: `${window.location.origin}/auth`,
+          data: {
+            linkedin_url: linkedinUrl || null,
+          },
         },
       });
 
@@ -200,18 +235,29 @@ const Auth = () => {
         setLoading(false);
         return;
       }
+
       trackEvent("auth_complete", { mode: "signup", email });
-      toast({
-        title: "You're in! 🎉",
-        description: "One more quick step to help us know you better.",
-      });
-      
-      // Show LinkedIn step for new signups
+
+      // Enrich LinkedIn if provided
+      if (authData.user && linkedinUrl) {
+        try {
+          await supabase.functions.invoke('enrich-linkedin', {
+            body: { linkedinUrl, userId: authData.user.id }
+          });
+          trackEvent("linkedin_enriched", { userId: authData.user.id });
+        } catch (e) {
+          console.error('LinkedIn enrichment error:', e);
+        }
+      }
+
+      // Update profile with LinkedIn URL
       if (authData.user) {
+        await supabase.from("profiles").update({
+          linkedin_url: linkedinUrl || null,
+        }).eq("id", authData.user.id);
+
         setNewUserId(authData.user.id);
-        setStep("linkedin");
-      } else {
-        navigate("/chat");
+        setStep("context");
       }
     } else {
       const { error } = await supabase.auth.signInWithPassword({
@@ -229,11 +275,46 @@ const Auth = () => {
         return;
       }
       trackEvent("auth_complete", { mode: "signin", email });
-      // Navigate immediately after successful signin
       navigate("/chat");
     }
 
     setLoading(false);
+  };
+
+  const handleContextComplete = async (context: any) => {
+    if (newUserId) {
+      // Save context to profile
+      await supabase.from("profiles").update({
+        ai_insights: {
+          contrarian_belief: context.contrarianBelief,
+          career_inflection: context.careerInflection,
+          motivation: context.motivation,
+          motivation_explanation: context.motivationExplanation,
+          constraint: context.constraint,
+        },
+      }).eq("id", newUserId);
+      
+      trackEvent("context_earning_complete", { userId: newUserId });
+    }
+    setStep("intent");
+  };
+
+  const handleIntentComplete = async (intent: string) => {
+    if (newUserId) {
+      // Save intent to profile
+      await supabase.from("profiles").update({
+        connection_intent: intent,
+        learning_complete: true,
+      }).eq("id", newUserId);
+      
+      trackEvent("intent_declaration_complete", { userId: newUserId, intent });
+    }
+    setStep("complete");
+  };
+
+  const handleOnboardingComplete = () => {
+    trackEvent("onboarding_complete", { userId: newUserId });
+    navigate("/chat");
   };
 
   if (authLoading) {
@@ -244,22 +325,36 @@ const Auth = () => {
     );
   }
 
-  // Handle LinkedIn step completion
-  const handleLinkedInComplete = () => {
-    trackEvent("linkedin_enriched", { userId: newUserId });
-    navigate("/chat");
-  };
+  // Render onboarding steps
+  if (step === "context" && newUserId) {
+    return (
+      <Suspense fallback={<div className="min-h-screen bg-background flex items-center justify-center"><Loader2 className="w-6 h-6 animate-spin text-muted-foreground" /></div>}>
+        <ContextEarningFlow onComplete={handleContextComplete} />
+      </Suspense>
+    );
+  }
 
-  const handleLinkedInSkip = () => {
-    trackEvent("linkedin_skipped", { userId: newUserId });
-    navigate("/chat");
-  };
+  if (step === "intent" && newUserId) {
+    return (
+      <Suspense fallback={<div className="min-h-screen bg-background flex items-center justify-center"><Loader2 className="w-6 h-6 animate-spin text-muted-foreground" /></div>}>
+        <IntentDeclaration onComplete={handleIntentComplete} />
+      </Suspense>
+    );
+  }
+
+  if (step === "complete") {
+    return (
+      <Suspense fallback={<div className="min-h-screen bg-background flex items-center justify-center"><Loader2 className="w-6 h-6 animate-spin text-muted-foreground" /></div>}>
+        <OnboardingComplete onStart={handleOnboardingComplete} />
+      </Suspense>
+    );
+  }
 
   return (
     <div className="min-h-screen bg-background flex flex-col">
       <header className="p-4">
         <button 
-          onClick={() => step === "linkedin" ? setStep("credentials") : navigate("/")} 
+          onClick={() => navigate("/")} 
           className="flex items-center gap-2 text-muted-foreground hover:text-foreground transition-colors"
         >
           <ArrowLeft className="w-5 h-5" />
@@ -268,26 +363,11 @@ const Auth = () => {
       </header>
 
       <div className="flex-1 flex items-center justify-center px-4 py-8">
-        {step === "linkedin" && newUserId ? (
-          <LinkedInStep 
-            userId={newUserId} 
-            onComplete={handleLinkedInComplete} 
-            onSkip={handleLinkedInSkip} 
-          />
-        ) : (
-          <motion.div
-            initial={{ opacity: 0, y: 20 }}
-            animate={{ opacity: 1, y: 0 }}
-            className="w-full max-w-sm"
-          >
-          {/* Quick step indicator */}
-          <div className="flex items-center justify-center gap-2 mb-6">
-            <div className="flex items-center gap-1.5 px-3 py-1.5 bg-primary/10 rounded-full">
-              <Sparkles className="w-3.5 h-3.5 text-primary" />
-              <span className="text-xs font-medium text-primary">30 seconds</span>
-            </div>
-          </div>
-
+        <motion.div
+          initial={{ opacity: 0, y: 20 }}
+          animate={{ opacity: 1, y: 0 }}
+          className="w-full max-w-sm"
+        >
           <div className="text-center mb-8">
             <h1 className="text-2xl font-bold mb-3">
               {isForgotPassword
@@ -295,7 +375,7 @@ const Auth = () => {
                   ? "Get a temporary password"
                   : "Set a new password"
                 : isSignUp
-                  ? "Quick step to get intros"
+                  ? "Enter ChekInn"
                   : "Welcome back"}
             </h1>
             <p className="text-muted-foreground text-sm leading-relaxed">
@@ -304,8 +384,8 @@ const Auth = () => {
                   ? "Enter your email — we'll send you a temporary password."
                   : "Enter the temporary password from your email, then set a new one."
                 : isSignUp
-                  ? "Just an email so we can nudge you when we find someone great for you to meet"
-                  : "Sign in to see your intros"}
+                  ? "A private space for thinking with people who've been here before."
+                  : "Sign in to continue your check-ins"}
             </p>
           </div>
 
@@ -433,12 +513,25 @@ const Auth = () => {
                   type="password"
                   value={password}
                   onChange={(e) => setPassword(e.target.value)}
-                  placeholder="Create a password"
+                  placeholder={isSignUp ? "Create a password" : "Your password"}
                   required
                   minLength={6}
                   className="h-12 text-base rounded-xl border-2 border-muted focus:border-primary transition-colors"
                 />
-                <p className="text-xs text-muted-foreground text-center">Min 6 characters — we keep it simple</p>
+
+                {isSignUp && (
+                  <div className="relative">
+                    <Linkedin className="absolute left-3 top-1/2 -translate-y-1/2 w-5 h-5 text-muted-foreground" />
+                    <Input
+                      id="linkedin"
+                      type="url"
+                      value={linkedinUrl}
+                      onChange={(e) => setLinkedinUrl(e.target.value)}
+                      placeholder="linkedin.com/in/yourprofile"
+                      className="h-12 text-base rounded-xl border-2 border-muted focus:border-primary transition-colors pl-11"
+                    />
+                  </div>
+                )}
 
                 <Button 
                   type="submit" 
@@ -448,7 +541,7 @@ const Auth = () => {
                   {loading ? (
                     <Loader2 className="w-4 h-4 animate-spin" />
                   ) : isSignUp ? (
-                    "Get Started →"
+                    "Enter ChekInn →"
                   ) : (
                     "Sign In"
                   )}
@@ -482,14 +575,17 @@ const Auth = () => {
 
               {/* Trust indicator */}
               {isSignUp && (
-                <p className="mt-8 text-xs text-center text-muted-foreground/70">
-                  No spam. We only reach out when we find a match.
-                </p>
+                <div className="mt-8 flex items-start gap-3 p-4 bg-muted/50 rounded-xl">
+                  <Shield className="w-5 h-5 text-muted-foreground flex-shrink-0 mt-0.5" />
+                  <div className="text-xs text-muted-foreground leading-relaxed">
+                    <p className="font-medium text-foreground/80 mb-1">We use identity to protect context.</p>
+                    <p>No feeds. No broadcasting.</p>
+                  </div>
+                </div>
               )}
             </>
           )}
         </motion.div>
-        )}
       </div>
     </div>
   );

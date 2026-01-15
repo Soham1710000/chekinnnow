@@ -14,6 +14,10 @@ type FunnelEvent =
   | "save_progress_captured"
   | "linkedin_enriched"
   | "linkedin_skipped"
+  // Onboarding events
+  | "context_earning_complete"
+  | "intent_declaration_complete"
+  | "onboarding_complete"
   // Voice experiment events
   | "experiment_assigned"
   | "voice_recording_started"

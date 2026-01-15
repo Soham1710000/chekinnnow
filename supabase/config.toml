@@ -1,109 +1,40 @@
 project_id = "pnyebagcmymrukwjkepz"
 
-[api]
-enabled = true
-port = 54321
-schemas = ["public", "graphql_public"]
-extra_search_path = ["public", "extensions"]
-max_rows = 1000
-
-[db]
-port = 54322
-shadow_port = 54320
-major_version = 15
-
-[studio]
-enabled = true
-port = 54323
-api_url = "http://127.0.0.1"
-
-[auth]
-enabled = true
-site_url = "http://127.0.0.1:3000"
-additional_redirect_urls = ["https://pnyebagcmymrukwjkepz.supabase.co", "https://chekinn.club", "https://www.chekinn.club"]
-jwt_expiry = 3600
-enable_signup = true
-enable_anonymous_sign_ins = false
-
-[auth.email]
-enable_signup = true
-double_confirm_changes = false
-enable_confirmations = false
-
-[functions.admin-data]
-verify_jwt = false
-
-[functions.gmail-oauth]
-verify_jwt = false
-
-[functions.gmail-ingest]
-verify_jwt = false
-
-[functions.signal-extract]
-verify_jwt = false
-
 [functions.chat-ai]
-verify_jwt = false
-
-[functions.chat-orchestrator]
-verify_jwt = false
-
-[functions.enrich-linkedin]
-verify_jwt = false
-
-[functions.chat-nudge]
-verify_jwt = false
-
-[functions.chat-judge]
-verify_jwt = false
-
-[functions.backfill-profiles]
-verify_jwt = false
-
-[functions.admin-create-intro]
-verify_jwt = true
-
-[functions.decision-engine]
-verify_jwt = false
-
-[functions.evaluate-p2p-chat]
 verify_jwt = false
 
 [functions.send-launch-email]
 verify_jwt = false
 
+[functions.admin-data]
+verify_jwt = true
+
+[functions.admin-create-intro]
+verify_jwt = true
+
+[functions.chat-nudge]
+verify_jwt = false
+
 [functions.send-temp-password]
 verify_jwt = false
 
-[functions.state-derive]
+[functions.backfill-profiles]
 verify_jwt = false
 
-[functions.judgment-engine]
+[functions.summarize-learnings]
 verify_jwt = false
 
-[functions.message-generate]
+[functions.enrich-linkedin]
+verify_jwt = false
+
+[functions.voice-to-text]
+verify_jwt = false
+
+[functions.reputation-engine]
 verify_jwt = false
 
 [functions.undercurrents]
 verify_jwt = false
 
-[functions.background-signal-loop]
-verify_jwt = false
-
-[functions.nudge-gating]
-verify_jwt = false
-
-[functions.signal-nudge-orchestrator]
-verify_jwt = false
-
-[functions.linkedin-ingest]
-verify_jwt = false
-
-[functions.linkedin-signal-process]
-verify_jwt = false
-
-[functions.linkedin-match-hiring]
-verify_jwt = false
-
-[functions.linkedin-meeting-prep]
+[functions.evaluate-p2p-chat]
 verify_jwt = false

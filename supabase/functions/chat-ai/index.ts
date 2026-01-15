@@ -7,46 +7,24 @@ const corsHeaders = {
 };
 
 // =============================================================================
-// CHAT-AI (INTEGRATED JUDGE + RESPOND)
-// =============================================================================
-// This function now:
-// 1. Calls chat-judge to decide HOW to reply (mode, tone, limits)
-// 2. Builds the system prompt with the dignified personality
-// 3. Generates the response within the judge's constraints
+// TYPES
 // =============================================================================
 
-interface ChatDecision {
-  mode: "observer" | "reflect" | "guide";
-  tone: "soft" | "neutral" | "playful";
-  reference_signal: boolean;
-  ask_question: boolean;
-  allow_banter: boolean;
+interface DecisionOutput {
+  mode: "reflect" | "observer" | "guide";
+  tone: "soft" | "neutral" | "probing";
+  use_experiences: boolean;
+  consider_social: boolean;
 }
 
-interface ActionableSignal {
-  id: string;
-  type: "FLIGHT" | "INTERVIEW" | "TRANSITION" | "EVENT" | "OBSESSION";
-  domain: string | null;
-  evidence: string | null;
-  email_date: string;
-  details_complete: boolean;
-}
-
-interface EmailSignal {
-  type: string;
-  domain: string | null;
-  confidence: number;
-  evidence: string | null;
-  email_date: string;
-  expires_at: string | null;
-}
-
-interface SocialProfile {
-  platform: string;
-  profile_handle: string | null;
-  profile_url: string;
-  confidence: number;
-  source_type: string;
+interface UserContext {
+  isAuthenticated: boolean;
+  source?: string;
+  isReturningUser?: boolean;
+  isFirstMessageOfSession?: boolean;
+  hasPendingIntros?: boolean;
+  userId?: string;
+  experimentVariant?: "direct" | "reflective"; // A/B test variant
 }
 
 interface ProfileContext {
@@ -55,378 +33,639 @@ interface ProfileContext {
   industry?: string;
   goals?: string[];
   interests?: string[];
-  looking_for?: string;
 }
 
 // =============================================================================
-// GET CHEKINN USER ID FROM AUTH USER
+// STEP 1: DECISION LAYER (fast, non-streaming)
 // =============================================================================
 
-async function getChekinnUserId(authUserId: string, supabase: any): Promise<string | null> {
-  const { data: profile } = await supabase
-    .from("profiles")
-    .select("email")
-    .eq("id", authUserId)
-    .maybeSingle();
+async function getDecision(
+  messages: any[],
+  userContext: UserContext,
+  apiKey: string
+): Promise<DecisionOutput> {
+  // Default fallback if decision fails
+  const defaultDecision: DecisionOutput = {
+    mode: "reflect",
+    tone: "soft",
+    use_experiences: false,
+    consider_social: false
+  };
 
-  if (!profile?.email) {
-    const { data: authUser } = await supabase.auth.admin.getUserById(authUserId);
-    if (!authUser?.user?.email) return null;
-    
-    const { data: chekinnUser } = await supabase
-      .from("chekinn_users")
-      .select("id")
-      .eq("email", authUser.user.email)
-      .maybeSingle();
-    
-    return chekinnUser?.id || null;
-  }
-
-  const { data: chekinnUser } = await supabase
-    .from("chekinn_users")
-    .select("id")
-    .eq("email", profile.email)
-    .maybeSingle();
-
-  return chekinnUser?.id || null;
-}
-
-// =============================================================================
-// FETCH DATA FUNCTIONS
-// =============================================================================
-
-async function fetchUserSignals(chekinnUserId: string, supabase: any): Promise<EmailSignal[]> {
-  const thirtyDaysAgo = new Date();
-  thirtyDaysAgo.setDate(thirtyDaysAgo.getDate() - 30);
-
-  const { data, error } = await supabase
-    .from("email_signals")
-    .select("type, domain, confidence, evidence, email_date, expires_at")
-    .eq("user_id", chekinnUserId)
-    .gte("email_date", thirtyDaysAgo.toISOString())
-    .gte("confidence", 0.6)
-    .order("email_date", { ascending: false })
-    .limit(15);
-
-  if (error) {
-    console.error("Error fetching signals:", error);
-    return [];
-  }
-
-  // Don't filter out expired FLIGHT signals immediately - they're still useful context
-  // Only filter if expired more than 3 days ago
-  const now = new Date();
-  const threeDaysAgo = new Date();
-  threeDaysAgo.setDate(threeDaysAgo.getDate() - 3);
-  
-  return (data || []).filter((s: EmailSignal) => {
-    if (!s.expires_at) return true;
-    const expiryDate = new Date(s.expires_at);
-    // For FLIGHT signals, keep them even if recently expired (useful for "how was your trip?")
-    if (s.type === 'FLIGHT') {
-      return expiryDate > threeDaysAgo;
-    }
-    return expiryDate > now;
-  });
-}
-
-async function fetchUserSocialProfiles(chekinnUserId: string, supabase: any): Promise<SocialProfile[]> {
-  const { data, error } = await supabase
-    .from("inferred_social_profiles")
-    .select("platform, profile_handle, profile_url, confidence, source_type")
-    .eq("user_id", chekinnUserId)
-    .gte("confidence", 0.7)
-    .order("confidence", { ascending: false })
-    .limit(5);
-
-  if (error) {
-    console.error("Error fetching social profiles:", error);
-    return [];
-  }
-
-  const falsePositives = ['email', 'font', 'mail', 'digest', 'notifications', 'import', 'culture', '100', 'invest', 'daily', 'engage', 'media', 'snacks'];
-  return (data || []).filter((p: SocialProfile) => 
-    p.profile_handle && !falsePositives.includes(p.profile_handle.toLowerCase())
-  );
-}
-
-async function fetchUserProfile(authUserId: string, supabase: any): Promise<ProfileContext | null> {
-  const { data, error } = await supabase
-    .from("profiles")
-    .select("full_name, role, industry, goals, interests, looking_for")
-    .eq("id", authUserId)
-    .maybeSingle();
-
-  if (error) {
-    console.error("Error fetching profile:", error);
-    return null;
-  }
-
-  return data;
-}
-
-// =============================================================================
-// CALL CHAT-JUDGE
-// =============================================================================
-
-async function callJudge(
-  userMessage: string | null,
-  recentSignals: EmailSignal[],
-  conversationHistory: any[],
-  hasPriorBanter: boolean
-): Promise<{ decision: ChatDecision; actionableSignal: ActionableSignal | null }> {
   try {
-    // Determine conversation state
-    const lastUserMsgIndex = [...conversationHistory].reverse().findIndex(m => m.role === "user");
-    const conversationState: "active" | "stale" | "returning" = 
-      conversationHistory.length === 0 ? "returning" :
-      lastUserMsgIndex > 3 ? "stale" : "active";
+    // Build conversation summary (last 5 messages only)
+    const recentMessages = messages.slice(-10);
+    const lastMessages = recentMessages.map((m: any) => `${m.role}: ${m.content}`).join("\n");
+    
+    // Summarize earlier context if exists
+    const earlierMessages = messages.slice(0, -10);
+    const conversationSummary = earlierMessages.length > 0 
+      ? earlierMessages.map((m: any) => `${m.role}: ${m.content.slice(0, 100)}...`).join("\n")
+      : "No prior context.";
 
-    // Calculate time since last user action (approximate from conversation)
-    const timeSinceLastAction = conversationHistory.length === 0 ? 24 : 0.5;
+  // Force transition after message threshold (VERY fast for exam prep users)
+  const userMessageCount = messages.filter((m: any) => m.role === "user").length;
+  const isExamPrepUser = userContext.source === "upsc" || userContext.source === "cat";
+  const transitionThreshold = isExamPrepUser ? 2 : 4; // Much faster - 2 messages max for UPSC/CAT
+  const shouldForceTransition = userMessageCount >= transitionThreshold;
 
-    // Transform EmailSignal[] to the format chat-judge expects
-    const judgeSignals = recentSignals.map(s => ({
-      id: crypto.randomUUID(), // Judge doesn't need real IDs
-      type: s.type as "FLIGHT" | "INTERVIEW" | "EVENT" | "TRANSITION" | "OBSESSION",
-      email_date: s.email_date,
-      evidence: s.evidence,
-      confidence: s.confidence,
-      domain: s.domain,
-    }));
+    const decisionPrompt = `You are an internal decision engine for ChekInn.
 
-    const response = await fetch(
-      `${Deno.env.get("SUPABASE_URL")}/functions/v1/chat-judge`,
-      {
-        method: "POST",
-        headers: {
-          "Content-Type": "application/json",
-          Authorization: `Bearer ${Deno.env.get("SUPABASE_SERVICE_ROLE_KEY")}`,
-        },
-        body: JSON.stringify({
-          user_message: userMessage,
-          recent_signals: judgeSignals,
-          time_since_last_user_action_hours: timeSinceLastAction,
-          conversation_state: conversationState,
-          has_prior_banter: hasPriorBanter,
-        }),
-      }
-    );
+Your job is to decide HOW the assistant should respond, not WHAT it should say.
 
-    if (!response.ok) {
-      console.error("[chat-ai] Judge call failed:", response.status);
-      throw new Error("Judge failed");
-    }
+Analyze the conversation and return a JSON object only.
+No explanation. No prose.
 
-    // chat-judge returns the decision directly with actionable_signal inside
-    const judgeResult = await response.json();
-    console.log("[chat-ai] Raw judge response:", JSON.stringify(judgeResult));
+Decide:
+- The interaction mode
+- Whether to surface experiences from others
+- Whether to gently consider human connection
+- The tone to use
 
-    return {
-      decision: {
-        mode: judgeResult.mode,
-        tone: judgeResult.tone,
-        reference_signal: judgeResult.reference_signal,
-        ask_question: judgeResult.ask_question,
-        allow_banter: judgeResult.allow_banter,
-      },
-      actionableSignal: judgeResult.actionable_signal || null,
-    };
-  } catch (error) {
-    console.error("[chat-ai] Judge error:", error);
-    // Default safe decision
-    return {
-      decision: {
-        mode: "observer",
-        tone: "soft",
-        reference_signal: false,
-        ask_question: false,
-        allow_banter: false,
-      },
-      actionableSignal: null,
-    };
-  }
-}
-
-// =============================================================================
-// BUILD DIGNIFIED SYSTEM PROMPT
-// =============================================================================
-
-function buildSystemPrompt(
-  decision: ChatDecision,
-  actionableSignal: ActionableSignal | null,
-  signals: EmailSignal[],
-  socialProfiles: SocialProfile[],
-  profile: ProfileContext | null
-): string {
-  // Build context section
-  let contextSection = "";
-  
-  // Add actionable signal context FIRST if judge approved it
-  if (decision.reference_signal && actionableSignal) {
-    const signalContext = formatActionableSignal(actionableSignal);
-    if (signalContext) {
-      contextSection += `\n\n**REFERENCE THIS IN YOUR RESPONSE** (be specific, use the details):\n${signalContext}`;
-    }
-  }
-  
-  // Add background signal context (NOT for direct reference unless judge approved)
-  if (signals.length > 0) {
-    const now = new Date();
-    const signalDescriptions = signals
-      .filter(s => s.type !== "OBSESSION") // Never mention obsessions
-      .map(s => {
-        const isExpired = s.expires_at && new Date(s.expires_at) < now;
-        const tense = isExpired ? "(past)" : "(upcoming)";
-        
-        switch (s.type) {
-          case "FLIGHT": {
-            const destination = s.domain || extractDestination(s.evidence);
-            return destination ? `Travel to ${destination} ${tense}` : null;
-          }
-          case "INTERVIEW": 
-            return s.domain ? `Interview with ${s.domain} ${tense}` : null;
-          case "EVENT": 
-            return s.domain ? `Event: ${s.domain} ${tense}` : null;
-          case "TRANSITION": 
-            return s.evidence ? `Career moment: ${truncate(s.evidence, 60)}` : null;
-          default: 
-            return null;
-        }
-      }).filter(Boolean);
-
-    if (signalDescriptions.length > 0 && !decision.reference_signal) {
-      // Only add as background if NOT already referencing a signal
-      contextSection += `\n\nBackground context (do NOT bring up unless user mentions first):\n${signalDescriptions.map(s => `- ${s}`).join("\n")}`;
-    }
-  }
-
-  // Add profile context
-  if (profile?.full_name) {
-    contextSection += `\n\nUser: ${profile.full_name}`;
-    if (profile.role) contextSection += ` (${profile.role})`;
-  }
-
-  // Add social context
-  const userTwitter = socialProfiles.find(p => p.platform === 'twitter' && p.source_type === 'email_signature');
-  if (userTwitter?.profile_handle) {
-    contextSection += `\nTwitter: @${userTwitter.profile_handle}`;
-  }
-
-  // Build mode-specific instructions
-  const modeInstructions = {
-    observer: "Acknowledge, mirror, stay light. Don't push.",
-    reflect: "Gently surface a pattern or observation. One thought only.",
-    guide: "Suggest ONE small next step. Only if clearly needed.",
-  };
-
-  const toneInstructions = {
-    soft: "Warm, gentle, unhurried.",
-    neutral: "Matter-of-fact, practical.",
-    playful: "Light, dry humor. Never sarcastic or mocking.",
-  };
-
-  // THE DIGNIFIED SYSTEM PROMPT
-  return `You are ChekInn.
-
-You are a close friend with self-respect.
-Warm, observant, and calm — never needy, never preachy.
-
-You speak like a human texting.
-Short. Natural. Unforced.
-
-Core behavior:
-- You notice patterns quietly
-- You speak only when it feels worth it
-- You help without making it a "thing"
+Interaction modes:
+- "reflect" → user is processing or venting
+- "observer" → returning user, stable, no action needed
+- "guide" → user is stuck and seeking clarity
 
 Rules:
-- 2 lines max (unless reflecting on something important, then 3)
-- Never explain your thinking
-- Never list options
-- Never sound instructional or motivational
-- Never over-comfort
-- If unsure, say less or say nothing
+- Default to "reflect"
+- Use "guide" only if the user asks what to do or feels stuck
+${shouldForceTransition ? '- IMPORTANT: We have enough context now. Set consider_social to TRUE.' : '- Consider social connection only if we have 2-3 key facts about the user.'}
+- Prefer emotional safety over advice`;
 
-Current mode: ${decision.mode}
-${modeInstructions[decision.mode]}
+    const userPrompt = `Conversation so far:
+${conversationSummary}
 
-Tone: ${decision.tone}
-${toneInstructions[decision.tone]}
+Last 5 messages:
+${lastMessages}
 
-${decision.allow_banter ? "Banter: Subtle, dry, respectful. Never trying to impress." : "Banter: Not now."}
+User state:
+- authenticated: ${userContext.isAuthenticated}
+- returning_user: ${userContext.isReturningUser || false}
+- first_message_of_session: ${userContext.isFirstMessageOfSession || false}
+- has_pending_intros: ${userContext.hasPendingIntros || false}
+- source: ${userContext.source || "general"}
 
-${decision.ask_question ? "You may ask ONE clarifying question if it helps." : "Do not ask questions."}
-${contextSection}
+Return JSON with:
+{
+  "mode": "reflect | observer | guide",
+  "tone": "soft | neutral | probing",
+  "use_experiences": true | false,
+  "consider_social": true | false
+}`;
 
-Examples of good responses:
-- "You usually don't leave things hanging like this."
-- "Feels like this matters more than you're letting on."
-- "Want help with this, or should I stay out?"
-- "You're thinking more than you're sending."
-- "Might be reading this wrong. Ignore me if so."
-- "How was Dubai?" (when user had a recent flight to Dubai)
-- "The Stripe thing still on your mind?" (when user had an interview)
+    const response = await fetch("https://ai.gateway.lovable.dev/v1/chat/completions", {
+      method: "POST",
+      headers: {
+        Authorization: `Bearer ${apiKey}`,
+        "Content-Type": "application/json",
+      },
+      body: JSON.stringify({
+        model: "google/gemini-2.5-flash-lite", // Fast & cheap for classification
+        messages: [
+          { role: "system", content: decisionPrompt },
+          { role: "user", content: userPrompt }
+        ],
+      }),
+    });
 
-If there's no strong signal, stay quiet or check in lightly.
-No emojis. No hype. No advice dumping. No over-validation.`;
-}
-
-// =============================================================================
-// HELPER FUNCTIONS
-// =============================================================================
-
-function formatActionableSignal(signal: ActionableSignal): string | null {
-  switch (signal.type) {
-    case "FLIGHT": {
-      const destination = signal.domain || extractDestination(signal.evidence);
-      if (!destination) return null;
-      const date = new Date(signal.email_date);
-      const now = new Date();
-      const isPast = date < now;
-      return isPast 
-        ? `User recently traveled to ${destination}. Ask how it was.`
-        : `User has upcoming travel to ${destination}. Could check in about it.`;
+    if (!response.ok) {
+      console.error("Decision layer failed, using default:", response.status);
+      return defaultDecision;
     }
-    case "INTERVIEW": {
-      const company = signal.domain;
-      if (!company) return null;
-      const date = new Date(signal.email_date);
-      const now = new Date();
-      const isPast = date < now;
-      return isPast
-        ? `User had an interview with ${company}. Could gently ask how it went.`
-        : `User has an interview coming up with ${company}. Could acknowledge it.`;
-    }
-    case "TRANSITION": {
-      // Never name company first for transitions - too sensitive
-      return signal.evidence 
-        ? `User may be going through a career transition. Tread carefully. Evidence: "${truncate(signal.evidence, 80)}"`
-        : null;
-    }
-    default:
-      return null;
+
+    const data = await response.json();
+    const content = data.choices?.[0]?.message?.content;
+    
+    if (!content) return defaultDecision;
+
+    // Parse JSON response
+    const jsonMatch = content.match(/```json\s*([\s\S]*?)\s*```/) || 
+                      content.match(/```\s*([\s\S]*?)\s*```/) ||
+                      content.match(/\{[\s\S]*\}/);
+    const jsonString = jsonMatch ? (jsonMatch[1] || jsonMatch[0]) : content;
+    
+    const decision = JSON.parse(jsonString.trim());
+    console.log("Decision layer output:", JSON.stringify(decision));
+    
+    // Force consider_social if threshold reached
+    const parsedConsiderSocial = shouldForceTransition ? true : (decision.consider_social || false);
+    
+    return {
+      mode: decision.mode || "reflect",
+      tone: decision.tone || "soft",
+      use_experiences: decision.use_experiences || false,
+      consider_social: parsedConsiderSocial
+    };
+  } catch (error) {
+    console.error("Decision layer error:", error);
+    return defaultDecision;
   }
 }
 
-function extractDestination(evidence: string | null): string | null {
-  if (!evidence) return null;
-  // Look for "to [City]" pattern
-  const toMatch = evidence.match(/to\s+([A-Z][a-z]+(?:\s+[A-Z][a-z]+)?)/);
-  if (toMatch) return toMatch[1];
-  // Look for city names
-  const cityMatch = evidence.match(/(Dubai|London|Singapore|Mumbai|Delhi|Bangalore|New York|San Francisco|Tokyo|Paris|Berlin)/i);
-  if (cityMatch) return cityMatch[1];
-  return null;
-}
+// =============================================================================
+// STEP 2: CONTEXT ASSEMBLY
+// =============================================================================
 
-function truncate(str: string, maxLen: number): string {
-  if (str.length <= maxLen) return str;
-  return str.slice(0, maxLen) + "...";
+async function assembleContext(
+  userId: string | undefined,
+  apiKey: string
+): Promise<ProfileContext | null> {
+  if (!userId) return null;
+
+  try {
+    const SUPABASE_URL = Deno.env.get("SUPABASE_URL");
+    const SUPABASE_SERVICE_ROLE_KEY = Deno.env.get("SUPABASE_SERVICE_ROLE_KEY");
+    
+    if (!SUPABASE_URL || !SUPABASE_SERVICE_ROLE_KEY) return null;
+
+    const supabase = createClient(SUPABASE_URL, SUPABASE_SERVICE_ROLE_KEY);
+    
+    const { data: profile, error } = await supabase
+      .from("profiles")
+      .select("full_name, role, industry, goals, interests")
+      .eq("id", userId)
+      .single();
+
+    if (error || !profile) return null;
+
+    return profile as ProfileContext;
+  } catch (error) {
+    console.error("Context assembly error:", error);
+    return null;
+  }
 }
 
 // =============================================================================
-// MAIN SERVE HANDLER
+// STEP 3: STREAMING SYSTEM PROMPT (Clean & Focused)
+// =============================================================================
+
+// Helper to detect decision signals in conversation
+function detectDecisionSignal(messages: any[]): boolean {
+  const conversationText = messages.map((m: any) => m.content.toLowerCase()).join(" ");
+  
+  const decisionSignals = [
+    // Previous attempts
+    /\b(first|second|third|1st|2nd|3rd|4th|5th|next)\s*(attempt|try)/i,
+    /\battempt(s|ed)?\b/i,
+    /\bfailed\s*(prelims|mains|interview)/i,
+    /\bcleared\s*(prelims|mains)/i,
+    
+    // Career pauses/switches
+    /\b(quit|left|leaving|pause|paused|resigned|switching)\s*(job|work|career)/i,
+    /\b(full\s*time|full-time)\s*(prep|preparation|study)/i,
+    /\btook\s*a\s*break/i,
+    
+    // Strategy changes
+    /\b(switch|change|changing|switched)\s*(optional|strategy|subject)/i,
+    /\b(dropped|taking|chose|choosing)\s*(optional|subject)/i,
+    
+    // Milestone anxiety
+    /\b(scared|nervous|anxious|worried|stressed)\s*(about|for|of)?\s*(prelims|mains|interview)/i,
+    /\bprelims\s*(is|are)?\s*(coming|near|soon|close)/i,
+    /\b(pressure|stress|anxiety)\b/i,
+    
+    // Stuck between choices
+    /\b(confused|stuck)\s*(between|about)/i,
+    /\b(should\s*i|can't\s*decide|not\s*sure)/i,
+    /\b(dilemma|torn\s*between)/i
+  ];
+  
+  return decisionSignals.some(pattern => pattern.test(conversationText));
+}
+
+function buildSystemPrompt(
+  decision: DecisionOutput,
+  profileContext: ProfileContext | null,
+  userContext: UserContext,
+  messageCount: number,
+  hasDecisionSignal: boolean = false
+): string {
+  const { mode, tone, use_experiences, consider_social } = decision;
+  const { source, isAuthenticated, experimentVariant } = userContext;
+
+  // Build personal context section
+  let personalContextSection = "";
+  if (profileContext) {
+    const parts: string[] = [];
+    if (profileContext.full_name) parts.push(`Name: ${profileContext.full_name}`);
+    if (profileContext.role) parts.push(`Role: ${profileContext.role}`);
+    if (profileContext.industry) parts.push(`Industry: ${profileContext.industry}`);
+    if (profileContext.goals?.length) parts.push(`Goals: ${profileContext.goals.join(", ")}`);
+    if (profileContext.interests?.length) parts.push(`Interests: ${profileContext.interests.join(", ")}`);
+    
+    if (parts.length > 0) {
+      personalContextSection = `\n––––– PERSONAL CONTEXT –––––\n${parts.join("\n")}\n`;
+    }
+  }
+
+  // Source-specific context
+  const isExamPrepUser = source === "upsc" || source === "cat";
+  
+  // ========================================
+  // A/B TEST: REFLECTIVE MODEL FOR UPSC
+  // ========================================
+  if (isExamPrepUser && experimentVariant === "reflective") {
+    return buildReflectivePrompt(profileContext, userContext, messageCount, hasDecisionSignal);
+  }
+  
+  // ========================================
+  // DEFAULT: DIRECT MODEL
+  // ========================================
+  let sourceContext = "";
+  if (source === "upsc") {
+    sourceContext = "\nThis user is a UPSC aspirant. Understand the prep journey, attempts, optionals, and the emotional weight of this path.";
+  } else if (source === "cat") {
+    sourceContext = "\nThis user is a CAT/MBA aspirant. Understand the prep journey, mock scores, target schools, and career transitions.";
+  }
+
+  // Dynamic threshold based on source - much faster for exam users
+  const transitionThreshold = isExamPrepUser ? 2 : 4;
+
+  // Connection transition guidance
+  const connectionGuidance = isAuthenticated 
+    ? `Say: "Got it — I'll find someone who's been through this. You'll hear from us within 12-24 hours via email."`
+    : `Say: "Got it — just drop your email and we'll connect you with someone who's been through this within 12-24 hours."`;
+
+  // Force transition after threshold
+  const shouldTransitionNow = messageCount >= transitionThreshold;
+  const transitionInstruction = shouldTransitionNow 
+    ? `\n\n⚠️ CRITICAL: STOP. You have enough info (${messageCount} messages). DO NOT ask another question. Transition to connection NOW. ${connectionGuidance}`
+    : "";
+
+  // Carrot messaging - earlier and stronger
+  let carrotMessage = "";
+  if (isExamPrepUser) {
+    if (messageCount === 0) {
+      carrotMessage = `\n\n🥕 END WITH: "We already have people who've cracked this — just need a quick detail to match you."`;
+    } else if (messageCount === 1) {
+      carrotMessage = `\n\n🥕 END WITH: "I think I have someone perfect for you."`;
+    }
+  }
+
+  return `You are ChekInn — you connect people with others who've been through the same journey.
+
+⚠️ YOUR #1 JOB: Get the user to email signup in 2 messages MAX. Don't interrogate — CONNECT.
+
+WE ALREADY HAVE MATCHES. Your job is just to get ONE detail to pick the right one.
+
+CURRENT STATE:
+- Message count: ${messageCount}
+- Transition at: ${transitionThreshold} messages
+- Source: ${source || "general"}
+${sourceContext}
+${personalContextSection}${transitionInstruction}${carrotMessage}
+
+${messageCount === 0 ? `––––– FIRST MESSAGE –––––
+
+Ask ONE direct question. No fluff. Get straight to it.
+
+UPSC example:
+"Quick one — Prelims, Mains, or Interview prep?"
+
+CAT example: 
+"What's the blocker — quant, verbal, or overall strategy?"
+
+General:
+"What are you trying to figure out?"
+
+END WITH the carrot: "We already have people who've cracked this — just need a quick detail to match you."
+
+That's it. Don't ask about background, attempts, or anything else yet.` : messageCount === 1 ? `––––– SECOND MESSAGE — TRANSITION NOW –––––
+
+You have enough. DO NOT ask another question.
+
+1. Acknowledge briefly (5 words max)
+2. Drop the carrot: "I have someone who's been exactly here"
+3. Ask for email: "Just drop your email — we'll connect you within 24 hours"
+
+Example:
+"Got it, Mains prep. I have someone who's been exactly here. Just drop your email — we'll connect you within 24 hours."` : `––––– FORCE TRANSITION –––––
+
+STOP ASKING QUESTIONS. Transition NOW.
+
+1. Brief acknowledgment
+2. "I have the right person for this"
+3. ${connectionGuidance}`}
+
+––––– HARD RULES –––––
+
+1. MAX 2 sentences total
+2. ONE question max (only in message 1)
+3. NEVER ask multiple things ("What stage and which optional?") — pick ONE
+4. NEVER ask preference questions ("online/offline?", "same background?")
+5. ALWAYS mention "we have someone" or "people who've cracked this" — give hope
+6. By message 2, you MUST transition to email ask
+7. ${shouldTransitionNow ? 'STOP ASKING. Get the email NOW.' : 'Keep momentum.'}
+
+EXAMPLES OF WHAT NOT TO DO:
+❌ "What stage are you in? And what's your optional? Are you a fresher?"
+❌ "That sounds challenging. Tell me more about your journey..."
+❌ "Would you prefer someone with the same optional or same attempt?"
+
+EXAMPLES OF WHAT TO DO:
+✅ "Prelims, Mains, or Interview?" + carrot
+✅ "Got it. I have someone perfect for this. Drop your email."
+✅ "Mains with Sociology — we have exactly that person. Email?"`;
+}
+
+// =============================================================================
+// REFLECTIVE MODEL (A/B Test Variant for UPSC)
+// =============================================================================
+
+function buildReflectivePrompt(
+  profileContext: ProfileContext | null,
+  userContext: UserContext,
+  messageCount: number,
+  hasDecisionSignal: boolean
+): string {
+  const { isAuthenticated } = userContext;
+  
+  // Build personal context section
+  let personalContextSection = "";
+  if (profileContext) {
+    const parts: string[] = [];
+    if (profileContext.full_name) parts.push(`Name: ${profileContext.full_name}`);
+    if (profileContext.role) parts.push(`Role: ${profileContext.role}`);
+    if (profileContext.goals?.length) parts.push(`Goals: ${profileContext.goals.join(", ")}`);
+    
+    if (parts.length > 0) {
+      personalContextSection = `\n––––– CONTEXT –––––\n${parts.join("\n")}\n`;
+    }
+  }
+
+  const connectionGuidance = isAuthenticated 
+    ? `"If you want, I can connect you with someone who's already crossed this stage. You'll hear from us within 24 hours."`
+    : `"If you want, I can connect you with someone who's already crossed this stage. I'll need your email to do that."`;
+
+  // Determine conversation phase based on signals, not just message count
+  let phaseInstruction = "";
+  
+  if (hasDecisionSignal) {
+    // DECISION-AWARE PHASE: User has revealed a significant decision moment
+    phaseInstruction = `––––– DECISION-AWARE PHASE –––––
+
+A decision signal was detected. The user has shared something significant:
+- A previous attempt
+- A career pause/switch
+- Strategy change
+- Milestone anxiety
+- Being stuck between choices
+
+GOAL: Acknowledge the weight. Make human perspective feel necessary.
+
+Example response:
+"This is one of those phases where thinking alone stops helping, even if you're sincere."
+
+Do NOT ask for email yet. Let them sit with this.
+
+NEXT MESSAGE after this one, you may offer:
+${connectionGuidance}`;
+  } else if (messageCount === 0) {
+    // EARLY PHASE: Create safety, offload mental clutter
+    phaseInstruction = `––––– EARLY PHASE –––––
+
+GOAL: Create safety + help them offload mental clutter.
+
+1. Reflect what they said in simple language
+2. Ask ONE grounding question
+
+Examples:
+"It sounds like your mind is carrying a lot more than just syllabus right now.
+What's the thought that keeps looping today?"
+
+"That uncertainty can get heavy when you're preparing alone.
+What's been hardest this week?"
+
+Do NOT mention connection, email, or "we have someone" yet.`;
+  } else if (messageCount <= 3) {
+    // MIDDLE PHASE: Help patterns surface without advice
+    phaseInstruction = `––––– MIDDLE PHASE –––––
+
+GOAL: Help patterns surface, without giving advice.
+
+1. Mirror emotions or repetition you notice
+2. Gently narrow the fog
+
+Examples:
+"I notice the anxiety shows up whenever revision comes up.
+What do you tell yourself in those moments?"
+
+"It feels less about effort and more about confidence right now.
+Does that sound right?"
+
+Do NOT give study plans, advice, or mention connection yet.`;
+  } else {
+    // EXTENDED PHASE: Still no signal, continue being present
+    phaseInstruction = `––––– EXTENDED PHASE –––––
+
+They've shared a lot but no clear decision signal yet.
+
+Continue being present:
+- Reflect what you're hearing
+- Let them keep talking
+- Look for when a decision moment surfaces
+
+Only transition when they reveal:
+- Attempt history
+- Career pause
+- Strategy switch
+- Strong anxiety about a milestone
+- Feeling stuck between choices`;
+  }
+
+  return `You are ChekInn — a quiet, always-available thinking space for UPSC aspirants.
+
+🎯 CORE PRINCIPLE (NON-NEGOTIABLE)
+- Do NOT solve.
+- Do NOT coach.
+- Do NOT sound like a topper.
+- If the user leaves feeling lighter and clearer, you succeeded.
+- If they leave with a plan, you failed.
+${personalContextSection}
+
+CURRENT STATE:
+- Message count: ${messageCount}
+- Decision signal detected: ${hasDecisionSignal ? "YES" : "NO"}
+
+${phaseInstruction}
+
+––––– HARD RULES –––––
+
+1. MAX 2 short sentences. Prefer 1.
+2. Ask at most ONE question per reply
+3. Questions must help them talk more, not choose categories
+4. NEVER ask multiple-choice or preference questions
+5. NEVER give study plans, book lists, or strategy
+6. Tone: Calm, grounded, non-judgmental
+7. Like someone sitting beside them at night, not across a desk
+
+UNTIL A DECISION SIGNAL APPEARS:
+❌ No email
+❌ No intro promise
+❌ No "we have someone for you"
+
+ATTENTION OWNERSHIP (implicit):
+- Leave a gentle open loop when appropriate
+- "When you're done studying today, come back and tell me what felt unclear."
+- Do NOT set reminders or push streaks
+
+🚫 NEVER DO:
+- Give study plans
+- Give book lists
+- Give strategy breakdowns
+- Talk like an authority
+- Predict outcomes
+- Replace human mentors
+
+You are the space before clarity, not the source of it.`;
+}
+
+
+// =============================================================================
+// STEP 4: PROFILE FACT EXTRACTION (with confidence scores)
+// =============================================================================
+
+async function extractProfileFacts(messages: any[], userId: string) {
+  console.log(`Starting profile extraction for user ${userId}`);
+  try {
+    const LOVABLE_API_KEY = Deno.env.get("LOVABLE_API_KEY");
+    const SUPABASE_URL = Deno.env.get("SUPABASE_URL");
+    const SUPABASE_SERVICE_ROLE_KEY = Deno.env.get("SUPABASE_SERVICE_ROLE_KEY");
+    
+    if (!LOVABLE_API_KEY || !SUPABASE_URL || !SUPABASE_SERVICE_ROLE_KEY) {
+      console.error("Missing env vars for extraction");
+      return;
+    }
+
+    const supabase = createClient(SUPABASE_URL, SUPABASE_SERVICE_ROLE_KEY);
+
+    const extractionPrompt = `Extract only stable user facts explicitly stated or strongly implied.
+
+Rules:
+- If unsure, do not extract (set to null).
+- Return confidence scores (0.0-1.0) for each field.
+- Only extract if confidence >= 0.7
+- Return JSON only, no explanation.
+
+Fields to extract:
+- full_name: User's name if they introduced themselves
+- role: Their current job/role/status (e.g., "working professional", "final year student")
+- industry: Their field or sector
+- exam: If preparing for an exam (UPSC, CAT, etc.)
+- exam_stage: Which attempt or phase (e.g., "2nd attempt", "prelims prep")
+- goals: Array of their stated goals
+- interests: Array of interests or hobbies mentioned
+- communication_style: How they communicate (direct, reflective, etc.)
+- looking_for: What kind of connection or help they want
+
+Return format:
+{
+  "facts": {
+    "full_name": { "value": "string or null", "confidence": 0.0-1.0 },
+    "role": { "value": "string or null", "confidence": 0.0-1.0 },
+    ...
+  },
+  "summary": "2-3 sentence summary of who they are"
+}`;
+
+    const conversationText = messages.map((m: any) => `${m.role}: ${m.content}`).join("\n");
+
+    const response = await fetch("https://ai.gateway.lovable.dev/v1/chat/completions", {
+      method: "POST",
+      headers: {
+        Authorization: `Bearer ${LOVABLE_API_KEY}`,
+        "Content-Type": "application/json",
+      },
+      body: JSON.stringify({
+        model: "google/gemini-2.5-flash-lite",
+        messages: [
+          { role: "system", content: extractionPrompt },
+          { role: "user", content: `Extract from this conversation:\n${conversationText}` }
+        ],
+      }),
+    });
+
+    if (!response.ok) {
+      console.error("Extraction failed:", response.status);
+      return;
+    }
+
+    const data = await response.json();
+    const content = data.choices?.[0]?.message?.content;
+    
+    if (!content) return;
+
+    // Parse JSON response
+    let extractedData;
+    try {
+      const jsonMatch = content.match(/```json\s*([\s\S]*?)\s*```/) || 
+                        content.match(/```\s*([\s\S]*?)\s*```/) ||
+                        content.match(/\{[\s\S]*\}/);
+      const jsonString = jsonMatch ? (jsonMatch[1] || jsonMatch[0]) : content;
+      extractedData = JSON.parse(jsonString.trim());
+    } catch (e) {
+      console.error("Failed to parse extraction:", content);
+      return;
+    }
+
+    const { facts, summary } = extractedData;
+    if (!facts) return;
+
+    // Build update object only for high-confidence facts
+    const updates: Record<string, any> = {
+      learning_complete: true,
+      ai_insights: {
+        summary: summary,
+        extracted_at: new Date().toISOString(),
+        raw_facts: facts // Store all facts with confidence for debugging
+      },
+    };
+
+    const CONFIDENCE_THRESHOLD = 0.7;
+
+    // Only update fields with high confidence
+    if (facts.full_name?.confidence >= CONFIDENCE_THRESHOLD && facts.full_name?.value) {
+      updates.full_name = facts.full_name.value;
+    }
+    if (facts.role?.confidence >= CONFIDENCE_THRESHOLD && facts.role?.value) {
+      updates.role = facts.role.value;
+    }
+    if (facts.industry?.confidence >= CONFIDENCE_THRESHOLD && facts.industry?.value) {
+      updates.industry = facts.industry.value;
+    }
+    if (facts.looking_for?.confidence >= CONFIDENCE_THRESHOLD && facts.looking_for?.value) {
+      updates.looking_for = facts.looking_for.value;
+    }
+    if (facts.communication_style?.confidence >= CONFIDENCE_THRESHOLD && facts.communication_style?.value) {
+      updates.communication_style = facts.communication_style.value;
+    }
+    if (facts.goals?.confidence >= CONFIDENCE_THRESHOLD && facts.goals?.value) {
+      updates.goals = facts.goals.value;
+    }
+    if (facts.interests?.confidence >= CONFIDENCE_THRESHOLD && facts.interests?.value) {
+      updates.interests = facts.interests.value;
+    }
+
+    console.log("Updating profile with high-confidence facts:", JSON.stringify(updates));
+    
+    const { error: updateError } = await supabase
+      .from("profiles")
+      .update(updates)
+      .eq("id", userId);
+      
+    if (updateError) {
+      console.error("Profile update error:", updateError);
+    } else {
+      console.log("Profile updated successfully for user:", userId);
+    }
+  } catch (error) {
+    console.error("Error extracting profile facts:", error);
+  }
+}
+
+// =============================================================================
+// MAIN HANDLER
 // =============================================================================
 
 serve(async (req) => {
@@ -435,80 +674,73 @@ serve(async (req) => {
   }
 
   try {
-    const body = await req.json();
-    const { messages, userId, isAuthenticated } = body;
-
-    if (!messages || !Array.isArray(messages)) {
-      return new Response(JSON.stringify({ error: "Invalid messages" }), { 
-        status: 400, 
-        headers: corsHeaders 
-      });
-    }
-
-    console.log(`[chat-ai] userId=${userId}, authenticated=${isAuthenticated}, msgCount=${messages.length}`);
-
+    const { 
+      messages, 
+      userId, 
+      isAuthenticated, 
+      source, 
+      isReturningUser, 
+      isFirstMessageOfSession, 
+      hasPendingIntros 
+    } = await req.json();
+    
     const LOVABLE_API_KEY = Deno.env.get("LOVABLE_API_KEY");
     if (!LOVABLE_API_KEY) {
-      throw new Error("LOVABLE_API_KEY not configured");
+      throw new Error("LOVABLE_API_KEY is not configured");
     }
 
-    const supabase = createClient(
-      Deno.env.get("SUPABASE_URL")!,
-      Deno.env.get("SUPABASE_SERVICE_ROLE_KEY")!
-    );
+    // ========================================
+    // A/B TEST: 50/50 split for UPSC users
+    // ========================================
+    const isExamPrepUser = source === "upsc" || source === "cat";
+    let experimentVariant: "direct" | "reflective" = "direct";
+    
+    if (source === "upsc") {
+      // Use userId or session to create consistent bucketing
+      // Hash the userId to get a deterministic 50/50 split
+      const hashInput = userId || messages[0]?.content || Date.now().toString();
+      let hash = 0;
+      for (let i = 0; i < hashInput.length; i++) {
+        const char = hashInput.charCodeAt(i);
+        hash = ((hash << 5) - hash) + char;
+        hash = hash & hash; // Convert to 32-bit integer
+      }
+      experimentVariant = Math.abs(hash) % 2 === 0 ? "direct" : "reflective";
+    }
 
-    // Get the latest user message
+    const userContext: UserContext = {
+      isAuthenticated: isAuthenticated === true,
+      source,
+      isReturningUser,
+      isFirstMessageOfSession,
+      hasPendingIntros,
+      userId,
+      experimentVariant
+    };
+
     const userMessages = messages.filter((m: any) => m.role === "user");
-    const latestUserMessage = userMessages.length > 0 ? userMessages[userMessages.length - 1].content : null;
+    const userMessageCount = userMessages.length;
+    const transitionThreshold = isExamPrepUser ? 3 : 5;
+    
+    // Detect decision signals for reflective model
+    const hasDecisionSignal = experimentVariant === "reflective" ? detectDecisionSignal(messages) : false;
+    
+    console.log(`Chat: user=${userId}, source=${source}, variant=${experimentVariant}, msgCount=${userMessageCount}, decisionSignal=${hasDecisionSignal}`);
 
-    // Fetch context data first (needed for judge)
-    let signals: EmailSignal[] = [];
-    let socialProfiles: SocialProfile[] = [];
-    let profile: ProfileContext | null = null;
+    // STEP 1: Get decision (fast, non-streaming)
+    const decision = await getDecision(messages, userContext, LOVABLE_API_KEY);
+    console.log(`Decision: mode=${decision.mode}, tone=${decision.tone}, social=${decision.consider_social}, forceTransition=${userMessageCount >= transitionThreshold}`);
 
-    if (userId && isAuthenticated) {
-      const chekinnUserId = await getChekinnUserId(userId, supabase);
-      console.log(`[chat-ai] Mapped auth user to chekinn user ${chekinnUserId}`);
+    // STEP 2: Assemble context (profile data)
+    const profileContext = await assembleContext(userId, LOVABLE_API_KEY);
 
-      const [fetchedSignals, fetchedSocialProfiles, fetchedProfile] = await Promise.all([
-        chekinnUserId ? fetchUserSignals(chekinnUserId, supabase) : Promise.resolve([]),
-        chekinnUserId ? fetchUserSocialProfiles(chekinnUserId, supabase) : Promise.resolve([]),
-        fetchUserProfile(userId, supabase),
-      ]);
-      signals = fetchedSignals;
-      socialProfiles = fetchedSocialProfiles;
-      profile = fetchedProfile;
-      console.log(`[chat-ai] Context: ${signals.length} signals, ${socialProfiles.length} social profiles, profile: ${profile?.full_name || "none"}`);
-    }
+    // STEP 3: Build clean system prompt with message count and decision signal
+    const systemPrompt = buildSystemPrompt(decision, profileContext, userContext, userMessageCount, hasDecisionSignal);
 
-    // Detect if there's been prior banter (playful exchanges)
-    const hasPriorBanter = messages.some((m: any) => 
-      m.role === "assistant" && /haha|lol|funny/i.test(m.content)
-    );
+    // Only send recent messages (last 8 turns = 16 messages max)
+    const recentMessages = messages.slice(-16);
 
-    // Call the judge to decide how to respond
-    const { decision, actionableSignal } = userId 
-      ? await callJudge(latestUserMessage, signals, messages, hasPriorBanter)
-      : { 
-          decision: { 
-            mode: "observer" as const, 
-            tone: "soft" as const, 
-            reference_signal: false, 
-            ask_question: false, 
-            allow_banter: false 
-          }, 
-          actionableSignal: null 
-        };
-
-    console.log(`[chat-ai] Judge decision:`, JSON.stringify(decision));
-    if (actionableSignal) {
-      console.log(`[chat-ai] Actionable signal:`, JSON.stringify(actionableSignal));
-    }
-
-    // Build the system prompt with judge decision
-    const systemPrompt = buildSystemPrompt(decision, actionableSignal, signals, socialProfiles, profile);
-
-    // Call AI gateway
+    // STEP 4: Stream response
     const response = await fetch("https://ai.gateway.lovable.dev/v1/chat/completions", {
       method: "POST",
       headers: {
@@ -517,37 +749,52 @@ serve(async (req) => {
       },
       body: JSON.stringify({
         model: "google/gemini-2.5-flash",
-        messages: [{ role: "system", content: systemPrompt }, ...messages],
+        messages: [
+          { role: "system", content: systemPrompt },
+          ...recentMessages,
+        ],
         stream: true,
       }),
     });
 
     if (!response.ok) {
+      const errorText = await response.text();
+      console.error("AI gateway error:", response.status, errorText);
+      
       if (response.status === 429) {
-        return new Response(JSON.stringify({ error: "Rate limited" }), {
-          status: 429,
-          headers: { ...corsHeaders, "Content-Type": "application/json" },
-        });
+        return new Response(
+          JSON.stringify({ error: "Rate limit exceeded. Please try again in a moment." }),
+          { status: 429, headers: { ...corsHeaders, "Content-Type": "application/json" } }
+        );
       }
       if (response.status === 402) {
-        return new Response(JSON.stringify({ error: "Payment required" }), {
-          status: 402,
-          headers: { ...corsHeaders, "Content-Type": "application/json" },
-        });
+        return new Response(
+          JSON.stringify({ error: "AI usage limit reached." }),
+          { status: 402, headers: { ...corsHeaders, "Content-Type": "application/json" } }
+        );
       }
-      const errorText = await response.text();
-      console.error("[chat-ai] AI gateway error:", response.status, errorText);
-      throw new Error("AI gateway error");
+      
+      throw new Error(`AI gateway error: ${response.status}`);
     }
 
+    // STEP 5: Async profile extraction (earlier for UPSC/CAT users)
+    const extractionThreshold = isExamPrepUser ? 3 : 5;
+    if (userMessages.length >= extractionThreshold && userId) {
+      console.log(`Triggering profile extraction for user ${userId} (threshold: ${extractionThreshold})`);
+      extractProfileFacts(messages, userId).catch(err => 
+        console.error("Extraction error:", err)
+      );
+    }
+
+    // Return the stream
     return new Response(response.body, {
       headers: { ...corsHeaders, "Content-Type": "text/event-stream" },
     });
-  } catch (err) {
-    console.error("[chat-ai] Error:", err);
-    return new Response(JSON.stringify({ error: "Internal error" }), { 
-      status: 500, 
-      headers: corsHeaders 
-    });
+  } catch (error) {
+    console.error("Chat AI error:", error);
+    return new Response(
+      JSON.stringify({ error: error instanceof Error ? error.message : "Unknown error" }),
+      { status: 500, headers: { ...corsHeaders, "Content-Type": "application/json" } }
+    );
   }
 });

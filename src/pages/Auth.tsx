@@ -283,8 +283,19 @@ const Auth = () => {
 
   const handleContextComplete = async (context: any) => {
     if (newUserId) {
-      // Save context to profile
+      // Save full context for admin matching + AI matching
       await supabase.from("profiles").update({
+        looking_for: context.lookingFor || null, // Main field for matching
+        onboarding_context: {
+          lookingFor: context.lookingFor,
+          whyOpportunity: context.whyOpportunity,
+          constraint: context.constraint,
+          motivation: context.motivation,
+          motivationExplanation: context.motivationExplanation,
+          contrarianBelief: context.contrarianBelief,
+          careerInflection: context.careerInflection,
+          completedAt: new Date().toISOString(),
+        },
         ai_insights: {
           contrarian_belief: context.contrarianBelief,
           career_inflection: context.careerInflection,

@@ -760,6 +760,7 @@ export type Database = {
           learning_messages_count: number | null
           linkedin_url: string | null
           looking_for: string | null
+          onboarding_context: Json | null
           role: string | null
           skills: string[] | null
           updated_at: string | null
@@ -781,6 +782,7 @@ export type Database = {
           learning_messages_count?: number | null
           linkedin_url?: string | null
           looking_for?: string | null
+          onboarding_context?: Json | null
           role?: string | null
           skills?: string[] | null
           updated_at?: string | null
@@ -802,6 +804,7 @@ export type Database = {
           learning_messages_count?: number | null
           linkedin_url?: string | null
           looking_for?: string | null
+          onboarding_context?: Json | null
           role?: string | null
           skills?: string[] | null
           updated_at?: string | null

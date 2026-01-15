@@ -1,5 +1,16 @@
-import { useState, useCallback } from "react";
+import { useState, useCallback, useEffect } from "react";
 import { supabase } from "@/integrations/supabase/client";
+
+// Cache keys for localStorage
+const SEARCH_CACHE_KEY = "chekinn_search_cache";
+const SEARCH_COOLDOWN_KEY = "chekinn_search_cooldown";
+const COOLDOWN_HOURS = 24; // Minimum hours between searches
+
+interface CachedSearch {
+  result: SearchResult;
+  timestamp: number;
+  queryHash: string;
+}
 
 export interface UserAsk {
   askType: string;
@@ -72,11 +83,79 @@ export interface SearchResult {
 
 type SearchStatus = "idle" | "initiating" | "searching" | "processing" | "complete" | "error";
 
+// Helper to generate hash for query caching
+const generateQueryHash = (profile: UserProfile, context?: ContextData): string => {
+  const key = JSON.stringify({
+    lookingFor: context?.lookingFor || profile.looking_for || "",
+    why: context?.whyOpportunity || "",
+    industry: profile.industry || "",
+  });
+  return btoa(key).slice(0, 32);
+};
+
+// Check if user can search (cooldown check)
+const canSearch = (): { allowed: boolean; remainingHours?: number } => {
+  const lastSearch = localStorage.getItem(SEARCH_COOLDOWN_KEY);
+  if (!lastSearch) return { allowed: true };
+  
+  const lastSearchTime = parseInt(lastSearch, 10);
+  const hoursSinceSearch = (Date.now() - lastSearchTime) / (1000 * 60 * 60);
+  
+  if (hoursSinceSearch >= COOLDOWN_HOURS) {
+    return { allowed: true };
+  }
+  return { allowed: false, remainingHours: Math.ceil(COOLDOWN_HOURS - hoursSinceSearch) };
+};
+
+// Get cached search result
+const getCachedResult = (queryHash: string): SearchResult | null => {
+  try {
+    const cached = localStorage.getItem(SEARCH_CACHE_KEY);
+    if (!cached) return null;
+    
+    const parsedCache: CachedSearch = JSON.parse(cached);
+    // Cache valid for 7 days
+    const cacheAge = (Date.now() - parsedCache.timestamp) / (1000 * 60 * 60 * 24);
+    if (cacheAge > 7) {
+      localStorage.removeItem(SEARCH_CACHE_KEY);
+      return null;
+    }
+    
+    // Return cached result if query matches
+    if (parsedCache.queryHash === queryHash) {
+      return parsedCache.result;
+    }
+    return null;
+  } catch {
+    return null;
+  }
+};
+
+// Save search result to cache
+const cacheSearchResult = (result: SearchResult, queryHash: string): void => {
+  const cacheData: CachedSearch = {
+    result,
+    timestamp: Date.now(),
+    queryHash,
+  };
+  localStorage.setItem(SEARCH_CACHE_KEY, JSON.stringify(cacheData));
+  localStorage.setItem(SEARCH_COOLDOWN_KEY, Date.now().toString());
+};
+
 export function useDeepSearch() {
   const [status, setStatus] = useState<SearchStatus>("idle");
   const [progress, setProgress] = useState(0);
   const [result, setResult] = useState<SearchResult | null>(null);
   const [error, setError] = useState<string | null>(null);
+  const [cooldownRemaining, setCooldownRemaining] = useState<number | null>(null);
+
+  // Check cooldown on mount
+  useEffect(() => {
+    const { allowed, remainingHours } = canSearch();
+    if (!allowed && remainingHours) {
+      setCooldownRemaining(remainingHours);
+    }
+  }, []);
 
   // Build search query from manual UserAsk form
   const buildSearchQueryFromAsk = (ask: UserAsk): string => {
@@ -157,7 +236,38 @@ export function useDeepSearch() {
   };
 
   // Search using profile context (auto-triggered)
-  const initiateSearchFromProfile = useCallback(async (profile: UserProfile, context?: ContextData) => {
+  const initiateSearchFromProfile = useCallback(async (profile: UserProfile, context?: ContextData, forceNew = false) => {
+    const queryHash = generateQueryHash(profile, context);
+    
+    // Check for cached result first (unless forcing new search)
+    if (!forceNew) {
+      const cached = getCachedResult(queryHash);
+      if (cached) {
+        console.log("Using cached search result");
+        setResult(cached);
+        setStatus("complete");
+        setProgress(100);
+        return;
+      }
+    }
+    
+    // Check cooldown for new searches
+    const { allowed, remainingHours } = canSearch();
+    if (!allowed && !forceNew) {
+      setError(`You can search again in ${remainingHours} hours. View your existing matches below.`);
+      setCooldownRemaining(remainingHours || null);
+      // Try to show cached result anyway
+      const cached = getCachedResult(queryHash);
+      if (cached) {
+        setResult(cached);
+        setStatus("complete");
+        setProgress(100);
+        return;
+      }
+      setStatus("error");
+      return;
+    }
+    
     setStatus("initiating");
     setProgress(10);
     setError(null);
@@ -234,6 +344,10 @@ export function useDeepSearch() {
         throw new Error(contextData?.error || contextError?.message || "Failed to generate matches");
       }
 
+      // Cache the result
+      cacheSearchResult(contextData, queryHash);
+      setCooldownRemaining(null);
+      
       setResult(contextData);
       setStatus("complete");
       setProgress(100);
@@ -328,13 +442,35 @@ export function useDeepSearch() {
     setError(null);
   }, []);
 
+  // Check if there's a cached result available
+  const hasCachedResult = useCallback((profile: UserProfile, context?: ContextData): boolean => {
+    const queryHash = generateQueryHash(profile, context);
+    return getCachedResult(queryHash) !== null;
+  }, []);
+
+  // Load cached result without triggering new search
+  const loadCachedResult = useCallback((profile: UserProfile, context?: ContextData): boolean => {
+    const queryHash = generateQueryHash(profile, context);
+    const cached = getCachedResult(queryHash);
+    if (cached) {
+      setResult(cached);
+      setStatus("complete");
+      setProgress(100);
+      return true;
+    }
+    return false;
+  }, []);
+
   return { 
     status, 
     progress, 
     result, 
     error, 
+    cooldownRemaining,
     initiateSearch, 
     initiateSearchFromProfile,
+    hasCachedResult,
+    loadCachedResult,
     reset 
   };
 }

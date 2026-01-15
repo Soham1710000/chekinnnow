@@ -25,7 +25,7 @@ interface MatchViewProps {
 
 export function MatchView({ userProfile, onboardingContext, autoSearch = false }: MatchViewProps) {
   const { toast } = useToast();
-  const { status, progress, result, error, initiateSearch, initiateSearchFromProfile, reset } = useDeepSearch();
+  const { status, progress, result, error, cooldownRemaining, initiateSearch, initiateSearchFromProfile, hasCachedResult, loadCachedResult, reset } = useDeepSearch();
   
   const [formData, setFormData] = useState<UserAsk>({
     askType: "",
@@ -35,7 +35,7 @@ export function MatchView({ userProfile, onboardingContext, autoSearch = false }
     constraints: "",
   });
   const [copiedMessage, setCopiedMessage] = useState<string | null>(null);
-  const [hasAutoSearched, setHasAutoSearched] = useState(false);
+  const [hasTriedLoad, setHasTriedLoad] = useState(false);
   const [showManualForm, setShowManualForm] = useState(false);
 
   // Check if we have enough info for auto-search
@@ -47,18 +47,24 @@ export function MatchView({ userProfile, onboardingContext, autoSearch = false }
     return false;
   };
 
-  // Auto-trigger search from profile if enabled AND we have enough info
+  // Auto-load cached result or trigger search from profile if enabled
   useEffect(() => {
-    if (autoSearch && !hasAutoSearched && status === "idle") {
+    if (autoSearch && !hasTriedLoad && status === "idle") {
+      setHasTriedLoad(true);
+      
       if (hasEnoughInfoForSearch()) {
-        setHasAutoSearched(true);
-        initiateSearchFromProfile(userProfile || {}, onboardingContext || undefined);
+        // First try to load from cache
+        const loaded = loadCachedResult(userProfile || {}, onboardingContext || undefined);
+        if (!loaded) {
+          // No cache - initiate new search
+          initiateSearchFromProfile(userProfile || {}, onboardingContext || undefined);
+        }
       } else {
         // Not enough info - show manual form
         setShowManualForm(true);
       }
     }
-  }, [autoSearch, userProfile, hasAutoSearched, status, initiateSearchFromProfile, onboardingContext]);
+  }, [autoSearch, userProfile, hasTriedLoad, status, initiateSearchFromProfile, loadCachedResult, onboardingContext]);
 
   const handleSubmit = async () => {
     if (!formData.askType || !formData.intent) {
@@ -73,6 +79,15 @@ export function MatchView({ userProfile, onboardingContext, autoSearch = false }
   };
 
   const handleNewSearch = () => {
+    // Force new search (bypasses cooldown check in UI but API still has rate limits)
+    if (cooldownRemaining) {
+      toast({
+        title: "Please wait",
+        description: `You can search again in ${cooldownRemaining} hours`,
+        variant: "destructive",
+      });
+      return;
+    }
     setShowManualForm(true);
     reset();
   };
@@ -283,10 +298,16 @@ export function MatchView({ userProfile, onboardingContext, autoSearch = false }
         <div className="space-y-4">
           <div className="flex items-center justify-between">
             <h3 className="font-semibold">Matches ({result.matches?.length || 0})</h3>
-            <Button variant="outline" size="sm" onClick={handleNewSearch}>
-              <RefreshCw className="w-3.5 h-3.5 mr-1.5" />
-              New Search
-            </Button>
+            {!cooldownRemaining ? (
+              <Button variant="outline" size="sm" onClick={handleNewSearch}>
+                <RefreshCw className="w-3.5 h-3.5 mr-1.5" />
+                New Search
+              </Button>
+            ) : (
+              <span className="text-xs text-muted-foreground">
+                Next search in {cooldownRemaining}h
+              </span>
+            )}
           </div>
 
           <AnimatePresence>

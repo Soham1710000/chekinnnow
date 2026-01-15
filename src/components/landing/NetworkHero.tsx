@@ -79,10 +79,10 @@ const profiles = [
     title: "Engineer",
     bio: "Anyone interviewing for **Amazon SDE II**?",
     image: rheaImg,
-    replyName: "Dev",
-    replyTitle: "Engineer",
-    replyImage: devImg,
-    reply: "Yes I just interviewed last week"
+    replyName: "chek",
+    replyTitle: "",
+    replyImage: null, // Wave emoji will be used
+    reply: "That's tough. I know someone who just went through it."
   },
   {
     id: 2,
@@ -90,10 +90,10 @@ const profiles = [
     title: "UPSC Aspirant",
     bio: "Anyone who **cleared mains**?",
     image: kushalImg,
-    replyName: "Rajat",
-    replyTitle: "Cleared Mains Twice",
-    replyImage: rajatImg,
-    reply: "Yes happy to chat"
+    replyName: "chek",
+    replyTitle: "",
+    replyImage: null,
+    reply: "I hear you. I know someone who's been exactly there."
   },
   {
     id: 3,
@@ -101,10 +101,10 @@ const profiles = [
     title: "Robotics Student",
     bio: "Working on a **robotics project** and exploring **US research paths**.",
     image: arnavImg,
-    replyName: "Dr. Meera Iyer",
-    replyTitle: "Research Faculty",
-    replyImage: meeraImg,
-    reply: "Sounds interesting. Happy to talk."
+    replyName: "chek",
+    replyTitle: "",
+    replyImage: null,
+    reply: "That's exciting. I know someone who can help."
   },
   {
     id: 4,
@@ -112,10 +112,10 @@ const profiles = [
     title: "College Student",
     bio: "Built **side projects**, trying to break into **gaming** as an SDE.",
     image: siddharthImg,
-    replyName: "Ananya",
-    replyTitle: "Talent Lead, Gaming Startup",
-    replyImage: ananyaImg,
-    reply: "That's understandable. Happy to chat."
+    replyName: "chek",
+    replyTitle: "",
+    replyImage: null,
+    reply: "I get it. I know someone in the space."
   },
   {
     id: 5,
@@ -123,10 +123,10 @@ const profiles = [
     title: "Growth Marketer",
     bio: "Curious how **brand marketing** works at different stages.",
     image: ishaanImg,
-    replyName: "Pallavi",
-    replyTitle: "Brand Marketer",
-    replyImage: pallaviImg,
-    reply: "Happy to share notes."
+    replyName: "chek",
+    replyTitle: "",
+    replyImage: null,
+    reply: "Makes sense. I know someone who's lived this."
   },
   {
     id: 6,
@@ -134,10 +134,10 @@ const profiles = [
     title: "Early Career",
     bio: "I've been trying to meet people who enjoy **long runs**.",
     image: aaravImg,
-    replyName: "Nisha",
-    replyTitle: "Working Professional",
-    replyImage: nishaImg,
-    reply: "That sounds like my kind of thing. When?"
+    replyName: "chek",
+    replyTitle: "",
+    replyImage: null,
+    reply: "Love that. I know someone who'd vibe with you."
   }
 ];
 
@@ -239,16 +239,24 @@ const IPhoneMockup = memo(({ currentIndex }: { currentIndex: number }) => {
                   <div className="flex items-center gap-1.5 sm:gap-2 mr-0.5 sm:mr-1">
                     <div className="text-right">
                       <p className="text-[10px] sm:text-[11px] md:text-sm text-gray-900 font-semibold">{currentProfile.replyName}</p>
-                      <p className="text-[8px] sm:text-[9px] md:text-xs text-gray-500 font-medium">{currentProfile.replyTitle}</p>
+                      {currentProfile.replyTitle && (
+                        <p className="text-[8px] sm:text-[9px] md:text-xs text-gray-500 font-medium">{currentProfile.replyTitle}</p>
+                      )}
                     </div>
-                    <img 
-                      src={currentProfile.replyImage} 
-                      alt={currentProfile.replyName}
-                      loading="eager"
-                      decoding="async"
-                      fetchPriority="high"
-                      className="w-7 h-7 sm:w-9 sm:h-9 md:w-11 md:h-11 rounded-full object-cover object-top border-2 border-gray-200 shadow-sm"
-                    />
+                    {currentProfile.replyImage ? (
+                      <img 
+                        src={currentProfile.replyImage} 
+                        alt={currentProfile.replyName}
+                        loading="eager"
+                        decoding="async"
+                        fetchPriority="high"
+                        className="w-7 h-7 sm:w-9 sm:h-9 md:w-11 md:h-11 rounded-full object-cover object-top border-2 border-gray-200 shadow-sm"
+                      />
+                    ) : (
+                      <div className="w-7 h-7 sm:w-9 sm:h-9 md:w-11 md:h-11 rounded-full bg-gradient-to-br from-primary/20 to-primary/40 border-2 border-primary/30 shadow-sm flex items-center justify-center text-base sm:text-lg md:text-xl">
+                        👋
+                      </div>
+                    )}
                   </div>
                   {/* Message bubble */}
                   <div className="bg-[#007AFF] text-white rounded-xl sm:rounded-2xl rounded-br-sm sm:rounded-br-md px-3 sm:px-4 md:px-5 py-2 sm:py-2.5">
@@ -428,9 +436,9 @@ export const NetworkHero = () => {
               transition={{ duration: 0.8, delay: 0.1 }}
               className="text-xl sm:text-2xl md:text-3xl lg:text-4xl xl:text-5xl font-medium text-foreground leading-tight mb-6 sm:mb-8 md:mb-10"
             >
-              <span className="font-normal text-muted-foreground">Don't know who to reach out to?</span>
+              <span className="font-semibold">chek knows everyone.</span>
               <br />
-              <span className="font-semibold">We make the introduction.</span>
+              <span className="font-normal text-muted-foreground">It talks to millions, so you don't need to.</span>
             </motion.h1>
 
             {/* CTA Button */}

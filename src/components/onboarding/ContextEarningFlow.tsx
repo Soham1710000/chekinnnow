@@ -9,11 +9,13 @@ interface ContextEarningFlowProps {
 }
 
 export interface ContextData {
+  lookingFor: string;  // What opportunity they're seeking
+  whyOpportunity: string;  // Why they want this opportunity
+  constraint: string;  // Any constraints
   contrarianBelief: string;
   careerInflection: string;
   motivation: string;
   motivationExplanation: string;
-  constraint: string;
 }
 
 const MOTIVATIONS = [
@@ -25,27 +27,38 @@ const MOTIVATIONS = [
   { id: "impact", label: "Impact on others" },
 ];
 
-const CONSTRAINT_EXAMPLES = ["Time", "Money", "Geography", "Confidence", "Information", "Social capital"];
+const OPPORTUNITY_EXAMPLES = [
+  "Find a co-founder",
+  "Get a job referral",
+  "Find investors",
+  "Meet mentors",
+  "Hire talent",
+  "Find business partners",
+];
 
-type Step = "intro" | "contrarian" | "inflection" | "motivation" | "constraint" | "complete";
+const CONSTRAINT_EXAMPLES = ["Time", "Money", "Location", "Confidence", "Information", "Network"];
+
+type Step = "intro" | "lookingFor" | "whyOpportunity" | "constraint" | "motivation" | "complete";
 
 const ContextEarningFlow = ({ onComplete }: ContextEarningFlowProps) => {
   const [step, setStep] = useState<Step>("intro");
   const [context, setContext] = useState<ContextData>({
+    lookingFor: "",
+    whyOpportunity: "",
+    constraint: "",
     contrarianBelief: "",
     careerInflection: "",
     motivation: "",
     motivationExplanation: "",
-    constraint: "",
   });
 
   const getProgressText = () => {
     switch (step) {
       case "intro": return "Context layer: starting...";
-      case "contrarian": return "Context layer: 20% complete";
-      case "inflection": return "Context layer: 40% complete";
-      case "motivation": return "Context layer: 60% complete";
-      case "constraint": return "Context layer: 80% complete";
+      case "lookingFor": return "Context layer: 25% complete";
+      case "whyOpportunity": return "Context layer: 50% complete";
+      case "constraint": return "Context layer: 75% complete";
+      case "motivation": return "Context layer: 90% complete";
       case "complete": return "Context layer: complete";
       default: return "";
     }
@@ -53,11 +66,11 @@ const ContextEarningFlow = ({ onComplete }: ContextEarningFlowProps) => {
 
   const handleNext = useCallback(() => {
     switch (step) {
-      case "intro": setStep("contrarian"); break;
-      case "contrarian": setStep("inflection"); break;
-      case "inflection": setStep("motivation"); break;
-      case "motivation": setStep("constraint"); break;
-      case "constraint": 
+      case "intro": setStep("lookingFor"); break;
+      case "lookingFor": setStep("whyOpportunity"); break;
+      case "whyOpportunity": setStep("constraint"); break;
+      case "constraint": setStep("motivation"); break;
+      case "motivation": 
         setStep("complete");
         setTimeout(() => onComplete(context), 1500);
         break;
@@ -70,10 +83,10 @@ const ContextEarningFlow = ({ onComplete }: ContextEarningFlowProps) => {
 
   const canProceed = () => {
     switch (step) {
-      case "contrarian": return true; // Optional
-      case "inflection": return true; // Optional
-      case "motivation": return !!context.motivation;
+      case "lookingFor": return !!context.lookingFor.trim(); // Required
+      case "whyOpportunity": return true; // Optional but encouraged
       case "constraint": return true; // Optional
+      case "motivation": return true; // Optional now
       default: return true;
     }
   };
@@ -136,10 +149,10 @@ const ContextEarningFlow = ({ onComplete }: ContextEarningFlowProps) => {
           </motion.div>
         )}
 
-        {/* Contrarian Beliefs */}
-        {step === "contrarian" && (
+        {/* Looking For - REQUIRED */}
+        {step === "lookingFor" && (
           <motion.div
-            key="contrarian"
+            key="lookingFor"
             initial={{ opacity: 0, y: 20 }}
             animate={{ opacity: 1, y: 0 }}
             exit={{ opacity: 0, y: -20 }}
@@ -147,17 +160,69 @@ const ContextEarningFlow = ({ onComplete }: ContextEarningFlowProps) => {
           >
             <div className="space-y-3">
               <h2 className="text-xl font-semibold">
-                What's a belief you hold that most people around you disagree with?
+                What kind of connection are you looking for?
               </h2>
               <p className="text-sm text-muted-foreground">
-                This helps ChekInn understand how you diverge from the crowd.
+                This helps us find the right people for you.
+              </p>
+            </div>
+
+            <div className="flex flex-wrap gap-2 mb-2">
+              {OPPORTUNITY_EXAMPLES.map((o) => (
+                <button
+                  key={o}
+                  onClick={() => setContext(prev => ({ ...prev, lookingFor: o }))}
+                  className={`px-4 py-2 rounded-full text-sm font-medium transition-all ${
+                    context.lookingFor === o
+                      ? "bg-primary text-primary-foreground"
+                      : "bg-muted hover:bg-muted/80"
+                  }`}
+                >
+                  {o}
+                </button>
+              ))}
+            </div>
+
+            <Textarea
+              value={context.lookingFor}
+              onChange={(e) => setContext(prev => ({ ...prev, lookingFor: e.target.value }))}
+              placeholder="Or describe in your own words..."
+              className="min-h-[80px] text-base rounded-xl border-2 resize-none"
+            />
+
+            <Button
+              onClick={handleNext}
+              disabled={!canProceed()}
+              className="w-full h-12 font-semibold rounded-xl"
+            >
+              Continue
+              <ArrowRight className="w-4 h-4 ml-2" />
+            </Button>
+          </motion.div>
+        )}
+
+        {/* Why Opportunity */}
+        {step === "whyOpportunity" && (
+          <motion.div
+            key="whyOpportunity"
+            initial={{ opacity: 0, y: 20 }}
+            animate={{ opacity: 1, y: 0 }}
+            exit={{ opacity: 0, y: -20 }}
+            className="max-w-md w-full space-y-6"
+          >
+            <div className="space-y-3">
+              <h2 className="text-xl font-semibold">
+                Why are you looking for this?
+              </h2>
+              <p className="text-sm text-muted-foreground">
+                Understanding your "why" helps us find better matches.
               </p>
             </div>
 
             <Textarea
-              value={context.contrarianBelief}
-              onChange={(e) => setContext(prev => ({ ...prev, contrarianBelief: e.target.value }))}
-              placeholder="Type your thoughts..."
+              value={context.whyOpportunity}
+              onChange={(e) => setContext(prev => ({ ...prev, whyOpportunity: e.target.value }))}
+              placeholder="e.g., I'm building a fintech startup and need someone who understands the regulatory landscape..."
               className="min-h-[120px] text-base rounded-xl border-2 resize-none"
             />
 
@@ -180,10 +245,10 @@ const ContextEarningFlow = ({ onComplete }: ContextEarningFlowProps) => {
           </motion.div>
         )}
 
-        {/* Career Inflection */}
-        {step === "inflection" && (
+        {/* Constraints */}
+        {step === "constraint" && (
           <motion.div
-            key="inflection"
+            key="constraint"
             initial={{ opacity: 0, y: 20 }}
             animate={{ opacity: 1, y: 0 }}
             exit={{ opacity: 0, y: -20 }}
@@ -191,18 +256,34 @@ const ContextEarningFlow = ({ onComplete }: ContextEarningFlowProps) => {
           >
             <div className="space-y-3">
               <h2 className="text-xl font-semibold">
-                What's a moment that quietly changed the direction of your career?
+                Any constraints we should know about?
               </h2>
               <p className="text-sm text-muted-foreground">
-                Not a milestone. An inflection.
+                Helps us avoid suggesting connections that won't work for you.
               </p>
             </div>
 
+            <div className="flex flex-wrap gap-2 mb-2">
+              {CONSTRAINT_EXAMPLES.map((c) => (
+                <button
+                  key={c}
+                  onClick={() => setContext(prev => ({ ...prev, constraint: c }))}
+                  className={`px-4 py-2 rounded-full text-sm font-medium transition-all ${
+                    context.constraint === c
+                      ? "bg-primary text-primary-foreground"
+                      : "bg-muted hover:bg-muted/80"
+                  }`}
+                >
+                  {c}
+                </button>
+              ))}
+            </div>
+
             <Textarea
-              value={context.careerInflection}
-              onChange={(e) => setContext(prev => ({ ...prev, careerInflection: e.target.value }))}
-              placeholder="Type your thoughts..."
-              className="min-h-[120px] text-base rounded-xl border-2 resize-none"
+              value={context.constraint}
+              onChange={(e) => setContext(prev => ({ ...prev, constraint: e.target.value }))}
+              placeholder="Or describe in your own words..."
+              className="min-h-[80px] text-base rounded-xl border-2 resize-none"
             />
 
             <div className="flex gap-3">
@@ -235,10 +316,10 @@ const ContextEarningFlow = ({ onComplete }: ContextEarningFlowProps) => {
           >
             <div className="space-y-3">
               <h2 className="text-xl font-semibold">
-                What currently pulls you forward more?
+                What currently drives you the most?
               </h2>
               <p className="text-sm text-muted-foreground">
-                Choose one, then explain if you want.
+                This helps us understand your mindset for better matches.
               </p>
             </div>
 
@@ -274,58 +355,6 @@ const ContextEarningFlow = ({ onComplete }: ContextEarningFlowProps) => {
                 />
               </motion.div>
             )}
-
-            <Button
-              onClick={handleNext}
-              disabled={!canProceed()}
-              className="w-full h-12 font-semibold rounded-xl"
-            >
-              Continue
-              <ArrowRight className="w-4 h-4 ml-2" />
-            </Button>
-          </motion.div>
-        )}
-
-        {/* Constraints */}
-        {step === "constraint" && (
-          <motion.div
-            key="constraint"
-            initial={{ opacity: 0, y: 20 }}
-            animate={{ opacity: 1, y: 0 }}
-            exit={{ opacity: 0, y: -20 }}
-            className="max-w-md w-full space-y-6"
-          >
-            <div className="space-y-3">
-              <h2 className="text-xl font-semibold">
-                What feels most limiting right now?
-              </h2>
-              <p className="text-sm text-muted-foreground">
-                Constraints help ChekInn avoid naive advice.
-              </p>
-            </div>
-
-            <div className="flex flex-wrap gap-2 mb-2">
-              {CONSTRAINT_EXAMPLES.map((c) => (
-                <button
-                  key={c}
-                  onClick={() => setContext(prev => ({ ...prev, constraint: c }))}
-                  className={`px-4 py-2 rounded-full text-sm font-medium transition-all ${
-                    context.constraint === c
-                      ? "bg-primary text-primary-foreground"
-                      : "bg-muted hover:bg-muted/80"
-                  }`}
-                >
-                  {c}
-                </button>
-              ))}
-            </div>
-
-            <Textarea
-              value={context.constraint}
-              onChange={(e) => setContext(prev => ({ ...prev, constraint: e.target.value }))}
-              placeholder="Or describe in your own words..."
-              className="min-h-[80px] text-base rounded-xl border-2 resize-none"
-            />
 
             <div className="flex gap-3">
               <Button

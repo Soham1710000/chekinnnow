@@ -136,11 +136,11 @@ ${dbProfile.ai_insights ? `- AI Insights: ${JSON.stringify(dbProfile.ai_insights
       };
       
       userProfileSection += `USER'S ONBOARDING CONTEXT:
-- Contrarian Belief: ${onboardingContext.contrarianBelief || 'Not shared'}
-- Career Inflection Point: ${onboardingContext.careerInflection || 'Not shared'}
+- Looking For: ${onboardingContext.lookingFor || 'Not specified'}
+- Why This Opportunity: ${onboardingContext.whyOpportunity || 'Not shared'}
+- Current Constraint: ${onboardingContext.constraint || 'Not shared'}
 - Primary Motivation: ${onboardingContext.motivation ? motivationLabels[onboardingContext.motivation] || onboardingContext.motivation : 'Not selected'}
 - Motivation Explanation: ${onboardingContext.motivationExplanation || 'Not provided'}
-- Current Constraint: ${onboardingContext.constraint || 'Not shared'}
 \n`;
     }
     
@@ -155,15 +155,17 @@ USER'S ASK:
 - Desired Outcome: ${userAsk.outcome}
 - Credibility: ${userAsk.credibility}
 - Constraints: ${userAsk.constraints || 'None'}
+- Geography: India only (hard constraint)
 
 ${userProfileSection}
 
-CANDIDATE PROFILES (${candidates?.length || 0} candidates):
+CANDIDATE PROFILES (${candidates?.length || 0} candidates from India):
 ${JSON.stringify(candidates?.slice(0, 30), null, 2)}
 
 Analyze these candidates and return ONLY valid JSON matching the schema.
 Focus on quality over quantity - max 5 matches total.
-Consider the user's onboarding context (contrarian beliefs, motivations, constraints) when finding matches.`;
+Consider the user's context (what they're looking for, why, and their constraints) when finding matches.
+All candidates should be based in India.`;
 
     const response = await fetch('https://ai.gateway.lovable.dev/v1/chat/completions', {
       method: 'POST',

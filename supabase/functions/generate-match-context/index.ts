@@ -88,7 +88,7 @@ serve(async (req) => {
   }
 
   try {
-    const { userAsk, candidates } = await req.json();
+    const { userAsk, candidates, userProfile: dbProfile, onboardingContext } = await req.json();
     
     const LOVABLE_API_KEY = Deno.env.get('LOVABLE_API_KEY');
     const CLADO_API_KEY = Deno.env.get('CLADO_API_KEY');
@@ -97,16 +97,56 @@ serve(async (req) => {
 
     console.log('Generating match context for:', userAsk.askType);
     console.log('Number of candidates:', candidates?.length || 0);
+    console.log('Has DB profile:', !!dbProfile);
+    console.log('Has onboarding context:', !!onboardingContext);
 
     // Fetch user's LinkedIn profile if URL provided
-    let userProfile = null;
+    let linkedInProfile = null;
     if (userAsk.linkedinUrl && CLADO_API_KEY) {
-      userProfile = await fetchUserLinkedInProfile(userAsk.linkedinUrl, CLADO_API_KEY);
+      linkedInProfile = await fetchUserLinkedInProfile(userAsk.linkedinUrl, CLADO_API_KEY);
     }
 
-    const userProfileSection = userProfile 
-      ? `USER'S LINKEDIN PROFILE:\n${JSON.stringify(userProfile, null, 2)}`
-      : `USER'S LINKEDIN PROFILE: Not available - rely on the ask details`;
+    // Build user profile section from multiple sources
+    let userProfileSection = '';
+    
+    if (linkedInProfile) {
+      userProfileSection += `USER'S LINKEDIN PROFILE:\n${JSON.stringify(linkedInProfile, null, 2)}\n\n`;
+    }
+    
+    if (dbProfile) {
+      userProfileSection += `USER'S CHEKINN PROFILE:
+- Name: ${dbProfile.full_name || 'Not provided'}
+- Role: ${dbProfile.role || 'Not provided'}
+- Industry: ${dbProfile.industry || 'Not provided'}
+- Looking For: ${dbProfile.looking_for || 'Not provided'}
+- Skills: ${dbProfile.skills?.join(', ') || 'Not provided'}
+- Interests: ${dbProfile.interests?.join(', ') || 'Not provided'}
+${dbProfile.ai_insights ? `- AI Insights: ${JSON.stringify(dbProfile.ai_insights)}` : ''}
+\n`;
+    }
+    
+    if (onboardingContext) {
+      const motivationLabels: Record<string, string> = {
+        building: "Building something meaningful",
+        recognition: "Recognition & status",
+        financial: "Financial freedom",
+        mastery: "Mastery & learning",
+        stability: "Stability",
+        impact: "Impact on others",
+      };
+      
+      userProfileSection += `USER'S ONBOARDING CONTEXT:
+- Contrarian Belief: ${onboardingContext.contrarianBelief || 'Not shared'}
+- Career Inflection Point: ${onboardingContext.careerInflection || 'Not shared'}
+- Primary Motivation: ${onboardingContext.motivation ? motivationLabels[onboardingContext.motivation] || onboardingContext.motivation : 'Not selected'}
+- Motivation Explanation: ${onboardingContext.motivationExplanation || 'Not provided'}
+- Current Constraint: ${onboardingContext.constraint || 'Not shared'}
+\n`;
+    }
+    
+    if (!userProfileSection) {
+      userProfileSection = "USER PROFILE: Limited information available - rely on the ask details\n";
+    }
 
     const userPrompt = `
 USER'S ASK:
@@ -122,7 +162,8 @@ CANDIDATE PROFILES (${candidates?.length || 0} candidates):
 ${JSON.stringify(candidates?.slice(0, 30), null, 2)}
 
 Analyze these candidates and return ONLY valid JSON matching the schema.
-Focus on quality over quantity - max 5 matches total.`;
+Focus on quality over quantity - max 5 matches total.
+Consider the user's onboarding context (contrarian beliefs, motivations, constraints) when finding matches.`;
 
     const response = await fetch('https://ai.gateway.lovable.dev/v1/chat/completions', {
       method: 'POST',

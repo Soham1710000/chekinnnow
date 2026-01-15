@@ -19,6 +19,7 @@ const SaveProgressNudge = lazy(() => import("@/components/chat/SaveProgressNudge
 const WhatsAppCommunityNudge = lazy(() => import("@/components/chat/WhatsAppCommunityNudge"));
 const VoiceInput = lazy(() => import("@/components/chat/VoiceInput"));
 const FindingMatchCard = lazy(() => import("@/components/chat/FindingMatchCard"));
+const ExternalMatchNudge = lazy(() => import("@/components/chat/ExternalMatchNudge"));
 const MatchView = lazy(() => import("@/components/match/MatchView"));
 
 // Lazy load undercurrents - only needed for authenticated users with access
@@ -152,7 +153,9 @@ const Chat = () => {
   const [sessionId] = useState(() => getSessionId());
   const [showWACommunity, setShowWACommunity] = useState(false);
   const [showFindingMatch, setShowFindingMatch] = useState(false);
+  const [showExternalMatchNudge, setShowExternalMatchNudge] = useState(false);
   const evaluatedIntros = useRef<Set<string>>(new Set());
+  const hasShownExternalNudge = useRef(false);
   
   const messagesEndRef = useRef<HTMLDivElement>(null);
   const hasTrackedPageLoad = useRef(false);
@@ -1095,7 +1098,10 @@ const Chat = () => {
 
       {view === "match" && user ? (
         <Suspense fallback={<div className="flex-1 flex items-center justify-center"><div className="animate-spin w-8 h-8 border-2 border-primary border-t-transparent rounded-full" /></div>}>
-          <MatchView />
+          <MatchView 
+            userProfile={userProfile} 
+            autoSearch={learningComplete && !!userProfile}
+          />
         </Suspense>
       ) : view === "chekinn" || !user ? (
         <>
@@ -1165,6 +1171,17 @@ const Chat = () => {
                         ))}
                       </div>
                     </div>
+                  )}
+                  {/* External Match Nudge - shown after greeting for users with complete learning */}
+                  {index === 0 && msg.role === "assistant" && user && learningComplete && !hasShownExternalNudge.current && (
+                    <Suspense fallback={null}>
+                      <ExternalMatchNudge
+                        onViewMatches={() => {
+                          hasShownExternalNudge.current = true;
+                          setView("match");
+                        }}
+                      />
+                    </Suspense>
                   )}
                 </motion.div>
               ))}

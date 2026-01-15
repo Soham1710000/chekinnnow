@@ -1,11 +1,11 @@
-import { useState } from "react";
+import { useState, useEffect } from "react";
 import { motion, AnimatePresence } from "framer-motion";
-import { Search, Sparkles, Loader2, Copy, Check, ExternalLink, Zap, Target, Users } from "lucide-react";
+import { Search, Sparkles, Loader2, Copy, Check, ExternalLink, Zap, Target, Users, RefreshCw } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Textarea } from "@/components/ui/textarea";
 import { useToast } from "@/hooks/use-toast";
-import { useDeepSearch, UserAsk, Match } from "@/hooks/useDeepSearch";
+import { useDeepSearch, UserAsk, Match, UserProfile, ContextData } from "@/hooks/useDeepSearch";
 
 const ASK_TYPES = [
   { id: "fundraising", label: "Fundraising", icon: "💰" },
@@ -17,9 +17,15 @@ const ASK_TYPES = [
   { id: "career", label: "Career Move", icon: "📈" },
 ];
 
-export function MatchView() {
+interface MatchViewProps {
+  userProfile?: UserProfile | null;
+  onboardingContext?: ContextData | null;
+  autoSearch?: boolean;
+}
+
+export function MatchView({ userProfile, onboardingContext, autoSearch = false }: MatchViewProps) {
   const { toast } = useToast();
-  const { status, progress, result, error, initiateSearch, reset } = useDeepSearch();
+  const { status, progress, result, error, initiateSearch, initiateSearchFromProfile, reset } = useDeepSearch();
   
   const [formData, setFormData] = useState<UserAsk>({
     askType: "",
@@ -30,6 +36,16 @@ export function MatchView() {
     linkedinUrl: "",
   });
   const [copiedMessage, setCopiedMessage] = useState<string | null>(null);
+  const [hasAutoSearched, setHasAutoSearched] = useState(false);
+  const [showManualForm, setShowManualForm] = useState(false);
+
+  // Auto-trigger search from profile if enabled
+  useEffect(() => {
+    if (autoSearch && userProfile && !hasAutoSearched && status === "idle") {
+      setHasAutoSearched(true);
+      initiateSearchFromProfile(userProfile, onboardingContext || undefined);
+    }
+  }, [autoSearch, userProfile, hasAutoSearched, status, initiateSearchFromProfile, onboardingContext]);
 
   const handleSubmit = async () => {
     if (!formData.askType || !formData.intent) {
@@ -43,6 +59,11 @@ export function MatchView() {
     await initiateSearch(formData);
   };
 
+  const handleNewSearch = () => {
+    setShowManualForm(true);
+    reset();
+  };
+
   const copyMessage = async (message: string, matchName: string) => {
     await navigator.clipboard.writeText(message);
     setCopiedMessage(matchName);
@@ -50,7 +71,7 @@ export function MatchView() {
     setTimeout(() => setCopiedMessage(null), 2000);
   };
 
-  if (status === "idle" || status === "error") {
+  if ((status === "idle" && (!autoSearch || showManualForm)) || status === "error") {
     return (
       <div className="flex-1 overflow-y-auto p-4 space-y-6">
         <motion.div
@@ -237,11 +258,20 @@ export function MatchView() {
           </motion.div>
         )}
 
+        {/* Note about external matches */}
+        <div className="bg-amber-500/10 border border-amber-500/20 rounded-lg p-3">
+          <p className="text-xs text-amber-700 dark:text-amber-400">
+            💡 These are potential connections found on LinkedIn outside the ChekInn network. 
+            We're also matching you with verified ChekInn members — expect that within 24 hours!
+          </p>
+        </div>
+
         {/* Matches */}
         <div className="space-y-4">
           <div className="flex items-center justify-between">
-            <h3 className="font-semibold">Matches ({result.matches?.length || 0})</h3>
-            <Button variant="outline" size="sm" onClick={reset}>
+            <h3 className="font-semibold">LinkedIn Matches ({result.matches?.length || 0})</h3>
+            <Button variant="outline" size="sm" onClick={handleNewSearch}>
+              <RefreshCw className="w-3.5 h-3.5 mr-1.5" />
               New Search
             </Button>
           </div>

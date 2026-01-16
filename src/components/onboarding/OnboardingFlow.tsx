@@ -2,6 +2,7 @@ import { useState, useCallback } from "react";
 import { motion, AnimatePresence } from "framer-motion";
 import { Button } from "@/components/ui/button";
 import { Textarea } from "@/components/ui/textarea";
+import { Input } from "@/components/ui/input";
 import { ArrowRight, Check } from "lucide-react";
 import { RadioGroup, RadioGroupItem } from "@/components/ui/radio-group";
 import { Label } from "@/components/ui/label";
@@ -18,13 +19,17 @@ export interface OnboardingData {
   context_chips: string[];
   open_help_text: string;
   help_style: string;
+  // Ask-Specific Depth Inputs
+  depth_input_1: string;
+  depth_input_2: string;
+  depth_input_3: string;
 }
 
 interface OnboardingFlowProps {
   onComplete: (data: OnboardingData) => void;
 }
 
-type Step = 1 | 2 | 3 | 4 | 5 | 6;
+type Step = 1 | 2 | 3 | 4 | 5 | 6 | 7;
 
 const DECISION_POSTURES = [
   { id: "talk_to_people", label: "Talk to people who've lived something similar" },
@@ -76,6 +81,140 @@ const CONTEXT_CONSTRAINTS = [
   { id: "limited_network", label: "Limited network" },
 ];
 
+// Ask-Specific Depth Input configurations
+interface DepthInputConfig {
+  trigger: (askType: string, livedContext: string[]) => boolean;
+  title: string;
+  prompts: {
+    prompt: string;
+    placeholder: string;
+    required: boolean;
+  }[];
+}
+
+const DEPTH_INPUT_CONFIGS: DepthInputConfig[] = [
+  // 1️⃣ Hiring / Getting Hired (Mid–Senior)
+  {
+    trigger: (askType, livedContext) =>
+      ["clarity", "direction", "pressure_testing"].includes(askType) &&
+      livedContext.includes("hired_mid_senior"),
+    title: "Let's get specific about your job search",
+    prompts: [
+      {
+        prompt: "What kind of role are you trying to move into?",
+        placeholder: "e.g. Growth, Product, Ops, GM, Founding team",
+        required: true,
+      },
+      {
+        prompt: "What's non-negotiable for you this time?",
+        placeholder: "e.g. ownership, learning curve, manager quality, comp",
+        required: true,
+      },
+      {
+        prompt: "What burned you in your last role that you don't want to repeat?",
+        placeholder: "A few words is enough",
+        required: false,
+      },
+    ],
+  },
+  // 2️⃣ Fundraising / Pre-Seed
+  {
+    trigger: (askType, livedContext) =>
+      ["pressure_testing", "direction"].includes(askType) &&
+      livedContext.includes("raising_capital"),
+    title: "Tell us more about your raise",
+    prompts: [
+      {
+        prompt: "What are you trying to raise for right now?",
+        placeholder: "e.g. validation, hiring, speed, credibility",
+        required: true,
+      },
+      {
+        prompt: "What's your biggest doubt going into this raise?",
+        placeholder: "e.g. timing, traction, story, myself",
+        required: true,
+      },
+      {
+        prompt: "What would make this raise feel successful even if it's small?",
+        placeholder: "A few words is enough",
+        required: false,
+      },
+    ],
+  },
+  // 3️⃣ Partnerships / Co-founders
+  {
+    trigger: (askType, livedContext) =>
+      ["clarity", "pressure_testing"].includes(askType) &&
+      (livedContext.includes("job_vs_startup") || livedContext.includes("hiring_early")),
+    title: "Let's understand your partnership needs",
+    prompts: [
+      {
+        prompt: "What gap are you hoping a partner fills?",
+        placeholder: "e.g. execution, vision, sales, emotional load",
+        required: true,
+      },
+      {
+        prompt: "What's a deal-breaker for you in a partnership?",
+        placeholder: "A few words is enough",
+        required: true,
+      },
+      {
+        prompt: "What kind of mistake are you most afraid of repeating?",
+        placeholder: "A few words is enough",
+        required: false,
+      },
+    ],
+  },
+  // 4️⃣ Beta Users / Early Feedback
+  {
+    trigger: (askType, livedContext) =>
+      ["pressure_testing", "opportunity"].includes(askType) &&
+      livedContext.includes("building_product"),
+    title: "Help us understand your product stage",
+    prompts: [
+      {
+        prompt: "Who is this product for right now?",
+        placeholder: "Describe the user in a few words",
+        required: true,
+      },
+      {
+        prompt: "What kind of feedback do you want most?",
+        placeholder: "e.g. brutal honesty, PMF signal, usability",
+        required: true,
+      },
+      {
+        prompt: "What would make you change direction after these conversations?",
+        placeholder: "A few words is enough",
+        required: false,
+      },
+    ],
+  },
+  // 5️⃣ Talking to Someone in a Role You're Interviewing For
+  {
+    trigger: (askType, livedContext) =>
+      ["direction", "pressure_testing"].includes(askType) &&
+      livedContext.includes("hired_mid_senior"),
+    title: "Let's understand your interview situation",
+    prompts: [
+      {
+        prompt: "What role or team are you interviewing for?",
+        placeholder: "A few words is enough",
+        required: true,
+      },
+      {
+        prompt: "What do you most want clarity on before committing?",
+        placeholder: "e.g. expectations, politics, growth, reality vs JD",
+        required: true,
+      },
+      {
+        prompt: "What would make you walk away even if you get the offer?",
+        placeholder: "A few words is enough",
+        required: false,
+      },
+    ],
+  },
+];
+
 const OnboardingFlow = ({ onComplete }: OnboardingFlowProps) => {
   const [step, setStep] = useState<Step>(1);
   const [data, setData] = useState<OnboardingData>({
@@ -89,19 +228,43 @@ const OnboardingFlow = ({ onComplete }: OnboardingFlowProps) => {
     context_chips: [],
     open_help_text: "",
     help_style: "",
+    depth_input_1: "",
+    depth_input_2: "",
+    depth_input_3: "",
   });
 
+  // Get the active depth input config based on current selections
+  const getActiveDepthConfig = (): DepthInputConfig | null => {
+    for (const config of DEPTH_INPUT_CONFIGS) {
+      if (config.trigger(data.ask_type, data.lived_context)) {
+        return config;
+      }
+    }
+    return null;
+  };
+
+  const activeDepthConfig = getActiveDepthConfig();
+  const hasDepthInputs = activeDepthConfig !== null;
+
+  const getTotalSteps = () => (hasDepthInputs ? 7 : 6);
+
   const getProgressPercent = () => {
-    return Math.round((step / 6) * 100);
+    return Math.round((step / getTotalSteps()) * 100);
   };
 
   const handleNext = useCallback(() => {
-    if (step < 6) {
-      setStep((s) => (s + 1) as Step);
+    const totalSteps = hasDepthInputs ? 7 : 6;
+    if (step < totalSteps) {
+      // If we're on step 3 and there are no depth inputs, skip step 4
+      if (step === 3 && !hasDepthInputs) {
+        setStep(5 as Step);
+      } else {
+        setStep((s) => (s + 1) as Step);
+      }
     } else {
       onComplete(data);
     }
-  }, [step, data, onComplete]);
+  }, [step, data, onComplete, hasDepthInputs]);
 
   const toggleArrayItem = (field: "lived_context" | "followup_context" | "context_chips", item: string) => {
     setData((prev) => {
@@ -143,11 +306,26 @@ const OnboardingFlow = ({ onComplete }: OnboardingFlowProps) => {
       case 1: return !!data.decision_posture;
       case 2: return !!data.ask_type;
       case 3: return data.lived_context.length > 0;
-      case 4: return !!data.decision_weight;
-      case 5: return true; // Optional
-      case 6: return true;
+      case 4: {
+        // Depth inputs step - check required fields
+        if (!activeDepthConfig) return true;
+        const requiredPrompts = activeDepthConfig.prompts.filter(p => p.required);
+        const inputs = [data.depth_input_1, data.depth_input_2, data.depth_input_3];
+        return requiredPrompts.every((_, idx) => inputs[idx]?.trim().length > 0);
+      }
+      case 5: return !!data.decision_weight;
+      case 6: return true; // Optional
+      case 7: return true;
       default: return true;
     }
+  };
+
+  // Adjust step display for progress when depth inputs are not shown
+  const getDisplayStep = () => {
+    if (!hasDepthInputs && step >= 5) {
+      return step - 1;
+    }
+    return step;
   };
 
   return (
@@ -167,7 +345,7 @@ const OnboardingFlow = ({ onComplete }: OnboardingFlowProps) => {
           />
         </div>
         <span className="text-xs font-medium text-muted-foreground">
-          {step} of 6
+          {getDisplayStep()} of {getTotalSteps()}
         </span>
       </motion.div>
 
@@ -397,10 +575,64 @@ const OnboardingFlow = ({ onComplete }: OnboardingFlowProps) => {
           </motion.div>
         )}
 
-        {/* Screen 4 - Decision Weight */}
-        {step === 4 && (
+        {/* Screen 4 - Ask-Specific Depth Inputs (Conditional) */}
+        {step === 4 && activeDepthConfig && (
           <motion.div
             key="step4"
+            initial={{ opacity: 0, y: 20 }}
+            animate={{ opacity: 1, y: 0 }}
+            exit={{ opacity: 0, y: -20 }}
+            className="max-w-md w-full space-y-6"
+          >
+            <div className="space-y-3">
+              <h2 className="text-xl font-semibold">
+                {activeDepthConfig.title}
+              </h2>
+              <p className="text-sm text-muted-foreground">
+                A few words is enough for each.
+              </p>
+            </div>
+
+            <div className="space-y-5">
+              {activeDepthConfig.prompts.map((promptConfig, idx) => {
+                const inputKey = `depth_input_${idx + 1}` as keyof OnboardingData;
+                const value = data[inputKey] as string;
+                
+                return (
+                  <div key={idx} className="space-y-2">
+                    <Label className="text-sm font-medium">
+                      {promptConfig.prompt}
+                      {promptConfig.required && <span className="text-destructive ml-1">*</span>}
+                    </Label>
+                    <Input
+                      value={value}
+                      onChange={(e) => setData((prev) => ({ ...prev, [inputKey]: e.target.value }))}
+                      placeholder={promptConfig.placeholder}
+                      className="h-12 rounded-xl border-2"
+                    />
+                    <p className="text-xs text-muted-foreground/70">
+                      {promptConfig.placeholder}
+                    </p>
+                  </div>
+                );
+              })}
+            </div>
+
+            <Button
+              onClick={handleNext}
+              disabled={!canProceed()}
+              className="w-full h-12 font-semibold rounded-xl"
+            >
+              Continue
+              <ArrowRight className="w-4 h-4 ml-2" />
+            </Button>
+          </motion.div>
+        )}
+
+        {/* Screen 5 - Decision Weight */}
+        {step === 5 && (
+          <motion.div
+            key="step5"
             initial={{ opacity: 0, y: 20 }}
             animate={{ opacity: 1, y: 0 }}
             exit={{ opacity: 0, y: -20 }}
@@ -458,10 +690,10 @@ const OnboardingFlow = ({ onComplete }: OnboardingFlowProps) => {
           </motion.div>
         )}
 
-        {/* Screen 5 - Context Amplifier */}
-        {step === 5 && (
+        {/* Screen 6 - Context Amplifier */}
+        {step === 6 && (
           <motion.div
-            key="step5"
+            key="step6"
             initial={{ opacity: 0, y: 20 }}
             animate={{ opacity: 1, y: 0 }}
             exit={{ opacity: 0, y: -20 }}
@@ -502,10 +734,10 @@ const OnboardingFlow = ({ onComplete }: OnboardingFlowProps) => {
           </motion.div>
         )}
 
-        {/* Screen 6 - Close */}
-        {step === 6 && (
+        {/* Screen 7 - Close */}
+        {step === 7 && (
           <motion.div
-            key="step6"
+            key="step7"
             initial={{ opacity: 0, y: 20 }}
             animate={{ opacity: 1, y: 0 }}
             exit={{ opacity: 0, y: -20 }}

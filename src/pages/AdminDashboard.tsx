@@ -48,6 +48,10 @@ interface OnboardingContext {
   context_chips?: string[];
   open_help_text?: string;
   help_style?: string;
+  // Depth inputs (from onboarding questions)
+  depth_input_1?: string;
+  depth_input_2?: string;
+  depth_input_3?: string;
   // Legacy fields (for backwards compatibility)
   lookingFor?: string;
   whyOpportunity?: string;
@@ -2153,6 +2157,25 @@ const AdminDashboard = () => {
                       <div>
                         <p className="text-xs font-medium text-muted-foreground">Additional Context</p>
                         <p className="text-sm italic">"{viewUser.onboarding_context.micro_reason}"</p>
+                      </div>
+                    )}
+                    {/* Depth Inputs - Core context from onboarding questions */}
+                    {viewUser.onboarding_context.depth_input_1 && (
+                      <div className="bg-violet-50 border border-violet-200 rounded-lg p-3">
+                        <p className="text-xs font-medium text-violet-700">📝 What they're working through</p>
+                        <p className="text-sm mt-1">"{viewUser.onboarding_context.depth_input_1}"</p>
+                      </div>
+                    )}
+                    {viewUser.onboarding_context.depth_input_2 && (
+                      <div className="bg-violet-50 border border-violet-200 rounded-lg p-3">
+                        <p className="text-xs font-medium text-violet-700">🔒 Non-negotiable / Key constraint</p>
+                        <p className="text-sm mt-1">"{viewUser.onboarding_context.depth_input_2}"</p>
+                      </div>
+                    )}
+                    {viewUser.onboarding_context.depth_input_3 && (
+                      <div className="bg-violet-50 border border-violet-200 rounded-lg p-3">
+                        <p className="text-xs font-medium text-violet-700">🎯 Dream outcome</p>
+                        <p className="text-sm mt-1">"{viewUser.onboarding_context.depth_input_3}"</p>
                       </div>
                     )}
                     {viewUser.onboarding_context.open_help_text && (

@@ -249,15 +249,6 @@ const STEP_GRADIENTS = [
   "from-violet-50/50 via-transparent to-transparent",
 ];
 
-// Social proof data (simulated)
-const SOCIAL_PROOF_MESSAGES: Record<string, { count: number; message: string }> = {
-  clarity: { count: 127, message: "127 people seeking clarity are here" },
-  direction: { count: 89, message: "89 people figuring out next steps" },
-  opportunity: { count: 156, message: "156 people exploring opportunities" },
-  pressure_testing: { count: 73, message: "73 people pressure-testing ideas" },
-  help_others: { count: 234, message: "234 people ready to give back" },
-};
-
 // Time estimates per step
 const TIME_ESTIMATES: Record<number, string> = {
   1: "~2 min",
@@ -552,11 +543,6 @@ const OnboardingFlow = ({ onComplete }: OnboardingFlowProps) => {
     }
   }, [step]);
 
-  // Get social proof for current ask type
-  const getSocialProof = () => {
-    return SOCIAL_PROOF_MESSAGES[data.ask_type] || null;
-  };
-
   return (
     <div className={`min-h-screen flex flex-col items-center justify-center p-6 transition-all duration-500 bg-gradient-to-br ${STEP_GRADIENTS[step - 1] || STEP_GRADIENTS[0]}`}>
       {/* Celebration Toast */}
@@ -723,21 +709,6 @@ const OnboardingFlow = ({ onComplete }: OnboardingFlowProps) => {
                 </motion.div>
               ))}
             </RadioGroup>
-
-            {/* Social Proof */}
-            <AnimatePresence>
-              {data.ask_type && getSocialProof() && (
-                <motion.div
-                  initial={{ opacity: 0, height: 0 }}
-                  animate={{ opacity: 1, height: "auto" }}
-                  exit={{ opacity: 0, height: 0 }}
-                  className="flex items-center justify-center gap-2 text-sm text-muted-foreground bg-muted/50 rounded-full py-2 px-4"
-                >
-                  <Users className="w-4 h-4" />
-                  <span>{getSocialProof()?.message}</span>
-                </motion.div>
-              )}
-            </AnimatePresence>
 
             <Button
               onClick={handleNext}

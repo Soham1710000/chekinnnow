@@ -3,10 +3,11 @@ import { motion, AnimatePresence } from "framer-motion";
 import { Button } from "@/components/ui/button";
 import { Textarea } from "@/components/ui/textarea";
 import { Input } from "@/components/ui/input";
-import { ArrowRight, Check, Sparkles, Heart, Zap, Target, Users, Lightbulb, Shield } from "lucide-react";
+import { ArrowRight, Check, Sparkles, Heart, Zap, Target, Users, Lightbulb, Shield, Clock } from "lucide-react";
 import { RadioGroup, RadioGroupItem } from "@/components/ui/radio-group";
 import { Label } from "@/components/ui/label";
 import { Checkbox } from "@/components/ui/checkbox";
+import confetti from "canvas-confetti";
 
 export interface OnboardingData {
   decision_posture: string;
@@ -237,6 +238,60 @@ const DEPTH_INPUT_CONFIGS: DepthInputConfig[] = [
   },
 ];
 
+// Step gradient backgrounds
+const STEP_GRADIENTS = [
+  "from-blue-50/50 via-transparent to-transparent",
+  "from-purple-50/50 via-transparent to-transparent",
+  "from-amber-50/50 via-transparent to-transparent",
+  "from-emerald-50/50 via-transparent to-transparent",
+  "from-rose-50/50 via-transparent to-transparent",
+  "from-cyan-50/50 via-transparent to-transparent",
+  "from-violet-50/50 via-transparent to-transparent",
+];
+
+// Social proof data (simulated)
+const SOCIAL_PROOF_MESSAGES: Record<string, { count: number; message: string }> = {
+  clarity: { count: 127, message: "127 people seeking clarity are here" },
+  direction: { count: 89, message: "89 people figuring out next steps" },
+  opportunity: { count: 156, message: "156 people exploring opportunities" },
+  pressure_testing: { count: 73, message: "73 people pressure-testing ideas" },
+  help_others: { count: 234, message: "234 people ready to give back" },
+};
+
+// Time estimates per step
+const TIME_ESTIMATES: Record<number, string> = {
+  1: "~2 min",
+  2: "~90 sec",
+  3: "~1 min",
+  4: "~45 sec",
+  5: "~30 sec",
+  6: "~15 sec",
+  7: "Done!",
+};
+
+// Confetti trigger function
+const triggerConfetti = () => {
+  const count = 200;
+  const defaults = {
+    origin: { y: 0.7 },
+    zIndex: 9999,
+  };
+
+  function fire(particleRatio: number, opts: confetti.Options) {
+    confetti({
+      ...defaults,
+      ...opts,
+      particleCount: Math.floor(count * particleRatio),
+    });
+  }
+
+  fire(0.25, { spread: 26, startVelocity: 55 });
+  fire(0.2, { spread: 60 });
+  fire(0.35, { spread: 100, decay: 0.91, scalar: 0.8 });
+  fire(0.1, { spread: 120, startVelocity: 25, decay: 0.92, scalar: 1.2 });
+  fire(0.1, { spread: 120, startVelocity: 45 });
+};
+
 // Playful progress component
 const PlayfulProgress = ({ currentStep, totalSteps, hasDepthInputs }: { 
   currentStep: number; 
@@ -247,50 +302,64 @@ const PlayfulProgress = ({ currentStep, totalSteps, hasDepthInputs }: {
     ? STEP_CONFIG 
     : STEP_CONFIG.filter(s => s.id !== 4);
 
-  return (
-    <div className="flex items-center justify-center gap-2">
-      {visibleSteps.map((stepConfig, index) => {
-        const adjustedCurrent = hasDepthInputs 
-          ? currentStep 
-          : currentStep > 3 ? currentStep + 1 : currentStep;
-        
-        const isCompleted = adjustedCurrent > stepConfig.id;
-        const isCurrent = adjustedCurrent === stepConfig.id;
-        const Icon = stepConfig.icon;
+  const timeEstimate = TIME_ESTIMATES[currentStep] || "";
 
-        return (
-          <motion.div
-            key={stepConfig.id}
-            className="flex flex-col items-center"
-            initial={{ opacity: 0, y: -10 }}
-            animate={{ opacity: 1, y: 0 }}
-            transition={{ delay: index * 0.05 }}
-          >
+  return (
+    <div className="flex flex-col items-center gap-3">
+      <div className="flex items-center justify-center gap-2">
+        {visibleSteps.map((stepConfig, index) => {
+          const adjustedCurrent = hasDepthInputs 
+            ? currentStep 
+            : currentStep > 3 ? currentStep + 1 : currentStep;
+          
+          const isCompleted = adjustedCurrent > stepConfig.id;
+          const isCurrent = adjustedCurrent === stepConfig.id;
+          const Icon = stepConfig.icon;
+
+          return (
             <motion.div
-              className={`w-10 h-10 rounded-full flex items-center justify-center transition-all duration-300 ${
-                isCompleted 
-                  ? "bg-primary text-primary-foreground" 
-                  : isCurrent 
-                    ? "bg-primary/20 text-primary border-2 border-primary" 
-                    : "bg-muted text-muted-foreground"
-              }`}
-              animate={isCurrent ? { scale: [1, 1.1, 1] } : {}}
-              transition={{ repeat: isCurrent ? Infinity : 0, duration: 2 }}
+              key={stepConfig.id}
+              className="flex flex-col items-center"
+              initial={{ opacity: 0, y: -10 }}
+              animate={{ opacity: 1, y: 0 }}
+              transition={{ delay: index * 0.05 }}
             >
-              {isCompleted ? (
-                <Check className="w-4 h-4" />
-              ) : (
-                <Icon className="w-4 h-4" />
-              )}
+              <motion.div
+                className={`w-10 h-10 rounded-full flex items-center justify-center transition-all duration-300 ${
+                  isCompleted 
+                    ? "bg-primary text-primary-foreground" 
+                    : isCurrent 
+                      ? "bg-primary/20 text-primary border-2 border-primary" 
+                      : "bg-muted text-muted-foreground"
+                }`}
+                animate={isCurrent ? { scale: [1, 1.1, 1] } : {}}
+                transition={{ repeat: isCurrent ? Infinity : 0, duration: 2 }}
+              >
+                {isCompleted ? (
+                  <Check className="w-4 h-4" />
+                ) : (
+                  <Icon className="w-4 h-4" />
+                )}
+              </motion.div>
+              <span className={`text-[10px] mt-1 font-medium ${
+                isCurrent ? "text-primary" : "text-muted-foreground"
+              }`}>
+                {stepConfig.label}
+              </span>
             </motion.div>
-            <span className={`text-[10px] mt-1 font-medium ${
-              isCurrent ? "text-primary" : "text-muted-foreground"
-            }`}>
-              {stepConfig.label}
-            </span>
-          </motion.div>
-        );
-      })}
+          );
+        })}
+      </div>
+      {/* Time estimate */}
+      <motion.div
+        key={currentStep}
+        initial={{ opacity: 0 }}
+        animate={{ opacity: 1 }}
+        className="flex items-center gap-1.5 text-xs text-muted-foreground"
+      >
+        <Clock className="w-3 h-3" />
+        <span>{timeEstimate}</span>
+      </motion.div>
     </div>
   );
 };
@@ -310,6 +379,47 @@ const CelebrationToast = ({ message, show }: { message: string; show: boolean })
         </motion.div>
       )}
     </AnimatePresence>
+  );
+};
+
+// Recap Card component for final step
+const RecapCard = ({ data }: { data: OnboardingData }) => {
+  const getAskLabel = () => ASK_TYPES.find(a => a.id === data.ask_type)?.label || "";
+  const getPostureEmoji = () => DECISION_POSTURES.find(p => p.id === data.decision_posture)?.emoji || "";
+  const getWeightLabel = () => DECISION_WEIGHTS.find(w => w.id === data.decision_weight)?.label || "";
+  const getLivedContextEmojis = () => data.lived_context.map(id => 
+    LIVED_CONTEXTS.find(c => c.id === id)?.emoji || ""
+  ).join(" ");
+
+  return (
+    <motion.div
+      initial={{ opacity: 0, y: 20 }}
+      animate={{ opacity: 1, y: 0 }}
+      transition={{ delay: 0.4 }}
+      className="bg-muted/50 rounded-2xl p-5 space-y-3 text-left w-full max-w-sm mx-auto"
+    >
+      <h4 className="text-xs font-medium text-muted-foreground uppercase tracking-wide">Your context snapshot</h4>
+      <div className="space-y-2">
+        <div className="flex items-center justify-between">
+          <span className="text-sm text-muted-foreground">Looking for</span>
+          <span className="text-sm font-medium">{getAskLabel()}</span>
+        </div>
+        <div className="flex items-center justify-between">
+          <span className="text-sm text-muted-foreground">Decision style</span>
+          <span className="text-lg">{getPostureEmoji()}</span>
+        </div>
+        <div className="flex items-center justify-between">
+          <span className="text-sm text-muted-foreground">Stakes</span>
+          <span className="text-sm font-medium">{getWeightLabel()}</span>
+        </div>
+        {data.lived_context.length > 0 && (
+          <div className="flex items-center justify-between">
+            <span className="text-sm text-muted-foreground">Experience</span>
+            <span className="text-lg">{getLivedContextEmojis()}</span>
+          </div>
+        )}
+      </div>
+    </motion.div>
   );
 };
 
@@ -433,8 +543,22 @@ const OnboardingFlow = ({ onComplete }: OnboardingFlowProps) => {
     return step;
   };
 
+  // Trigger confetti on final step
+  useEffect(() => {
+    if (step === 7) {
+      setTimeout(() => {
+        triggerConfetti();
+      }, 300);
+    }
+  }, [step]);
+
+  // Get social proof for current ask type
+  const getSocialProof = () => {
+    return SOCIAL_PROOF_MESSAGES[data.ask_type] || null;
+  };
+
   return (
-    <div className="min-h-screen bg-background flex flex-col items-center justify-center p-6">
+    <div className={`min-h-screen flex flex-col items-center justify-center p-6 transition-all duration-500 bg-gradient-to-br ${STEP_GRADIENTS[step - 1] || STEP_GRADIENTS[0]}`}>
       {/* Celebration Toast */}
       <CelebrationToast message={celebrationMessage} show={showCelebration} />
 
@@ -442,7 +566,7 @@ const OnboardingFlow = ({ onComplete }: OnboardingFlowProps) => {
       <motion.div
         initial={{ opacity: 0, y: -20 }}
         animate={{ opacity: 1, y: 0 }}
-        className="fixed top-6 left-1/2 -translate-x-1/2"
+        className="fixed top-6 left-1/2 -translate-x-1/2 z-10"
       >
         <PlayfulProgress 
           currentStep={step} 
@@ -599,6 +723,21 @@ const OnboardingFlow = ({ onComplete }: OnboardingFlowProps) => {
                 </motion.div>
               ))}
             </RadioGroup>
+
+            {/* Social Proof */}
+            <AnimatePresence>
+              {data.ask_type && getSocialProof() && (
+                <motion.div
+                  initial={{ opacity: 0, height: 0 }}
+                  animate={{ opacity: 1, height: "auto" }}
+                  exit={{ opacity: 0, height: 0 }}
+                  className="flex items-center justify-center gap-2 text-sm text-muted-foreground bg-muted/50 rounded-full py-2 px-4"
+                >
+                  <Users className="w-4 h-4" />
+                  <span>{getSocialProof()?.message}</span>
+                </motion.div>
+              )}
+            </AnimatePresence>
 
             <Button
               onClick={handleNext}
@@ -977,46 +1116,38 @@ const OnboardingFlow = ({ onComplete }: OnboardingFlowProps) => {
             initial={{ opacity: 0, y: 20 }}
             animate={{ opacity: 1, y: 0 }}
             exit={{ opacity: 0, y: -20 }}
-            className="max-w-md w-full text-center space-y-8"
+            className="max-w-md w-full text-center space-y-6"
           >
             <motion.div
               initial={{ scale: 0 }}
               animate={{ scale: 1 }}
               transition={{ type: "spring", delay: 0.1 }}
-              className="text-6xl mb-4"
+              className="text-6xl mb-2"
             >
               🎉
             </motion.div>
 
-            <div className="space-y-6">
-              <motion.h2
-                initial={{ opacity: 0, y: 10 }}
-                animate={{ opacity: 1, y: 0 }}
-                transition={{ delay: 0.2 }}
-                className="text-2xl font-semibold"
-              >
-                You're all set!
-              </motion.h2>
-              <motion.div
-                initial={{ opacity: 0 }}
-                animate={{ opacity: 1 }}
-                transition={{ delay: 0.3 }}
-                className="space-y-3 text-muted-foreground"
-              >
-                <p>We don't match on titles or resumes.</p>
-                <p className="font-medium text-foreground">We match on forks already crossed.</p>
-              </motion.div>
-              <motion.div
-                initial={{ opacity: 0 }}
-                animate={{ opacity: 1 }}
-                transition={{ delay: 0.5 }}
-                className="pt-4 space-y-2 text-sm text-muted-foreground/80"
-              >
-                <p>Some conversations are fast.</p>
-                <p>Some change how you think.</p>
-                <p className="pt-2 font-medium text-foreground">We'll respect both. ✨</p>
-              </motion.div>
-            </div>
+            <motion.h2
+              initial={{ opacity: 0, y: 10 }}
+              animate={{ opacity: 1, y: 0 }}
+              transition={{ delay: 0.2 }}
+              className="text-2xl font-semibold"
+            >
+              You're all set!
+            </motion.h2>
+
+            {/* Recap Card */}
+            <RecapCard data={data} />
+
+            <motion.div
+              initial={{ opacity: 0 }}
+              animate={{ opacity: 1 }}
+              transition={{ delay: 0.5 }}
+              className="space-y-2 text-sm text-muted-foreground"
+            >
+              <p>We don't match on titles or resumes.</p>
+              <p className="font-medium text-foreground">We match on forks already crossed. ✨</p>
+            </motion.div>
 
             <motion.div
               initial={{ opacity: 0, y: 20 }}

@@ -11,6 +11,7 @@ import { useToast } from "@/hooks/use-toast";
 // Core components loaded eagerly for initial render
 import IntroCard from "@/components/chat/IntroCard";
 import LearningProgress from "@/components/chat/LearningProgress";
+import WelcomeGreeting from "@/components/chat/WelcomeGreeting";
 
 // Lazy load heavy components that aren't needed immediately
 const UserChatView = lazy(() => import("@/components/chat/UserChatView"));
@@ -1173,8 +1174,26 @@ const Chat = () => {
                       </div>
                     </div>
                   )}
-                  {/* External Match Nudge - shown after greeting for users with complete learning */}
-                  {index === 0 && msg.role === "assistant" && user && learningComplete && !hasShownExternalNudge.current && (
+                  {/* Welcome Greeting with profile summary - shown for users who completed onboarding */}
+                  {index === 0 && msg.role === "assistant" && user && learningComplete && userProfile?.onboarding_context && !hasShownExternalNudge.current && (
+                    <motion.div
+                      initial={{ opacity: 0, y: 10 }}
+                      animate={{ opacity: 1, y: 0 }}
+                      transition={{ delay: 0.3 }}
+                      className="mt-4"
+                    >
+                      <WelcomeGreeting
+                        userName={userProfile?.full_name}
+                        onboardingContext={userProfile?.onboarding_context}
+                        onViewMatches={() => {
+                          hasShownExternalNudge.current = true;
+                          setView("match");
+                        }}
+                      />
+                    </motion.div>
+                  )}
+                  {/* Fallback External Match Nudge - for users without onboarding context */}
+                  {index === 0 && msg.role === "assistant" && user && learningComplete && !userProfile?.onboarding_context && !hasShownExternalNudge.current && (
                     <Suspense fallback={null}>
                       <ExternalMatchNudge
                         onViewMatches={() => {

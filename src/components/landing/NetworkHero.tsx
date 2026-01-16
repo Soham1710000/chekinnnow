@@ -480,23 +480,6 @@ export const NetworkHero = () => {
                   </Button>
                 </motion.div>
                 
-                {/* Waitlist counter with live indicator */}
-                <motion.div
-                  initial={{ opacity: 0 }}
-                  animate={{ opacity: 1 }}
-                  transition={{ delay: 0.5 }}
-                  className="flex items-center justify-center lg:justify-start gap-2 text-gray-500 w-full"
-                >
-                  {/* Pulsing live dot */}
-                  <span className="relative flex h-2 w-2">
-                    <span className="animate-ping absolute inline-flex h-full w-full rounded-full bg-green-400 opacity-75"></span>
-                    <span className="relative inline-flex rounded-full h-2 w-2 bg-green-500"></span>
-                  </span>
-                  <Users className="w-3 h-3 sm:w-3.5 sm:h-3.5" />
-                  <span className="text-[11px] sm:text-xs md:text-sm font-medium">
-                    {waitlistCount.toLocaleString()}+ people in beta
-                  </span>
-                </motion.div>
               </div>
               
             </motion.div>

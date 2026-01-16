@@ -441,8 +441,25 @@ const Chat = () => {
       // Check if we have local messages to migrate
       if (localMessages.length > 0) {
         await migrateLocalMessages();
+      } else {
+        // Create initial greeting for authenticated users so WelcomeGreeting can display
+        const greetingMessage: Message = {
+          id: `greeting-${Date.now()}`,
+          role: "assistant",
+          content: "Welcome back! I've captured your context from onboarding.",
+          created_at: new Date().toISOString(),
+          message_type: "greeting",
+          metadata: null,
+        };
+        // Save to DB so it persists
+        await supabase.from("chat_messages").insert({
+          user_id: user.id,
+          role: greetingMessage.role,
+          content: greetingMessage.content,
+          message_type: greetingMessage.message_type,
+        });
+        setMessages([greetingMessage]);
       }
-      // No initial bot greeting needed - WelcomeGreeting component handles this
     } else {
       setMessages(data as Message[]);
     }

@@ -1,5 +1,5 @@
 import { motion } from "framer-motion";
-import { Sparkles } from "lucide-react";
+import { Sparkles, Target, Lightbulb } from "lucide-react";
 
 interface OnboardingContext {
   ask_type?: string;
@@ -11,92 +11,105 @@ interface OnboardingContext {
   depth_input_3?: string;
 }
 
+interface ProfileSummary {
+  headline?: string;
+  narrative?: string;
+  seeking?: string;
+  decisionContext?: string;
+}
+
+interface AiInsights {
+  profileSummary?: ProfileSummary;
+}
+
 interface WelcomeGreetingProps {
   userName?: string;
   onboardingContext?: OnboardingContext;
+  aiInsights?: AiInsights;
   onViewMatches: () => void;
 }
 
-const ASK_LABELS: Record<string, string> = {
-  clarity: "clarity on a decision",
-  direction: "direction on what's next",
-  opportunity: "new opportunities",
-  pressure_testing: "feedback on a decision",
-  help_others: "ways to help others",
-};
-
-const LIVED_CONTEXT_LABELS: Record<string, string> = {
-  hired_mid_senior: "hiring",
-  raising_capital: "fundraising",
-  job_vs_startup: "job vs startup",
-  career_switch: "career transitions",
-  building_product: "0→1 building",
-  hiring_early: "early hiring",
-  decision_paralysis: "tough decisions",
-};
-
-const WelcomeGreeting = ({ userName, onboardingContext, onViewMatches }: WelcomeGreetingProps) => {
-  const askType = onboardingContext?.ask_type;
-  const livedContexts = onboardingContext?.lived_context || [];
+const WelcomeGreeting = ({ userName, onboardingContext, aiInsights, onViewMatches }: WelcomeGreetingProps) => {
+  const firstName = userName?.split(' ')[0];
   const depthInput1 = onboardingContext?.depth_input_1;
+  const depthInput2 = onboardingContext?.depth_input_2;
+  
+  // Get AI-generated insights if available
+  const profileSummary = aiInsights?.profileSummary;
+  const hasAiSummary = profileSummary?.narrative || profileSummary?.seeking;
 
-  // Build a concise summary
-  const buildSummary = () => {
-    const parts: string[] = [];
-    
-    // What they're seeking
-    if (askType && ASK_LABELS[askType]) {
-      parts.push(`seeking ${ASK_LABELS[askType]}`);
+  // Build personalized understanding text
+  const buildUnderstandingText = () => {
+    if (profileSummary?.narrative) {
+      // Use AI-generated narrative (truncate if too long)
+      const narrative = profileSummary.narrative;
+      return narrative.length > 200 ? narrative.substring(0, 200) + '...' : narrative;
     }
     
-    // Their lived experience
-    const relevantContexts = livedContexts
-      .filter(ctx => LIVED_CONTEXT_LABELS[ctx])
-      .map(ctx => LIVED_CONTEXT_LABELS[ctx])
-      .slice(0, 2);
-    
-    if (relevantContexts.length > 0) {
-      parts.push(`with experience in ${relevantContexts.join(" & ")}`);
+    // Fallback to depth inputs
+    if (depthInput1) {
+      return depthInput1;
     }
     
-    return parts.join(", ");
+    return null;
   };
 
-  const summary = buildSummary();
-  const firstName = userName?.split(' ')[0];
+  const understandingText = buildUnderstandingText();
 
   return (
     <motion.div
       initial={{ opacity: 0, y: 10 }}
       animate={{ opacity: 1, y: 0 }}
-      className="max-w-[85%]"
+      className="max-w-[88%]"
     >
-      <div className="bg-gradient-to-br from-primary/5 to-primary/10 border border-primary/20 rounded-2xl p-4">
-        <div className="flex items-start gap-3">
-          <div className="w-8 h-8 rounded-full bg-primary/10 flex items-center justify-center shrink-0">
+      <div className="bg-gradient-to-br from-primary/5 via-primary/8 to-primary/5 border border-primary/20 rounded-2xl p-5 space-y-4">
+        {/* Header */}
+        <div className="flex items-center gap-2">
+          <div className="w-8 h-8 rounded-full bg-primary/15 flex items-center justify-center">
             <Sparkles className="w-4 h-4 text-primary" />
           </div>
+          <p className="font-semibold text-primary">
+            Hey{firstName ? `, ${firstName}` : ''}! I'm Chek.
+          </p>
+        </div>
+
+        {/* What we understand */}
+        {understandingText && (
           <div className="space-y-2">
-            <p className="font-semibold text-sm text-primary">
-              Hey{firstName ? `, ${firstName}` : ''}! I'm Chek.
-            </p>
-            
-            {summary && (
-              <p className="text-sm text-muted-foreground">
-                Got it — you're <span className="text-foreground font-medium">{summary}</span>.
-              </p>
-            )}
-            
-            {depthInput1 && (
-              <p className="text-sm text-muted-foreground">
-                Working through: <span className="text-foreground">"{depthInput1}"</span>
-              </p>
-            )}
-            
-            <p className="text-xs text-muted-foreground pt-1">
-              Finding you the right person to talk to. Check the match tab for updates.
+            <div className="flex items-center gap-2 text-xs font-medium text-muted-foreground">
+              <Target className="w-3.5 h-3.5" />
+              <span>What I understand about your situation</span>
+            </div>
+            <p className="text-sm text-foreground leading-relaxed pl-5">
+              "{understandingText}"
             </p>
           </div>
+        )}
+
+        {/* What they're seeking - from AI or depth_input_2 */}
+        {(profileSummary?.seeking || depthInput2) && (
+          <div className="space-y-2">
+            <div className="flex items-center gap-2 text-xs font-medium text-muted-foreground">
+              <Lightbulb className="w-3.5 h-3.5" />
+              <span>What would help most</span>
+            </div>
+            <p className="text-sm text-foreground leading-relaxed pl-5">
+              {profileSummary?.seeking || depthInput2}
+            </p>
+          </div>
+        )}
+
+        {/* CTA */}
+        <div className="pt-2 border-t border-primary/10">
+          <p className="text-xs text-muted-foreground">
+            I'm finding the right person who's been exactly where you are. 
+            <button 
+              onClick={onViewMatches}
+              className="text-primary font-medium ml-1 hover:underline"
+            >
+              Check matches →
+            </button>
+          </p>
         </div>
       </div>
     </motion.div>

@@ -128,18 +128,7 @@ const Chat = () => {
   const isUPSC = source === "upsc";
   const isCAT = source === "cat";
   
-  const [localMessages, setLocalMessages] = useState<Message[]>(() => [{
-    id: `local-${Date.now()}`,
-    role: "assistant" as const,
-    content: isUPSCSource() 
-      ? "Hey! I know the UPSC journey can feel overwhelming. Tell me what you're struggling with — I'll connect you with someone who's been through it."
-      : isCATSource()
-      ? "Hey! CAT prep can be intense. Tell me what's on your mind — I'll connect you with someone who's been through it."
-      : "Hey! A few quick questions and I'll find you the right person. What brings you here?",
-    message_type: "text",
-    metadata: {},
-    created_at: new Date().toISOString(),
-  }]); // Pre-populate for instant load
+  const [localMessages, setLocalMessages] = useState<Message[]>([]); // Start empty, greeting handled by WelcomeGreeting component
   const [introductions, setIntroductions] = useState<Introduction[]>([]);
   const [unreadCounts, setUnreadCounts] = useState<Record<string, number>>({});
   const [input, setInput] = useState("");
@@ -452,38 +441,8 @@ const Chat = () => {
       // Check if we have local messages to migrate
       if (localMessages.length > 0) {
         await migrateLocalMessages();
-      } else {
-        // Fetch personalized greeting for users who completed onboarding
-        try {
-          const response = await fetch(CHAT_URL, {
-            method: "POST",
-            headers: {
-              "Content-Type": "application/json",
-              Authorization: `Bearer ${import.meta.env.VITE_SUPABASE_PUBLISHABLE_KEY}`,
-            },
-            body: JSON.stringify({
-              generateGreeting: true,
-              userId: user.id,
-            }),
-          });
-          
-          if (response.ok) {
-            const result = await response.json();
-            const greeting = result.greeting || "Hey! A few quick questions and I'll find you the right person. What brings you here?";
-            await sendBotMessage(greeting);
-            
-            // Show finding match card if user completed onboarding (personalized greeting was generated)
-            if (result.greeting && learningComplete) {
-              setTimeout(() => setShowFindingMatch(true), 800);
-            }
-          } else {
-            await sendBotMessage("Hey! A few quick questions and I'll find you the right person. What brings you here?");
-          }
-        } catch (err) {
-          console.error("Error fetching personalized greeting:", err);
-          await sendBotMessage("Hey! A few quick questions and I'll find you the right person. What brings you here?");
-        }
       }
+      // No initial bot greeting needed - WelcomeGreeting component handles this
     } else {
       setMessages(data as Message[]);
     }

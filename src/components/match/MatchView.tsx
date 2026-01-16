@@ -330,11 +330,6 @@ export function MatchView({ userProfile, onboardingContext, autoSearch = false }
           )}
         </div>
 
-        {result.reasoning && (
-          <div className="text-xs text-muted-foreground bg-muted/50 rounded-lg p-3">
-            <strong>AI Reasoning:</strong> {result.reasoning}
-          </div>
-        )}
       </div>
     );
   }

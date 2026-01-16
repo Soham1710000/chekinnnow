@@ -3,7 +3,7 @@ import { motion, AnimatePresence } from "framer-motion";
 import { Button } from "@/components/ui/button";
 import { Textarea } from "@/components/ui/textarea";
 import { Input } from "@/components/ui/input";
-import { ArrowRight, Check, Sparkles, Heart, Zap, Target, Users, Lightbulb, Shield, Clock } from "lucide-react";
+import { ArrowRight, Check, Sparkles } from "lucide-react";
 import { RadioGroup, RadioGroupItem } from "@/components/ui/radio-group";
 import { Label } from "@/components/ui/label";
 import { Checkbox } from "@/components/ui/checkbox";
@@ -32,75 +32,65 @@ interface OnboardingFlowProps {
 
 type Step = 1 | 2 | 3 | 4 | 5 | 6 | 7;
 
-// Step configuration for progress display
-const STEP_CONFIG = [
-  { id: 1, icon: Lightbulb, label: "Mindset" },
-  { id: 2, icon: Target, label: "Intent" },
-  { id: 3, icon: Users, label: "Experience" },
-  { id: 4, icon: Zap, label: "Details" },
-  { id: 5, icon: Heart, label: "Stakes" },
-  { id: 6, icon: Shield, label: "Context" },
-  { id: 7, icon: Sparkles, label: "Ready" },
-];
 
 // Celebration messages for transitions
 const CELEBRATION_MESSAGES = [
-  "Nice! You think things through 🧠",
-  "Got it! Let's find your people ✨",
-  "Love that honesty 💪",
-  "Perfect, almost there! 🎯",
-  "This is helpful 🙌",
-  "Last one, you're doing great! 🚀",
+  "Nice! You think things through",
+  "Got it! Let's find your people",
+  "Love that honesty",
+  "Perfect, almost there!",
+  "This is helpful",
+  "Last one, you're doing great!",
 ];
 
 const DECISION_POSTURES = [
-  { id: "talk_to_people", label: "Talk to people who've been there", emoji: "🗣️" },
-  { id: "deep_research", label: "Go deep on research first", emoji: "📚" },
-  { id: "move_fast", label: "Trust my gut and move fast", emoji: "⚡" },
-  { id: "sit_with_it", label: "Let it marinate until clarity hits", emoji: "🧘" },
-  { id: "help_others_decide", label: "Help others before deciding for myself", emoji: "🤝" },
+  { id: "talk_to_people", label: "Talk to people who've been there" },
+  { id: "deep_research", label: "Go deep on research first" },
+  { id: "move_fast", label: "Trust my gut and move fast" },
+  { id: "sit_with_it", label: "Let it marinate until clarity hits" },
+  { id: "help_others_decide", label: "Help others before deciding for myself" },
 ];
 
 const ASK_TYPES = [
-  { id: "clarity", label: "Clarity", description: "too many good options, brain is stuck", emoji: "🌀" },
-  { id: "direction", label: "Direction", description: "what should I actually do next?", emoji: "🧭" },
-  { id: "opportunity", label: "Opportunity", description: "exploring what's even possible", emoji: "🔮" },
-  { id: "pressure_testing", label: "Pressure testing", description: "I have a lean, poke holes in it", emoji: "🎯" },
-  { id: "help_others", label: "Here to give back", description: "I've lived this, happy to share", emoji: "💫" },
+  { id: "clarity", label: "Clarity", description: "too many good options, brain is stuck" },
+  { id: "direction", label: "Direction", description: "what should I actually do next?" },
+  { id: "opportunity", label: "Opportunity", description: "exploring what's even possible" },
+  { id: "pressure_testing", label: "Pressure testing", description: "I have a lean, poke holes in it" },
+  { id: "help_others", label: "Here to give back", description: "I've lived this, happy to share" },
 ];
 
 const LIVED_CONTEXTS = [
-  { id: "hired_mid_senior", label: "Getting hired at a mid–senior level", emoji: "💼" },
-  { id: "raising_capital", label: "Raising capital / pitching investors", emoji: "💰" },
-  { id: "job_vs_startup", label: "Choosing between job vs startup", emoji: "🔀" },
-  { id: "career_switch", label: "Switching careers or functions", emoji: "🔄" },
-  { id: "building_product", label: "Building a product from zero", emoji: "🛠️" },
-  { id: "hiring_early", label: "Hiring early team members", emoji: "👥" },
-  { id: "decision_paralysis", label: "Navigating long decision paralysis", emoji: "😵‍💫" },
+  { id: "hired_mid_senior", label: "Getting hired at a mid–senior level" },
+  { id: "raising_capital", label: "Raising capital / pitching investors" },
+  { id: "job_vs_startup", label: "Choosing between job vs startup" },
+  { id: "career_switch", label: "Switching careers or functions" },
+  { id: "building_product", label: "Building a product from zero" },
+  { id: "hiring_early", label: "Hiring early team members" },
+  { id: "decision_paralysis", label: "Navigating long decision paralysis" },
 ];
 
 const HELP_STYLES = [
-  { id: "practical_steps", label: "Practical steps", emoji: "📋" },
-  { id: "big_picture", label: "Big-picture framing", emoji: "🖼️" },
-  { id: "emotional_grounding", label: "Emotional grounding", emoji: "🫂" },
-  { id: "brutal_truth", label: "Brutal truth", emoji: "💊" },
-  { id: "pattern_recognition", label: "Pattern recognition", emoji: "🔍" },
+  { id: "practical_steps", label: "Practical steps" },
+  { id: "big_picture", label: "Big-picture framing" },
+  { id: "emotional_grounding", label: "Emotional grounding" },
+  { id: "brutal_truth", label: "Brutal truth" },
+  { id: "pattern_recognition", label: "Pattern recognition" },
 ];
 
 const DECISION_WEIGHTS = [
-  { id: "light", label: "Light", description: "just poking around", emoji: "🍃" },
-  { id: "medium", label: "Medium", description: "affects the next few months", emoji: "⚖️" },
-  { id: "heavy", label: "Heavy", description: "could shift my whole trajectory", emoji: "🏔️" },
-  { id: "very_heavy", label: "Very heavy", description: "impacts people beyond me", emoji: "🌊" },
+  { id: "light", label: "Light", description: "just poking around" },
+  { id: "medium", label: "Medium", description: "affects the next few months" },
+  { id: "heavy", label: "Heavy", description: "could shift my whole trajectory" },
+  { id: "very_heavy", label: "Very heavy", description: "impacts people beyond me" },
 ];
 
 const CONTEXT_CONSTRAINTS = [
-  { id: "time_pressure", label: "Time pressure", emoji: "⏰" },
-  { id: "money_runway", label: "Money / runway", emoji: "💸" },
-  { id: "location", label: "Location constraints", emoji: "📍" },
-  { id: "confidence", label: "Confidence or self-doubt", emoji: "🎭" },
-  { id: "missing_info", label: "Missing information", emoji: "❓" },
-  { id: "limited_network", label: "Limited network", emoji: "🔗" },
+  { id: "time_pressure", label: "Time pressure" },
+  { id: "money_runway", label: "Money / runway" },
+  { id: "location", label: "Location constraints" },
+  { id: "confidence", label: "Confidence or self-doubt" },
+  { id: "missing_info", label: "Missing information" },
+  { id: "limited_network", label: "Limited network" },
 ];
 
 // Ask-Specific Depth Input configurations
@@ -120,7 +110,7 @@ const DEPTH_INPUT_CONFIGS: DepthInputConfig[] = [
     trigger: (askType, livedContext) =>
       ["clarity", "direction", "pressure_testing"].includes(askType) &&
       livedContext.includes("hired_mid_senior"),
-    title: "Let's get specific about your search 🎯",
+    title: "Let's get specific about your search",
     subtitle: "A few words is enough — this helps us find the right people.",
     prompts: [
       {
@@ -144,7 +134,7 @@ const DEPTH_INPUT_CONFIGS: DepthInputConfig[] = [
     trigger: (askType, livedContext) =>
       ["pressure_testing", "direction"].includes(askType) &&
       livedContext.includes("raising_capital"),
-    title: "Tell us about your raise 💰",
+    title: "Tell us about your raise",
     subtitle: "We'll find people who've been exactly here.",
     prompts: [
       {
@@ -168,7 +158,7 @@ const DEPTH_INPUT_CONFIGS: DepthInputConfig[] = [
     trigger: (askType, livedContext) =>
       ["clarity", "pressure_testing"].includes(askType) &&
       (livedContext.includes("job_vs_startup") || livedContext.includes("hiring_early")),
-    title: "About partnerships 🤝",
+    title: "About partnerships",
     subtitle: "Finding the right people to build with is everything.",
     prompts: [
       {
@@ -192,7 +182,7 @@ const DEPTH_INPUT_CONFIGS: DepthInputConfig[] = [
     trigger: (askType, livedContext) =>
       ["pressure_testing", "opportunity"].includes(askType) &&
       livedContext.includes("building_product"),
-    title: "About your product 🛠️",
+    title: "About your product",
     subtitle: "Let's understand where you are.",
     prompts: [
       {
@@ -216,7 +206,7 @@ const DEPTH_INPUT_CONFIGS: DepthInputConfig[] = [
     trigger: (askType, livedContext) =>
       ["direction", "pressure_testing"].includes(askType) &&
       livedContext.includes("hired_mid_senior"),
-    title: "About your interview 💼",
+    title: "About your interview",
     subtitle: "Let's find people who know this company/role.",
     prompts: [
       {
@@ -283,74 +273,34 @@ const triggerConfetti = () => {
   fire(0.1, { spread: 120, startVelocity: 45 });
 };
 
-// Playful progress component
-const PlayfulProgress = ({ currentStep, totalSteps, hasDepthInputs }: { 
+// Simple step indicator (just dots)
+const SimpleProgress = ({ currentStep, totalSteps }: { 
   currentStep: number; 
   totalSteps: number;
-  hasDepthInputs: boolean;
 }) => {
-  const visibleSteps = hasDepthInputs 
-    ? STEP_CONFIG 
-    : STEP_CONFIG.filter(s => s.id !== 4);
-
-  const timeEstimate = TIME_ESTIMATES[currentStep] || "";
-
   return (
-    <div className="flex flex-col items-center gap-3">
-      <div className="flex items-center justify-center gap-2">
-        {visibleSteps.map((stepConfig, index) => {
-          const adjustedCurrent = hasDepthInputs 
-            ? currentStep 
-            : currentStep > 3 ? currentStep + 1 : currentStep;
-          
-          const isCompleted = adjustedCurrent > stepConfig.id;
-          const isCurrent = adjustedCurrent === stepConfig.id;
-          const Icon = stepConfig.icon;
+    <div className="flex items-center gap-1.5">
+      {Array.from({ length: totalSteps }).map((_, index) => {
+        const stepNum = index + 1;
+        const isCompleted = currentStep > stepNum;
+        const isCurrent = currentStep === stepNum;
 
-          return (
-            <motion.div
-              key={stepConfig.id}
-              className="flex flex-col items-center"
-              initial={{ opacity: 0, y: -10 }}
-              animate={{ opacity: 1, y: 0 }}
-              transition={{ delay: index * 0.05 }}
-            >
-              <motion.div
-                className={`w-10 h-10 rounded-full flex items-center justify-center transition-all duration-300 ${
-                  isCompleted 
-                    ? "bg-primary text-primary-foreground" 
-                    : isCurrent 
-                      ? "bg-primary/20 text-primary border-2 border-primary" 
-                      : "bg-muted text-muted-foreground"
-                }`}
-                animate={isCurrent ? { scale: [1, 1.1, 1] } : {}}
-                transition={{ repeat: isCurrent ? Infinity : 0, duration: 2 }}
-              >
-                {isCompleted ? (
-                  <Check className="w-4 h-4" />
-                ) : (
-                  <Icon className="w-4 h-4" />
-                )}
-              </motion.div>
-              <span className={`text-[10px] mt-1 font-medium ${
-                isCurrent ? "text-primary" : "text-muted-foreground"
-              }`}>
-                {stepConfig.label}
-              </span>
-            </motion.div>
-          );
-        })}
-      </div>
-      {/* Time estimate */}
-      <motion.div
-        key={currentStep}
-        initial={{ opacity: 0 }}
-        animate={{ opacity: 1 }}
-        className="flex items-center gap-1.5 text-xs text-muted-foreground"
-      >
-        <Clock className="w-3 h-3" />
-        <span>{timeEstimate}</span>
-      </motion.div>
+        return (
+          <motion.div
+            key={stepNum}
+            initial={{ opacity: 0, scale: 0.8 }}
+            animate={{ opacity: 1, scale: 1 }}
+            transition={{ delay: index * 0.05 }}
+            className={`w-2 h-2 rounded-full transition-all duration-300 ${
+              isCompleted 
+                ? "bg-primary" 
+                : isCurrent 
+                  ? "bg-primary/60 ring-2 ring-primary/30" 
+                  : "bg-muted-foreground/30"
+            }`}
+          />
+        );
+      })}
     </div>
   );
 };
@@ -376,11 +326,9 @@ const CelebrationToast = ({ message, show }: { message: string; show: boolean })
 // Recap Card component for final step
 const RecapCard = ({ data }: { data: OnboardingData }) => {
   const getAskLabel = () => ASK_TYPES.find(a => a.id === data.ask_type)?.label || "";
-  const getPostureEmoji = () => DECISION_POSTURES.find(p => p.id === data.decision_posture)?.emoji || "";
+  const getPostureLabel = () => DECISION_POSTURES.find(p => p.id === data.decision_posture)?.label || "";
   const getWeightLabel = () => DECISION_WEIGHTS.find(w => w.id === data.decision_weight)?.label || "";
-  const getLivedContextEmojis = () => data.lived_context.map(id => 
-    LIVED_CONTEXTS.find(c => c.id === id)?.emoji || ""
-  ).join(" ");
+  const getLivedContextCount = () => data.lived_context.length;
 
   return (
     <motion.div
@@ -397,7 +345,7 @@ const RecapCard = ({ data }: { data: OnboardingData }) => {
         </div>
         <div className="flex items-center justify-between">
           <span className="text-sm text-muted-foreground">Decision style</span>
-          <span className="text-lg">{getPostureEmoji()}</span>
+          <span className="text-sm font-medium truncate max-w-[180px]">{getPostureLabel()}</span>
         </div>
         <div className="flex items-center justify-between">
           <span className="text-sm text-muted-foreground">Stakes</span>
@@ -405,8 +353,8 @@ const RecapCard = ({ data }: { data: OnboardingData }) => {
         </div>
         {data.lived_context.length > 0 && (
           <div className="flex items-center justify-between">
-            <span className="text-sm text-muted-foreground">Experience</span>
-            <span className="text-lg">{getLivedContextEmojis()}</span>
+            <span className="text-sm text-muted-foreground">Experience areas</span>
+            <span className="text-sm font-medium">{getLivedContextCount()} selected</span>
           </div>
         )}
       </div>
@@ -548,16 +496,15 @@ const OnboardingFlow = ({ onComplete }: OnboardingFlowProps) => {
       {/* Celebration Toast */}
       <CelebrationToast message={celebrationMessage} show={showCelebration} />
 
-      {/* Playful Progress indicator */}
+      {/* Simple Progress indicator */}
       <motion.div
         initial={{ opacity: 0, y: -20 }}
         animate={{ opacity: 1, y: 0 }}
         className="fixed top-6 left-1/2 -translate-x-1/2 z-10"
       >
-        <PlayfulProgress 
+        <SimpleProgress 
           currentStep={step} 
           totalSteps={getTotalSteps()} 
-          hasDepthInputs={hasDepthInputs}
         />
       </motion.div>
 
@@ -572,14 +519,6 @@ const OnboardingFlow = ({ onComplete }: OnboardingFlowProps) => {
             className="max-w-md w-full space-y-6"
           >
             <div className="space-y-3 text-center">
-              <motion.div
-                initial={{ scale: 0 }}
-                animate={{ scale: 1 }}
-                transition={{ type: "spring", delay: 0.1 }}
-                className="text-4xl mb-4"
-              >
-                🤔
-              </motion.div>
               <h2 className="text-2xl font-semibold">
                 Hey! When a decision really matters, what do you usually do first?
               </h2>
@@ -608,7 +547,6 @@ const OnboardingFlow = ({ onComplete }: OnboardingFlowProps) => {
                     }`}
                     onClick={() => setData((prev) => ({ ...prev, decision_posture: posture.id }))}
                   >
-                    <span className="text-xl">{posture.emoji}</span>
                     <RadioGroupItem value={posture.id} id={posture.id} className="hidden" />
                     <Label htmlFor={posture.id} className="flex-1 cursor-pointer font-medium">
                       {posture.label}
@@ -654,14 +592,6 @@ const OnboardingFlow = ({ onComplete }: OnboardingFlowProps) => {
             className="max-w-md w-full space-y-6"
           >
             <div className="space-y-3 text-center">
-              <motion.div
-                initial={{ scale: 0 }}
-                animate={{ scale: 1 }}
-                transition={{ type: "spring", delay: 0.1 }}
-                className="text-4xl mb-4"
-              >
-                ✨
-              </motion.div>
               <h2 className="text-2xl font-semibold">
                 What brings you to ChekInn today?
               </h2>
@@ -690,7 +620,6 @@ const OnboardingFlow = ({ onComplete }: OnboardingFlowProps) => {
                     }`}
                     onClick={() => setData((prev) => ({ ...prev, ask_type: ask.id }))}
                   >
-                    <span className="text-xl">{ask.emoji}</span>
                     <RadioGroupItem value={ask.id} id={ask.id} className="hidden" />
                     <Label htmlFor={ask.id} className="flex-1 cursor-pointer">
                       <span className="font-medium">{ask.label}</span>
@@ -731,14 +660,6 @@ const OnboardingFlow = ({ onComplete }: OnboardingFlowProps) => {
             className="max-w-md w-full space-y-6 max-h-[80vh] overflow-y-auto"
           >
             <div className="space-y-3 text-center">
-              <motion.div
-                initial={{ scale: 0 }}
-                animate={{ scale: 1 }}
-                transition={{ type: "spring", delay: 0.1 }}
-                className="text-4xl mb-4"
-              >
-                🎒
-              </motion.div>
               <h2 className="text-2xl font-semibold">
                 What have you already lived through?
               </h2>
@@ -763,7 +684,6 @@ const OnboardingFlow = ({ onComplete }: OnboardingFlowProps) => {
                     }`}
                     onClick={() => toggleArrayItem("lived_context", ctx.id)}
                   >
-                    <span className="text-xl">{ctx.emoji}</span>
                     <Checkbox
                       checked={data.lived_context.includes(ctx.id)}
                       onCheckedChange={() => toggleArrayItem("lived_context", ctx.id)}
@@ -803,7 +723,6 @@ const OnboardingFlow = ({ onComplete }: OnboardingFlowProps) => {
                       }`}
                       onClick={() => toggleArrayItem("followup_context", ctx.id)}
                     >
-                      <span className="text-lg">{ctx.emoji}</span>
                       <Checkbox
                         checked={data.followup_context.includes(ctx.id)}
                         onCheckedChange={() => toggleArrayItem("followup_context", ctx.id)}
@@ -834,13 +753,12 @@ const OnboardingFlow = ({ onComplete }: OnboardingFlowProps) => {
                         <button
                           key={style.id}
                           onClick={() => setData((prev) => ({ ...prev, help_style: style.id }))}
-                          className={`px-4 py-2 rounded-full text-sm font-medium transition-all flex items-center gap-2 ${
+                          className={`px-4 py-2 rounded-full text-sm font-medium transition-all ${
                             data.help_style === style.id
                               ? "bg-primary text-primary-foreground"
                               : "bg-muted hover:bg-muted/80"
                           }`}
                         >
-                          <span>{style.emoji}</span>
                           {style.label}
                         </button>
                       ))}
@@ -881,14 +799,6 @@ const OnboardingFlow = ({ onComplete }: OnboardingFlowProps) => {
             className="max-w-md w-full space-y-6"
           >
             <div className="space-y-3 text-center">
-              <motion.div
-                initial={{ scale: 0 }}
-                animate={{ scale: 1 }}
-                transition={{ type: "spring", delay: 0.1 }}
-                className="text-4xl mb-4"
-              >
-                🔍
-              </motion.div>
               <h2 className="text-2xl font-semibold">
                 {activeDepthConfig.title}
               </h2>
@@ -946,14 +856,6 @@ const OnboardingFlow = ({ onComplete }: OnboardingFlowProps) => {
             className="max-w-md w-full space-y-6"
           >
             <div className="space-y-3 text-center">
-              <motion.div
-                initial={{ scale: 0 }}
-                animate={{ scale: 1 }}
-                transition={{ type: "spring", delay: 0.1 }}
-                className="text-4xl mb-4"
-              >
-                ⚖️
-              </motion.div>
               <h2 className="text-2xl font-semibold">
                 How big is this decision, really?
               </h2>
@@ -982,7 +884,6 @@ const OnboardingFlow = ({ onComplete }: OnboardingFlowProps) => {
                     }`}
                     onClick={() => setData((prev) => ({ ...prev, decision_weight: weight.id }))}
                   >
-                    <span className="text-xl">{weight.emoji}</span>
                     <RadioGroupItem value={weight.id} id={weight.id} className="hidden" />
                     <Label htmlFor={weight.id} className="flex-1 cursor-pointer">
                       <span className="font-medium">{weight.label}</span>
@@ -1034,14 +935,6 @@ const OnboardingFlow = ({ onComplete }: OnboardingFlowProps) => {
             className="max-w-md w-full space-y-6"
           >
             <div className="space-y-3 text-center">
-              <motion.div
-                initial={{ scale: 0 }}
-                animate={{ scale: 1 }}
-                transition={{ type: "spring", delay: 0.1 }}
-                className="text-4xl mb-4"
-              >
-                🎯
-              </motion.div>
               <h2 className="text-2xl font-semibold">
                 Any constraints shaping your thinking?
               </h2>
@@ -1058,13 +951,12 @@ const OnboardingFlow = ({ onComplete }: OnboardingFlowProps) => {
                   animate={{ opacity: 1, scale: 1 }}
                   transition={{ delay: 0.1 + index * 0.03 }}
                   onClick={() => toggleArrayItem("context_chips", constraint.id)}
-                  className={`px-4 py-3 rounded-xl text-sm font-medium transition-all flex items-center gap-2 ${
+                  className={`px-4 py-3 rounded-xl text-sm font-medium transition-all ${
                     data.context_chips.includes(constraint.id)
                       ? "bg-primary text-primary-foreground shadow-md"
                       : "bg-muted hover:bg-muted/80"
                   }`}
                 >
-                  <span>{constraint.emoji}</span>
                   {constraint.label}
                 </motion.button>
               ))}
@@ -1089,15 +981,6 @@ const OnboardingFlow = ({ onComplete }: OnboardingFlowProps) => {
             exit={{ opacity: 0, y: -20 }}
             className="max-w-md w-full text-center space-y-6"
           >
-            <motion.div
-              initial={{ scale: 0 }}
-              animate={{ scale: 1 }}
-              transition={{ type: "spring", delay: 0.1 }}
-              className="text-6xl mb-2"
-            >
-              🎉
-            </motion.div>
-
             <motion.h2
               initial={{ opacity: 0, y: 10 }}
               animate={{ opacity: 1, y: 0 }}
@@ -1117,7 +1000,7 @@ const OnboardingFlow = ({ onComplete }: OnboardingFlowProps) => {
               className="space-y-2 text-sm text-muted-foreground"
             >
               <p>We don't match on titles or resumes.</p>
-              <p className="font-medium text-foreground">We match on forks already crossed. ✨</p>
+              <p className="font-medium text-foreground">We match on forks already crossed.</p>
             </motion.div>
 
             <motion.div

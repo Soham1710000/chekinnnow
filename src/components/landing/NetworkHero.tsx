@@ -76,68 +76,68 @@ const profiles = [
   {
     id: 1,
     name: "Rhea",
-    title: "Engineer",
-    bio: "Anyone interviewing for **Amazon SDE II**?",
+    title: "SDE at Microsoft",
+    bio: "Got an offer from a **Series A startup** vs staying at Microsoft — how do people really judge this later?",
     image: rheaImg,
     replyName: "chek",
     replyTitle: "",
-    replyImage: null, // Wave emoji will be used
-    reply: "That's tough. I know someone who just went through it."
+    replyImage: null,
+    reply: "That's a real fork. I know someone who made this exact call."
   },
   {
     id: 2,
     name: "Kushal",
-    title: "UPSC Aspirant",
-    bio: "Anyone who **cleared mains**?",
+    title: "Hiring Manager",
+    bio: "This candidate feels **impressive**, but I've been burned before.",
     image: kushalImg,
     replyName: "chek",
     replyTitle: "",
     replyImage: null,
-    reply: "I hear you. I know someone who's been exactly there."
+    reply: "I hear you. I know someone who's great at reading signals."
   },
   {
     id: 3,
     name: "Arnav",
-    title: "Robotics Student",
-    bio: "Working on a **robotics project** and exploring **US research paths**.",
+    title: "Founder",
+    bio: "We're **post-revenue but small** — do I raise or keep bootstrapping?",
     image: arnavImg,
     replyName: "chek",
     replyTitle: "",
     replyImage: null,
-    reply: "That's exciting. I know someone who can help."
+    reply: "Tough call. I know someone who's been on both sides."
   },
   {
     id: 4,
     name: "Siddharth",
-    title: "College Student",
-    bio: "Built **side projects**, trying to break into **gaming** as an SDE.",
+    title: "Ops at Reliance",
+    bio: "I'm 30 and in ops at Reliance — is switching to **product** unrealistic?",
     image: siddharthImg,
     replyName: "chek",
     replyTitle: "",
     replyImage: null,
-    reply: "I get it. I know someone in the space."
+    reply: "Not at all. I know someone who made this switch."
   },
   {
     id: 5,
     name: "Ishaan",
-    title: "Growth Marketer",
-    bio: "Curious how **brand marketing** works at different stages.",
+    title: "Engineer at Google",
+    bio: "I'm at Google and doing fine, but I feel **weirdly replaceable**.",
     image: ishaanImg,
     replyName: "chek",
     replyTitle: "",
     replyImage: null,
-    reply: "Makes sense. I know someone who's lived this."
+    reply: "That's real. I know someone who felt the same."
   },
   {
     id: 6,
     name: "Aarav",
-    title: "Early Career",
-    bio: "I've been trying to meet people who enjoy **long runs**.",
+    title: "Considering Meesho",
+    bio: "Does this role at **Meesho** actually compound?",
     image: aaravImg,
     replyName: "chek",
     replyTitle: "",
     replyImage: null,
-    reply: "Love that. I know someone who'd vibe with you."
+    reply: "Good question. I know someone inside who can share."
   }
 ];
 

@@ -11,61 +11,18 @@ Deno.serve(async (req) => {
   }
 
   try {
-    // Get the authorization header
-    const authHeader = req.headers.get("authorization");
-    if (!authHeader) {
+    const { password, timeRange, action, user_id, full_name } = await req.json();
+
+    // Verify admin password
+    const adminPassword = Deno.env.get("ADMIN_PASSWORD");
+    if (!adminPassword || password !== adminPassword) {
       return new Response(
-        JSON.stringify({ error: "Missing authorization header" }),
+        JSON.stringify({ error: "Unauthorized" }),
         { status: 401, headers: { ...corsHeaders, "Content-Type": "application/json" } }
       );
     }
 
-    // Create a Supabase client with the user's token to verify their identity
-    const supabaseAuth = createClient(
-      Deno.env.get("SUPABASE_URL")!,
-      Deno.env.get("SUPABASE_ANON_KEY")!,
-      {
-        global: {
-          headers: { Authorization: authHeader },
-        },
-      }
-    );
-
-    // Get the authenticated user
-    const { data: { user }, error: userError } = await supabaseAuth.auth.getUser();
-    if (userError || !user) {
-      console.error("Auth error:", userError);
-      return new Response(
-        JSON.stringify({ error: "Invalid or expired token" }),
-        { status: 401, headers: { ...corsHeaders, "Content-Type": "application/json" } }
-      );
-    }
-
-    // Verify user has admin role using the has_role function
-    const { data: isAdmin, error: roleError } = await supabaseAuth.rpc("has_role", {
-      _user_id: user.id,
-      _role: "admin"
-    });
-
-    if (roleError) {
-      console.error("Role check error:", roleError);
-      return new Response(
-        JSON.stringify({ error: "Failed to verify admin role" }),
-        { status: 500, headers: { ...corsHeaders, "Content-Type": "application/json" } }
-      );
-    }
-
-    if (!isAdmin) {
-      console.error("User is not admin:", user.id);
-      return new Response(
-        JSON.stringify({ error: "Forbidden: Admin role required" }),
-        { status: 403, headers: { ...corsHeaders, "Content-Type": "application/json" } }
-      );
-    }
-
-    console.log("Admin verified:", user.id);
-
-    const { timeRange, action, user_id, full_name } = await req.json();
+    console.log("Admin password verified");
 
     // Use service role to bypass RLS for admin operations
     const supabase = createClient(

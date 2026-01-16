@@ -206,10 +206,11 @@ const AdminDashboard = () => {
   const [searchTerm, setSearchTerm] = useState("");
   const [loading, setLoading] = useState(true);
 
-  // Admin unlock (one-time). If the signed-in user has admin role, no password needed.
-  const [adminPasswordInput, setAdminPasswordInput] = useState("");
-  const [adminUnlocking, setAdminUnlocking] = useState(false);
-  const [adminUnlockError, setAdminUnlockError] = useState<string | null>(null);
+  // Password gate
+  const [passwordEntered, setPasswordEntered] = useState(false);
+  const [passwordInput, setPasswordInput] = useState("");
+  const [adminPassword, setAdminPassword] = useState("");
+  const [passwordError, setPasswordError] = useState(false);
 
   // Create intro modal
   const [showCreateIntro, setShowCreateIntro] = useState(false);
@@ -243,67 +244,46 @@ const AdminDashboard = () => {
   // Profile summary generation
   const [generatingSummary, setGeneratingSummary] = useState(false);
 
-  const handleUnlockAdmin = async (e: React.FormEvent) => {
+  const handlePasswordSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
-    setAdminUnlockError(null);
-    setAdminUnlocking(true);
-
+    setPasswordError(false);
+    
     try {
-      const { data, error } = await supabase.functions.invoke("admin-grant-role", {
-        body: { password: adminPasswordInput },
+      const { data, error } = await supabase.functions.invoke("admin-data", {
+        body: { password: passwordInput, timeRange: funnelTimeRange },
       });
-
-      if (error) throw error;
-      if (data?.error) throw new Error(data.error);
-
-      toast({
-        title: "Admin unlocked",
-        description: "This account now has access to the dashboard.",
-      });
-
-      await checkAdminStatus(true);
-    } catch (err: any) {
-      setAdminUnlockError(err?.message || "Failed to unlock admin access");
-    } finally {
-      setAdminUnlocking(false);
-    }
-  };
-
-  const checkAdminStatus = async (shouldLoadData = false) => {
-    if (!user) {
-      setIsAdmin(false);
-      setCheckingAdmin(false);
-      return;
-    }
-
-    const { data, error } = await supabase.rpc("has_role", {
-      _user_id: user.id,
-      _role: "admin",
-    });
-
-    if (error) {
-      console.error("Error checking admin status:", error);
-      setCheckingAdmin(false);
-      return;
-    }
-
-    setIsAdmin(!!data);
-    setCheckingAdmin(false);
-
-    if (data && shouldLoadData) {
-      loadData();
+      
+      if (error || data?.error) {
+        setPasswordError(true);
+        return;
+      }
+      
+      setAdminPassword(passwordInput);
+      setPasswordEntered(true);
+      setProfiles(data.profiles || []);
+      setIntroductions(data.introductions || []);
+      setFunnelStats(data.funnelStats || null);
+      setUpscStats(data.upscStats || null);
+      setCatStats(data.catStats || null);
+      setMainStats(data.mainStats || null);
+      setRecentEvents(data.recentEvents || []);
+      setLeads(data.leads || []);
+      setEngagementMetrics(data.engagementMetrics || null);
+      setLoading(false);
+    } catch {
+      setPasswordError(true);
     }
   };
 
   const loadData = async (timeRange?: number) => {
+    if (!adminPassword) return;
     setLoading(true);
     try {
       const { data, error } = await supabase.functions.invoke("admin-data", {
-        body: { timeRange: timeRange || funnelTimeRange },
+        body: { password: adminPassword, timeRange: timeRange || funnelTimeRange },
       });
 
       if (error) throw error;
-      if (data?.error) throw new Error(data.error);
 
       setProfiles(data.profiles || []);
       setIntroductions(data.introductions || []);
@@ -325,13 +305,6 @@ const AdminDashboard = () => {
       setLoading(false);
     }
   };
-
-  useEffect(() => {
-    if (authLoading) return;
-    setCheckingAdmin(true);
-    checkAdminStatus(true);
-    // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [authLoading, user?.id]);
 
   const handleTimeRangeChange = (hours: number) => {
     setFunnelTimeRange(hours);

@@ -13,6 +13,7 @@ import { useFunnelTracking } from "@/hooks/useFunnelTracking";
 // Lazy load onboarding components
 const OnboardingFlow = lazy(() => import("@/components/onboarding/OnboardingFlow"));
 
+const nameSchema = z.string().min(2, "Name must be at least 2 characters").max(100, "Name must be less than 100 characters");
 const emailSchema = z.string().email("Please enter a valid email");
 const passwordSchema = z.string().min(6, "Password must be at least 6 characters");
 const linkedinUrlSchema = z.string()
@@ -36,6 +37,7 @@ const Auth = () => {
   const [forgotStep, setForgotStep] = useState<"request" | "reset">("request");
   const [email, setEmail] = useState("");
   const [password, setPassword] = useState("");
+  const [fullName, setFullName] = useState("");
   const [linkedinUrl, setLinkedinUrl] = useState("");
   const [tempPassword, setTempPassword] = useState("");
   const [newPassword, setNewPassword] = useState("");
@@ -186,6 +188,9 @@ const Auth = () => {
     setLoading(true);
 
     try {
+      if (isSignUp) {
+        nameSchema.parse(fullName);
+      }
       emailSchema.parse(email);
       passwordSchema.parse(password);
       if (isSignUp && linkedinUrl) {
@@ -210,6 +215,7 @@ const Auth = () => {
         options: {
           emailRedirectTo: `${window.location.origin}/auth`,
           data: {
+            full_name: fullName,
             linkedin_url: linkedinUrl || null,
           },
         },
@@ -248,9 +254,10 @@ const Auth = () => {
         }
       }
 
-      // Update profile with LinkedIn URL
+      // Update profile with name and LinkedIn URL
       if (authData.user) {
         await supabase.from("profiles").update({
+          full_name: fullName,
           linkedin_url: linkedinUrl || null,
         }).eq("id", authData.user.id);
 
@@ -486,6 +493,18 @@ const Auth = () => {
           ) : (
             <>
               <form onSubmit={handleAuth} className="space-y-3">
+                {isSignUp && (
+                  <Input
+                    id="fullName"
+                    type="text"
+                    value={fullName}
+                    onChange={(e) => setFullName(e.target.value)}
+                    placeholder="Your name"
+                    required
+                    className="h-12 text-base rounded-xl border-2 border-muted focus:border-primary transition-colors"
+                  />
+                )}
+
                 <Input
                   id="email"
                   type="email"

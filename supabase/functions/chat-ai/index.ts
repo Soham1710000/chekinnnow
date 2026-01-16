@@ -39,9 +39,24 @@ interface ProfileContext {
     motivation?: string;
     motivation_explanation?: string;
     constraint?: string;
+    // Depth inputs
+    depth_input_1?: string;
+    depth_input_2?: string;
+    depth_input_3?: string;
+    lived_context?: string[];
+    decision_weight?: string;
   };
   connection_intent?: string;
   learning_complete?: boolean;
+  onboarding_context?: {
+    ask_type?: string;
+    lived_context?: string[];
+    depth_input_1?: string;
+    depth_input_2?: string;
+    depth_input_3?: string;
+    decision_weight?: string;
+    context_chips?: string[];
+  };
 }
 
 // =============================================================================
@@ -192,7 +207,7 @@ async function assembleContext(
     
     const { data: profile, error } = await supabase
       .from("profiles")
-      .select("full_name, role, industry, goals, interests, ai_insights, connection_intent, learning_complete")
+      .select("full_name, role, industry, goals, interests, ai_insights, connection_intent, learning_complete, onboarding_context")
       .eq("id", userId)
       .single();
 
@@ -214,11 +229,44 @@ async function generatePersonalizedGreeting(
   apiKey: string
 ): Promise<string> {
   const insights = profileContext.ai_insights || {};
+  const onboarding = profileContext.onboarding_context || {};
   const intent = profileContext.connection_intent;
   const name = profileContext.full_name;
   
   // Build context summary for AI
   const contextParts: string[] = [];
+  
+  // Depth inputs provide the most specific context
+  if (onboarding.depth_input_1) {
+    contextParts.push(`What they're looking for: "${onboarding.depth_input_1}"`);
+  }
+  
+  if (onboarding.depth_input_2) {
+    contextParts.push(`Their non-negotiable: "${onboarding.depth_input_2}"`);
+  }
+  
+  if (onboarding.depth_input_3) {
+    contextParts.push(`What they want to avoid: "${onboarding.depth_input_3}"`);
+  }
+  
+  // Add lived context for experience-based matching
+  if (onboarding.lived_context?.length) {
+    const livedLabels: Record<string, string> = {
+      hired_mid_senior: "mid-senior job search",
+      raising_capital: "fundraising/pitching investors",
+      job_vs_startup: "choosing between job and startup",
+      career_switch: "career/function switching",
+      building_product: "building a product from scratch",
+      hiring_early: "early team hiring",
+      decision_paralysis: "navigating decision paralysis",
+    };
+    const experiences = onboarding.lived_context
+      .filter((ctx: string) => livedLabels[ctx])
+      .map((ctx: string) => livedLabels[ctx]);
+    if (experiences.length > 0) {
+      contextParts.push(`Has experience with: ${experiences.slice(0, 2).join(", ")}`);
+    }
+  }
   
   if (insights.motivation) {
     const motivationLabels: Record<string, string> = {
@@ -248,12 +296,15 @@ async function generatePersonalizedGreeting(
     "clarity": "seeking clarity between multiple options",
     "direction": "needs to decide what to do next",
     "opportunity": "exploring what's possible",
+    "pressure_testing": "wants to validate a decision",
     "pressure-testing": "wants to validate a decision",
+    "help_others": "wants to help others who are earlier in the journey",
     "help-others": "wants to help others who are earlier in the journey"
   };
   
-  if (intent) {
-    contextParts.push(`Current intent: ${intentLabels[intent] || intent}`);
+  const askType = onboarding.ask_type || intent;
+  if (askType) {
+    contextParts.push(`Current intent: ${intentLabels[askType] || askType}`);
   }
   
   if (contextParts.length === 0) {

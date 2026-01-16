@@ -281,7 +281,7 @@ const Auth = () => {
 
   const handleOnboardingComplete = async (data: any) => {
     if (newUserId) {
-      // Save full onboarding context
+      // Save full onboarding context with depth inputs
       await supabase.from("profiles").update({
         looking_for: data.ask_type || null,
         connection_intent: data.ask_type,
@@ -297,6 +297,10 @@ const Auth = () => {
           context_chips: data.context_chips,
           open_help_text: data.open_help_text,
           help_style: data.help_style,
+          // Depth inputs
+          depth_input_1: data.depth_input_1,
+          depth_input_2: data.depth_input_2,
+          depth_input_3: data.depth_input_3,
           completedAt: new Date().toISOString(),
         },
         ai_insights: {
@@ -305,6 +309,10 @@ const Auth = () => {
           decision_weight: data.decision_weight,
           context_constraints: data.context_chips,
           help_style: data.help_style,
+          // Depth insights for matching
+          depth_input_1: data.depth_input_1,
+          depth_input_2: data.depth_input_2,
+          depth_input_3: data.depth_input_3,
         },
       }).eq("id", newUserId);
       

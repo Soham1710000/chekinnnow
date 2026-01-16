@@ -29,6 +29,14 @@ export interface ContextData {
   careerInflection?: string;
   motivation?: string;
   motivationExplanation?: string;
+  // Depth inputs
+  ask_type?: string;
+  lived_context?: string[];
+  depth_input_1?: string;
+  depth_input_2?: string;
+  depth_input_3?: string;
+  decision_weight?: string;
+  context_chips?: string[];
 }
 
 // User profile data from DB
@@ -184,6 +192,14 @@ export function useDeepSearch() {
       parts.push(profile.looking_for);
     }
     
+    // Add depth inputs for more specific matching
+    if (context?.depth_input_1) {
+      parts.push(context.depth_input_1);
+    }
+    if (context?.depth_input_2) {
+      parts.push(context.depth_input_2);
+    }
+    
     // Add why context for better matching
     if (context?.whyOpportunity) {
       parts.push(context.whyOpportunity);
@@ -197,6 +213,24 @@ export function useDeepSearch() {
     // Add skills for complementary matches
     if (profile.skills?.length) {
       parts.push(profile.skills.slice(0, 3).join(" "));
+    }
+    
+    // Add lived context for experience-based matching
+    if (context?.lived_context?.length) {
+      const livedContextKeywords: Record<string, string> = {
+        hired_mid_senior: "hiring managers recruiters career transitions",
+        raising_capital: "investors VCs angel investors fundraising",
+        job_vs_startup: "founders entrepreneurs startup advisors",
+        career_switch: "career changers mentors industry switchers",
+        building_product: "product builders founders early-stage",
+        hiring_early: "startup hiring founders team building",
+        decision_paralysis: "mentors coaches decision advisors",
+      };
+      context.lived_context.forEach(ctx => {
+        if (livedContextKeywords[ctx]) {
+          parts.push(livedContextKeywords[ctx]);
+        }
+      });
     }
     
     // Add context from onboarding motivation if available
@@ -217,6 +251,14 @@ export function useDeepSearch() {
 
   // Convert profile context to UserAsk format for the API
   const profileToUserAsk = (profile: UserProfile, context?: ContextData): UserAsk => {
+    const askTypeToSearchType: Record<string, string> = {
+      clarity: "mentorship",
+      direction: "mentorship",
+      opportunity: "peer",
+      pressure_testing: "mentorship",
+      help_others: "peer",
+    };
+    
     const motivationToAskType: Record<string, string> = {
       building: "peer",
       recognition: "mentorship",
@@ -226,12 +268,32 @@ export function useDeepSearch() {
       impact: "partnerships",
     };
     
+    // Determine ask type from onboarding context
+    let askType = "peer";
+    if (context?.ask_type && askTypeToSearchType[context.ask_type]) {
+      askType = askTypeToSearchType[context.ask_type];
+    } else if (context?.motivation && motivationToAskType[context.motivation]) {
+      askType = motivationToAskType[context.motivation];
+    }
+    
+    // Build intent from depth inputs
+    let intent = context?.lookingFor || profile.looking_for || `Connect with ${profile.industry || "relevant"} professionals`;
+    if (context?.depth_input_1) {
+      intent = context.depth_input_1;
+    }
+    
+    // Build constraints from depth inputs
+    let constraints = context?.constraint || "";
+    if (context?.depth_input_2) {
+      constraints = `Non-negotiable: ${context.depth_input_2}`;
+    }
+    
     return {
-      askType: context?.motivation ? (motivationToAskType[context.motivation] || "peer") : "peer",
-      intent: context?.lookingFor || profile.looking_for || `Connect with ${profile.industry || "relevant"} professionals`,
+      askType,
+      intent,
       outcome: context?.whyOpportunity || "Find meaningful connections who can provide value",
       credibility: profile.role ? `${profile.role}${profile.industry ? ` in ${profile.industry}` : ""}` : "",
-      constraints: context?.constraint || "",
+      constraints,
     };
   };
 

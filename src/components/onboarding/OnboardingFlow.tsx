@@ -1,13 +1,12 @@
-import { useState, useCallback, useEffect } from "react";
+import { useState, useCallback } from "react";
 import { motion, AnimatePresence } from "framer-motion";
 import { Button } from "@/components/ui/button";
 import { Textarea } from "@/components/ui/textarea";
 import { Input } from "@/components/ui/input";
-import { ArrowRight, Check, Sparkles } from "lucide-react";
+import { ArrowRight, Check } from "lucide-react";
 import { RadioGroup, RadioGroupItem } from "@/components/ui/radio-group";
 import { Label } from "@/components/ui/label";
 import { Checkbox } from "@/components/ui/checkbox";
-import confetti from "canvas-confetti";
 
 export interface OnboardingData {
   decision_posture: string;
@@ -32,31 +31,20 @@ interface OnboardingFlowProps {
 
 type Step = 1 | 2 | 3 | 4 | 5 | 6 | 7;
 
-
-// Celebration messages for transitions
-const CELEBRATION_MESSAGES = [
-  "Nice! You think things through",
-  "Got it! Let's find your people",
-  "Love that honesty",
-  "Perfect, almost there!",
-  "This is helpful",
-  "Last one, you're doing great!",
-];
-
 const DECISION_POSTURES = [
-  { id: "talk_to_people", label: "Talk to people who've been there" },
-  { id: "deep_research", label: "Go deep on research first" },
-  { id: "move_fast", label: "Trust my gut and move fast" },
-  { id: "sit_with_it", label: "Let it marinate until clarity hits" },
-  { id: "help_others_decide", label: "Help others before deciding for myself" },
+  { id: "talk_to_people", label: "Talk to people who've lived something similar" },
+  { id: "deep_research", label: "Go deep on research and comparisons" },
+  { id: "move_fast", label: "Move fast based on instinct" },
+  { id: "sit_with_it", label: "Sit with it until something forces the call" },
+  { id: "help_others_decide", label: "I usually end up helping others decide instead" },
 ];
 
 const ASK_TYPES = [
-  { id: "clarity", label: "Clarity", description: "too many good options, brain is stuck" },
-  { id: "direction", label: "Direction", description: "what should I actually do next?" },
-  { id: "opportunity", label: "Opportunity", description: "exploring what's even possible" },
-  { id: "pressure_testing", label: "Pressure testing", description: "I have a lean, poke holes in it" },
-  { id: "help_others", label: "Here to give back", description: "I've lived this, happy to share" },
+  { id: "clarity", label: "Clarity", description: "confused between multiple right answers" },
+  { id: "direction", label: "Direction", description: "need to decide what to do next" },
+  { id: "opportunity", label: "Opportunity", description: "exploring what's possible" },
+  { id: "pressure_testing", label: "Pressure testing", description: "validating a lean" },
+  { id: "help_others", label: "Help others", description: "I've been here before" },
 ];
 
 const LIVED_CONTEXTS = [
@@ -78,10 +66,10 @@ const HELP_STYLES = [
 ];
 
 const DECISION_WEIGHTS = [
-  { id: "light", label: "Light", description: "just poking around" },
-  { id: "medium", label: "Medium", description: "affects the next few months" },
-  { id: "heavy", label: "Heavy", description: "could shift my whole trajectory" },
-  { id: "very_heavy", label: "Very heavy", description: "impacts people beyond me" },
+  { id: "light", label: "Light", description: "just exploring" },
+  { id: "medium", label: "Medium", description: "affects next few months" },
+  { id: "heavy", label: "Heavy", description: "could change my trajectory" },
+  { id: "very_heavy", label: "Very heavy", description: "impacts other people too" },
 ];
 
 const CONTEXT_CONSTRAINTS = [
@@ -97,7 +85,6 @@ const CONTEXT_CONSTRAINTS = [
 interface DepthInputConfig {
   trigger: (askType: string, livedContext: string[]) => boolean;
   title: string;
-  subtitle: string;
   prompts: {
     prompt: string;
     placeholder: string;
@@ -106,60 +93,60 @@ interface DepthInputConfig {
 }
 
 const DEPTH_INPUT_CONFIGS: DepthInputConfig[] = [
+  // 1️⃣ Hiring / Getting Hired (Mid–Senior)
   {
     trigger: (askType, livedContext) =>
       ["clarity", "direction", "pressure_testing"].includes(askType) &&
       livedContext.includes("hired_mid_senior"),
-    title: "Let's get specific about your search",
-    subtitle: "A few words is enough — this helps us find the right people.",
+    title: "Let's get specific about your job search",
     prompts: [
       {
-        prompt: "What kind of role are you eyeing?",
+        prompt: "What kind of role are you trying to move into?",
         placeholder: "e.g. Growth, Product, Ops, GM, Founding team",
         required: true,
       },
       {
-        prompt: "What's non-negotiable this time around?",
+        prompt: "What's non-negotiable for you this time?",
         placeholder: "e.g. ownership, learning curve, manager quality, comp",
         required: true,
       },
       {
-        prompt: "What burned you last time that you're avoiding now?",
+        prompt: "What burned you in your last role that you don't want to repeat?",
         placeholder: "A few words is enough",
         required: false,
       },
     ],
   },
+  // 2️⃣ Fundraising / Pre-Seed
   {
     trigger: (askType, livedContext) =>
       ["pressure_testing", "direction"].includes(askType) &&
       livedContext.includes("raising_capital"),
-    title: "Tell us about your raise",
-    subtitle: "We'll find people who've been exactly here.",
+    title: "Tell us more about your raise",
     prompts: [
       {
-        prompt: "What are you really trying to raise for?",
+        prompt: "What are you trying to raise for right now?",
         placeholder: "e.g. validation, hiring, speed, credibility",
         required: true,
       },
       {
-        prompt: "What's your biggest doubt going in?",
+        prompt: "What's your biggest doubt going into this raise?",
         placeholder: "e.g. timing, traction, story, myself",
         required: true,
       },
       {
-        prompt: "What would make this feel like a win, even if it's small?",
+        prompt: "What would make this raise feel successful even if it's small?",
         placeholder: "A few words is enough",
         required: false,
       },
     ],
   },
+  // 3️⃣ Partnerships / Co-founders
   {
     trigger: (askType, livedContext) =>
       ["clarity", "pressure_testing"].includes(askType) &&
       (livedContext.includes("job_vs_startup") || livedContext.includes("hiring_early")),
-    title: "About partnerships",
-    subtitle: "Finding the right people to build with is everything.",
+    title: "Let's understand your partnership needs",
     prompts: [
       {
         prompt: "What gap are you hoping a partner fills?",
@@ -167,27 +154,27 @@ const DEPTH_INPUT_CONFIGS: DepthInputConfig[] = [
         required: true,
       },
       {
-        prompt: "What's a deal-breaker for you?",
+        prompt: "What's a deal-breaker for you in a partnership?",
         placeholder: "A few words is enough",
         required: true,
       },
       {
-        prompt: "Any past mistake you're trying not to repeat?",
+        prompt: "What kind of mistake are you most afraid of repeating?",
         placeholder: "A few words is enough",
         required: false,
       },
     ],
   },
+  // 4️⃣ Beta Users / Early Feedback
   {
     trigger: (askType, livedContext) =>
       ["pressure_testing", "opportunity"].includes(askType) &&
       livedContext.includes("building_product"),
-    title: "About your product",
-    subtitle: "Let's understand where you are.",
+    title: "Help us understand your product stage",
     prompts: [
       {
-        prompt: "Who is this for right now?",
-        placeholder: "Describe your user in a few words",
+        prompt: "Who is this product for right now?",
+        placeholder: "Describe the user in a few words",
         required: true,
       },
       {
@@ -196,18 +183,18 @@ const DEPTH_INPUT_CONFIGS: DepthInputConfig[] = [
         required: true,
       },
       {
-        prompt: "What would make you pivot after these conversations?",
+        prompt: "What would make you change direction after these conversations?",
         placeholder: "A few words is enough",
         required: false,
       },
     ],
   },
+  // 5️⃣ Talking to Someone in a Role You're Interviewing For
   {
     trigger: (askType, livedContext) =>
       ["direction", "pressure_testing"].includes(askType) &&
       livedContext.includes("hired_mid_senior"),
-    title: "About your interview",
-    subtitle: "Let's find people who know this company/role.",
+    title: "Let's understand your interview situation",
     prompts: [
       {
         prompt: "What role or team are you interviewing for?",
@@ -215,12 +202,12 @@ const DEPTH_INPUT_CONFIGS: DepthInputConfig[] = [
         required: true,
       },
       {
-        prompt: "What do you most want clarity on before saying yes?",
+        prompt: "What do you most want clarity on before committing?",
         placeholder: "e.g. expectations, politics, growth, reality vs JD",
         required: true,
       },
       {
-        prompt: "What would make you walk away even with an offer?",
+        prompt: "What would make you walk away even if you get the offer?",
         placeholder: "A few words is enough",
         required: false,
       },
@@ -228,144 +215,8 @@ const DEPTH_INPUT_CONFIGS: DepthInputConfig[] = [
   },
 ];
 
-// Step gradient backgrounds
-const STEP_GRADIENTS = [
-  "from-blue-50/50 via-transparent to-transparent",
-  "from-purple-50/50 via-transparent to-transparent",
-  "from-amber-50/50 via-transparent to-transparent",
-  "from-emerald-50/50 via-transparent to-transparent",
-  "from-rose-50/50 via-transparent to-transparent",
-  "from-cyan-50/50 via-transparent to-transparent",
-  "from-violet-50/50 via-transparent to-transparent",
-];
-
-// Time estimates per step
-const TIME_ESTIMATES: Record<number, string> = {
-  1: "~2 min",
-  2: "~90 sec",
-  3: "~1 min",
-  4: "~45 sec",
-  5: "~30 sec",
-  6: "~15 sec",
-  7: "Done!",
-};
-
-// Confetti trigger function
-const triggerConfetti = () => {
-  const count = 200;
-  const defaults = {
-    origin: { y: 0.7 },
-    zIndex: 9999,
-  };
-
-  function fire(particleRatio: number, opts: confetti.Options) {
-    confetti({
-      ...defaults,
-      ...opts,
-      particleCount: Math.floor(count * particleRatio),
-    });
-  }
-
-  fire(0.25, { spread: 26, startVelocity: 55 });
-  fire(0.2, { spread: 60 });
-  fire(0.35, { spread: 100, decay: 0.91, scalar: 0.8 });
-  fire(0.1, { spread: 120, startVelocity: 25, decay: 0.92, scalar: 1.2 });
-  fire(0.1, { spread: 120, startVelocity: 45 });
-};
-
-// Simple step indicator (just dots)
-const SimpleProgress = ({ currentStep, totalSteps }: { 
-  currentStep: number; 
-  totalSteps: number;
-}) => {
-  return (
-    <div className="flex items-center gap-1.5">
-      {Array.from({ length: totalSteps }).map((_, index) => {
-        const stepNum = index + 1;
-        const isCompleted = currentStep > stepNum;
-        const isCurrent = currentStep === stepNum;
-
-        return (
-          <motion.div
-            key={stepNum}
-            initial={{ opacity: 0, scale: 0.8 }}
-            animate={{ opacity: 1, scale: 1 }}
-            transition={{ delay: index * 0.05 }}
-            className={`w-2 h-2 rounded-full transition-all duration-300 ${
-              isCompleted 
-                ? "bg-primary" 
-                : isCurrent 
-                  ? "bg-primary/60 ring-2 ring-primary/30" 
-                  : "bg-muted-foreground/30"
-            }`}
-          />
-        );
-      })}
-    </div>
-  );
-};
-
-// Celebration toast component
-const CelebrationToast = ({ message, show }: { message: string; show: boolean }) => {
-  return (
-    <AnimatePresence>
-      {show && (
-        <motion.div
-          initial={{ opacity: 0, y: 20, scale: 0.9 }}
-          animate={{ opacity: 1, y: 0, scale: 1 }}
-          exit={{ opacity: 0, y: -20, scale: 0.9 }}
-          className="fixed bottom-24 left-1/2 -translate-x-1/2 bg-primary text-primary-foreground px-6 py-3 rounded-full shadow-lg font-medium text-sm z-50"
-        >
-          {message}
-        </motion.div>
-      )}
-    </AnimatePresence>
-  );
-};
-
-// Recap Card component for final step
-const RecapCard = ({ data }: { data: OnboardingData }) => {
-  const getAskLabel = () => ASK_TYPES.find(a => a.id === data.ask_type)?.label || "";
-  const getPostureLabel = () => DECISION_POSTURES.find(p => p.id === data.decision_posture)?.label || "";
-  const getWeightLabel = () => DECISION_WEIGHTS.find(w => w.id === data.decision_weight)?.label || "";
-  const getLivedContextCount = () => data.lived_context.length;
-
-  return (
-    <motion.div
-      initial={{ opacity: 0, y: 20 }}
-      animate={{ opacity: 1, y: 0 }}
-      transition={{ delay: 0.4 }}
-      className="bg-muted/50 rounded-2xl p-5 space-y-3 text-left w-full max-w-sm mx-auto"
-    >
-      <h4 className="text-xs font-medium text-muted-foreground uppercase tracking-wide">Your context snapshot</h4>
-      <div className="space-y-2">
-        <div className="flex items-center justify-between">
-          <span className="text-sm text-muted-foreground">Looking for</span>
-          <span className="text-sm font-medium">{getAskLabel()}</span>
-        </div>
-        <div className="flex items-center justify-between">
-          <span className="text-sm text-muted-foreground">Decision style</span>
-          <span className="text-sm font-medium truncate max-w-[180px]">{getPostureLabel()}</span>
-        </div>
-        <div className="flex items-center justify-between">
-          <span className="text-sm text-muted-foreground">Stakes</span>
-          <span className="text-sm font-medium">{getWeightLabel()}</span>
-        </div>
-        {data.lived_context.length > 0 && (
-          <div className="flex items-center justify-between">
-            <span className="text-sm text-muted-foreground">Experience areas</span>
-            <span className="text-sm font-medium">{getLivedContextCount()} selected</span>
-          </div>
-        )}
-      </div>
-    </motion.div>
-  );
-};
-
 const OnboardingFlow = ({ onComplete }: OnboardingFlowProps) => {
   const [step, setStep] = useState<Step>(1);
-  const [showCelebration, setShowCelebration] = useState(false);
-  const [celebrationMessage, setCelebrationMessage] = useState("");
   const [data, setData] = useState<OnboardingData>({
     decision_posture: "",
     ask_type: "",
@@ -397,21 +248,14 @@ const OnboardingFlow = ({ onComplete }: OnboardingFlowProps) => {
 
   const getTotalSteps = () => (hasDepthInputs ? 7 : 6);
 
-  // Show celebration when step changes
-  const triggerCelebration = (stepNum: number) => {
-    if (stepNum > 1 && stepNum <= 7) {
-      setCelebrationMessage(CELEBRATION_MESSAGES[Math.min(stepNum - 2, CELEBRATION_MESSAGES.length - 1)]);
-      setShowCelebration(true);
-      setTimeout(() => setShowCelebration(false), 1500);
-    }
+  const getProgressPercent = () => {
+    return Math.round((step / getTotalSteps()) * 100);
   };
 
   const handleNext = useCallback(() => {
     const totalSteps = hasDepthInputs ? 7 : 6;
     if (step < totalSteps) {
       // If we're on step 3 and there are no depth inputs, skip step 4
-      const nextStep = step === 3 && !hasDepthInputs ? 5 : step + 1;
-      triggerCelebration(nextStep);
       if (step === 3 && !hasDepthInputs) {
         setStep(5 as Step);
       } else {
@@ -436,23 +280,23 @@ const OnboardingFlow = ({ onComplete }: OnboardingFlowProps) => {
   const getFollowupPrompt = () => {
     switch (data.ask_type) {
       case "clarity":
-        return "Which past fork still haunts your current confusion?";
+        return "Which past fork is bleeding into your current confusion?";
       case "direction":
         return "Which experience are you trying to project forward from?";
       case "opportunity":
-        return "Which of these feels like an unfinished thread?";
+        return "Which of these feels like an unfinished thread for you?";
       case "pressure_testing":
-        return "Which experience already shaped your current lean?";
+        return "Which experience has already shaped your current lean?";
       case "help_others":
         return "Which of these could you speak about without polishing the story?";
       default:
-        return "Which of these are relevant right now?";
+        return "Which of these are relevant to your current situation?";
     }
   };
 
   const showMicroReason = data.ask_type === "clarity" || data.ask_type === "pressure_testing";
   const getMicroReasonPlaceholder = () => {
-    if (data.ask_type === "clarity") return "What makes this genuinely hard to decide?";
+    if (data.ask_type === "clarity") return "What makes this hard to decide?";
     if (data.ask_type === "pressure_testing") return "What did you learn the hard way?";
     return "";
   };
@@ -463,18 +307,20 @@ const OnboardingFlow = ({ onComplete }: OnboardingFlowProps) => {
       case 2: return !!data.ask_type;
       case 3: return data.lived_context.length > 0;
       case 4: {
+        // Depth inputs step - check required fields
         if (!activeDepthConfig) return true;
         const requiredPrompts = activeDepthConfig.prompts.filter(p => p.required);
         const inputs = [data.depth_input_1, data.depth_input_2, data.depth_input_3];
         return requiredPrompts.every((_, idx) => inputs[idx]?.trim().length > 0);
       }
       case 5: return !!data.decision_weight;
-      case 6: return true;
+      case 6: return true; // Optional
       case 7: return true;
       default: return true;
     }
   };
 
+  // Adjust step display for progress when depth inputs are not shown
   const getDisplayStep = () => {
     if (!hasDepthInputs && step >= 5) {
       return step - 1;
@@ -482,30 +328,25 @@ const OnboardingFlow = ({ onComplete }: OnboardingFlowProps) => {
     return step;
   };
 
-  // Trigger confetti on final step
-  useEffect(() => {
-    if (step === 7) {
-      setTimeout(() => {
-        triggerConfetti();
-      }, 300);
-    }
-  }, [step]);
-
   return (
-    <div className={`min-h-screen flex flex-col items-center justify-center p-6 transition-all duration-500 bg-gradient-to-br ${STEP_GRADIENTS[step - 1] || STEP_GRADIENTS[0]}`}>
-      {/* Celebration Toast */}
-      <CelebrationToast message={celebrationMessage} show={showCelebration} />
-
-      {/* Simple Progress indicator */}
+    <div className="min-h-screen bg-background flex flex-col items-center justify-center p-6">
+      {/* Progress indicator */}
       <motion.div
-        initial={{ opacity: 0, y: -20 }}
-        animate={{ opacity: 1, y: 0 }}
-        className="fixed top-6 left-1/2 -translate-x-1/2 z-10"
+        initial={{ opacity: 0 }}
+        animate={{ opacity: 1 }}
+        className="fixed top-6 left-1/2 -translate-x-1/2 flex flex-col items-center gap-2"
       >
-        <SimpleProgress 
-          currentStep={step} 
-          totalSteps={getTotalSteps()} 
-        />
+        <div className="w-32 h-1 bg-muted rounded-full overflow-hidden">
+          <motion.div
+            className="h-full bg-primary"
+            initial={{ width: 0 }}
+            animate={{ width: `${getProgressPercent()}%` }}
+            transition={{ duration: 0.3 }}
+          />
+        </div>
+        <span className="text-xs font-medium text-muted-foreground">
+          {getDisplayStep()} of {getTotalSteps()}
+        </span>
       </motion.div>
 
       <AnimatePresence mode="wait">
@@ -518,13 +359,10 @@ const OnboardingFlow = ({ onComplete }: OnboardingFlowProps) => {
             exit={{ opacity: 0, y: -20 }}
             className="max-w-md w-full space-y-6"
           >
-            <div className="space-y-3 text-center">
-              <h2 className="text-2xl font-semibold">
-                Hey! When a decision really matters, what do you usually do first?
+            <div className="space-y-3">
+              <h2 className="text-xl font-semibold">
+                When a decision actually matters, what do you tend to do first?
               </h2>
-              <p className="text-muted-foreground">
-                No wrong answers — this just helps us understand how you think.
-              </p>
             </div>
 
             <RadioGroup
@@ -532,53 +370,32 @@ const OnboardingFlow = ({ onComplete }: OnboardingFlowProps) => {
               onValueChange={(val) => setData((prev) => ({ ...prev, decision_posture: val }))}
               className="space-y-3"
             >
-              {DECISION_POSTURES.map((posture, index) => (
-                <motion.div
+              {DECISION_POSTURES.map((posture) => (
+                <div
                   key={posture.id}
-                  initial={{ opacity: 0, x: -20 }}
-                  animate={{ opacity: 1, x: 0 }}
-                  transition={{ delay: 0.1 + index * 0.05 }}
+                  className={`flex items-center space-x-3 p-4 rounded-xl border-2 transition-all cursor-pointer ${
+                    data.decision_posture === posture.id
+                      ? "border-primary bg-primary/5"
+                      : "border-border hover:border-muted-foreground/30"
+                  }`}
+                  onClick={() => setData((prev) => ({ ...prev, decision_posture: posture.id }))}
                 >
-                  <div
-                    className={`flex items-center space-x-3 p-4 rounded-xl border-2 transition-all cursor-pointer hover:shadow-md ${
-                      data.decision_posture === posture.id
-                        ? "border-primary bg-primary/5 shadow-md"
-                        : "border-border hover:border-muted-foreground/30"
-                    }`}
-                    onClick={() => setData((prev) => ({ ...prev, decision_posture: posture.id }))}
-                  >
-                    <RadioGroupItem value={posture.id} id={posture.id} className="hidden" />
-                    <Label htmlFor={posture.id} className="flex-1 cursor-pointer font-medium">
-                      {posture.label}
-                    </Label>
-                    {data.decision_posture === posture.id && (
-                      <motion.div
-                        initial={{ scale: 0 }}
-                        animate={{ scale: 1 }}
-                        className="w-6 h-6 bg-primary rounded-full flex items-center justify-center"
-                      >
-                        <Check className="w-3 h-3 text-primary-foreground" />
-                      </motion.div>
-                    )}
-                  </div>
-                </motion.div>
+                  <RadioGroupItem value={posture.id} id={posture.id} />
+                  <Label htmlFor={posture.id} className="flex-1 cursor-pointer font-medium">
+                    {posture.label}
+                  </Label>
+                </div>
               ))}
             </RadioGroup>
 
-            <motion.div
-              initial={{ opacity: 0 }}
-              animate={{ opacity: canProceed() ? 1 : 0.5 }}
-              className="pt-2"
+            <Button
+              onClick={handleNext}
+              disabled={!canProceed()}
+              className="w-full h-12 font-semibold rounded-xl"
             >
-              <Button
-                onClick={handleNext}
-                disabled={!canProceed()}
-                className="w-full h-12 font-semibold rounded-xl group"
-              >
-                Continue
-                <ArrowRight className="w-4 h-4 ml-2 group-hover:translate-x-1 transition-transform" />
-              </Button>
-            </motion.div>
+              Continue
+              <ArrowRight className="w-4 h-4 ml-2" />
+            </Button>
           </motion.div>
         )}
 
@@ -591,12 +408,12 @@ const OnboardingFlow = ({ onComplete }: OnboardingFlowProps) => {
             exit={{ opacity: 0, y: -20 }}
             className="max-w-md w-full space-y-6"
           >
-            <div className="space-y-3 text-center">
-              <h2 className="text-2xl font-semibold">
-                What brings you to ChekInn today?
+            <div className="space-y-3">
+              <h2 className="text-xl font-semibold">
+                What are you checking in for right now?
               </h2>
-              <p className="text-muted-foreground">
-                This helps us match you with the right people. You can always change your mind later!
+              <p className="text-sm text-muted-foreground">
+                This doesn't lock you into anything.
               </p>
             </div>
 
@@ -605,47 +422,32 @@ const OnboardingFlow = ({ onComplete }: OnboardingFlowProps) => {
               onValueChange={(val) => setData((prev) => ({ ...prev, ask_type: val }))}
               className="space-y-3"
             >
-              {ASK_TYPES.map((ask, index) => (
-                <motion.div
+              {ASK_TYPES.map((ask) => (
+                <div
                   key={ask.id}
-                  initial={{ opacity: 0, x: -20 }}
-                  animate={{ opacity: 1, x: 0 }}
-                  transition={{ delay: 0.1 + index * 0.05 }}
+                  className={`flex items-center space-x-3 p-4 rounded-xl border-2 transition-all cursor-pointer ${
+                    data.ask_type === ask.id
+                      ? "border-primary bg-primary/5"
+                      : "border-border hover:border-muted-foreground/30"
+                  }`}
+                  onClick={() => setData((prev) => ({ ...prev, ask_type: ask.id }))}
                 >
-                  <div
-                    className={`flex items-center space-x-3 p-4 rounded-xl border-2 transition-all cursor-pointer hover:shadow-md ${
-                      data.ask_type === ask.id
-                        ? "border-primary bg-primary/5 shadow-md"
-                        : "border-border hover:border-muted-foreground/30"
-                    }`}
-                    onClick={() => setData((prev) => ({ ...prev, ask_type: ask.id }))}
-                  >
-                    <RadioGroupItem value={ask.id} id={ask.id} className="hidden" />
-                    <Label htmlFor={ask.id} className="flex-1 cursor-pointer">
-                      <span className="font-medium">{ask.label}</span>
-                      <span className="text-muted-foreground text-sm block">{ask.description}</span>
-                    </Label>
-                    {data.ask_type === ask.id && (
-                      <motion.div
-                        initial={{ scale: 0 }}
-                        animate={{ scale: 1 }}
-                        className="w-6 h-6 bg-primary rounded-full flex items-center justify-center"
-                      >
-                        <Check className="w-3 h-3 text-primary-foreground" />
-                      </motion.div>
-                    )}
-                  </div>
-                </motion.div>
+                  <RadioGroupItem value={ask.id} id={ask.id} />
+                  <Label htmlFor={ask.id} className="flex-1 cursor-pointer">
+                    <span className="font-medium">{ask.label}</span>
+                    <span className="text-muted-foreground"> — {ask.description}</span>
+                  </Label>
+                </div>
               ))}
             </RadioGroup>
 
             <Button
               onClick={handleNext}
               disabled={!canProceed()}
-              className="w-full h-12 font-semibold rounded-xl group"
+              className="w-full h-12 font-semibold rounded-xl"
             >
               Continue
-              <ArrowRight className="w-4 h-4 ml-2 group-hover:translate-x-1 transition-transform" />
+              <ArrowRight className="w-4 h-4 ml-2" />
             </Button>
           </motion.div>
         )}
@@ -659,52 +461,37 @@ const OnboardingFlow = ({ onComplete }: OnboardingFlowProps) => {
             exit={{ opacity: 0, y: -20 }}
             className="max-w-md w-full space-y-6 max-h-[80vh] overflow-y-auto"
           >
-            <div className="space-y-3 text-center">
-              <h2 className="text-2xl font-semibold">
-                What have you already lived through?
+            {/* 3A - Base Question */}
+            <div className="space-y-3">
+              <h2 className="text-xl font-semibold">
+                Which of these have you already lived through?
               </h2>
-              <p className="text-muted-foreground">
-                This helps us know who can help you — and who you can help.
+              <p className="text-sm text-muted-foreground">
+                This helps us know who you can help — and who can help you.
               </p>
             </div>
 
             <div className="space-y-2">
-              {LIVED_CONTEXTS.map((ctx, index) => (
-                <motion.div
+              {LIVED_CONTEXTS.map((ctx) => (
+                <div
                   key={ctx.id}
-                  initial={{ opacity: 0, x: -20 }}
-                  animate={{ opacity: 1, x: 0 }}
-                  transition={{ delay: 0.05 + index * 0.03 }}
+                  className={`flex items-center space-x-3 p-4 rounded-xl border-2 transition-all cursor-pointer ${
+                    data.lived_context.includes(ctx.id)
+                      ? "border-primary bg-primary/5"
+                      : "border-border hover:border-muted-foreground/30"
+                  }`}
+                  onClick={() => toggleArrayItem("lived_context", ctx.id)}
                 >
-                  <div
-                    className={`flex items-center space-x-3 p-4 rounded-xl border-2 transition-all cursor-pointer hover:shadow-md ${
-                      data.lived_context.includes(ctx.id)
-                        ? "border-primary bg-primary/5 shadow-md"
-                        : "border-border hover:border-muted-foreground/30"
-                    }`}
-                    onClick={() => toggleArrayItem("lived_context", ctx.id)}
-                  >
-                    <Checkbox
-                      checked={data.lived_context.includes(ctx.id)}
-                      onCheckedChange={() => toggleArrayItem("lived_context", ctx.id)}
-                      className="hidden"
-                    />
-                    <Label className="flex-1 cursor-pointer font-medium">{ctx.label}</Label>
-                    {data.lived_context.includes(ctx.id) && (
-                      <motion.div
-                        initial={{ scale: 0 }}
-                        animate={{ scale: 1 }}
-                        className="w-6 h-6 bg-primary rounded-full flex items-center justify-center"
-                      >
-                        <Check className="w-3 h-3 text-primary-foreground" />
-                      </motion.div>
-                    )}
-                  </div>
-                </motion.div>
+                  <Checkbox
+                    checked={data.lived_context.includes(ctx.id)}
+                    onCheckedChange={() => toggleArrayItem("lived_context", ctx.id)}
+                  />
+                  <Label className="flex-1 cursor-pointer font-medium">{ctx.label}</Label>
+                </div>
               ))}
             </div>
 
-            {/* Conditional Follow-Up */}
+            {/* 3B - Conditional Follow-Up */}
             {data.lived_context.length > 0 && (
               <motion.div
                 initial={{ opacity: 0, height: 0 }}
@@ -726,7 +513,6 @@ const OnboardingFlow = ({ onComplete }: OnboardingFlowProps) => {
                       <Checkbox
                         checked={data.followup_context.includes(ctx.id)}
                         onCheckedChange={() => toggleArrayItem("followup_context", ctx.id)}
-                        className="hidden"
                       />
                       <Label className="flex-1 cursor-pointer text-sm">{ctx.label}</Label>
                     </div>
@@ -768,12 +554,12 @@ const OnboardingFlow = ({ onComplete }: OnboardingFlowProps) => {
               </motion.div>
             )}
 
-            {/* Universal Optional */}
+            {/* 3C - Universal Optional */}
             <div className="pt-4 border-t border-border">
               <Textarea
                 value={data.open_help_text}
                 onChange={(e) => setData((prev) => ({ ...prev, open_help_text: e.target.value }))}
-                placeholder="Anything you'd want to be useful to others about? (optional)"
+                placeholder="Anything here you'd want to be useful to others about? (optional)"
                 className="min-h-[80px] text-sm rounded-xl border-2 resize-none"
               />
             </div>
@@ -781,10 +567,10 @@ const OnboardingFlow = ({ onComplete }: OnboardingFlowProps) => {
             <Button
               onClick={handleNext}
               disabled={!canProceed()}
-              className="w-full h-12 font-semibold rounded-xl group"
+              className="w-full h-12 font-semibold rounded-xl"
             >
               Continue
-              <ArrowRight className="w-4 h-4 ml-2 group-hover:translate-x-1 transition-transform" />
+              <ArrowRight className="w-4 h-4 ml-2" />
             </Button>
           </motion.div>
         )}
@@ -798,12 +584,12 @@ const OnboardingFlow = ({ onComplete }: OnboardingFlowProps) => {
             exit={{ opacity: 0, y: -20 }}
             className="max-w-md w-full space-y-6"
           >
-            <div className="space-y-3 text-center">
-              <h2 className="text-2xl font-semibold">
+            <div className="space-y-3">
+              <h2 className="text-xl font-semibold">
                 {activeDepthConfig.title}
               </h2>
-              <p className="text-muted-foreground">
-                {activeDepthConfig.subtitle}
+              <p className="text-sm text-muted-foreground">
+                A few words is enough for each.
               </p>
             </div>
 
@@ -811,15 +597,9 @@ const OnboardingFlow = ({ onComplete }: OnboardingFlowProps) => {
               {activeDepthConfig.prompts.map((promptConfig, idx) => {
                 const inputKey = `depth_input_${idx + 1}` as keyof OnboardingData;
                 const value = data[inputKey] as string;
-
+                
                 return (
-                  <motion.div
-                    key={idx}
-                    className="space-y-2"
-                    initial={{ opacity: 0, y: 10 }}
-                    animate={{ opacity: 1, y: 0 }}
-                    transition={{ delay: 0.1 + idx * 0.1 }}
-                  >
+                  <div key={idx} className="space-y-2">
                     <Label className="text-sm font-medium">
                       {promptConfig.prompt}
                       {promptConfig.required && <span className="text-destructive ml-1">*</span>}
@@ -830,7 +610,10 @@ const OnboardingFlow = ({ onComplete }: OnboardingFlowProps) => {
                       placeholder={promptConfig.placeholder}
                       className="h-12 rounded-xl border-2"
                     />
-                  </motion.div>
+                    <p className="text-xs text-muted-foreground/70">
+                      {promptConfig.placeholder}
+                    </p>
+                  </div>
                 );
               })}
             </div>
@@ -838,10 +621,10 @@ const OnboardingFlow = ({ onComplete }: OnboardingFlowProps) => {
             <Button
               onClick={handleNext}
               disabled={!canProceed()}
-              className="w-full h-12 font-semibold rounded-xl group"
+              className="w-full h-12 font-semibold rounded-xl"
             >
               Continue
-              <ArrowRight className="w-4 h-4 ml-2 group-hover:translate-x-1 transition-transform" />
+              <ArrowRight className="w-4 h-4 ml-2" />
             </Button>
           </motion.div>
         )}
@@ -855,13 +638,10 @@ const OnboardingFlow = ({ onComplete }: OnboardingFlowProps) => {
             exit={{ opacity: 0, y: -20 }}
             className="max-w-md w-full space-y-6"
           >
-            <div className="space-y-3 text-center">
-              <h2 className="text-2xl font-semibold">
-                How big is this decision, really?
+            <div className="space-y-3">
+              <h2 className="text-xl font-semibold">
+                How much does this decision change things if you get it wrong?
               </h2>
-              <p className="text-muted-foreground">
-                This helps us calibrate how seriously to take the conversation.
-              </p>
             </div>
 
             <RadioGroup
@@ -869,37 +649,22 @@ const OnboardingFlow = ({ onComplete }: OnboardingFlowProps) => {
               onValueChange={(val) => setData((prev) => ({ ...prev, decision_weight: val }))}
               className="space-y-3"
             >
-              {DECISION_WEIGHTS.map((weight, index) => (
-                <motion.div
+              {DECISION_WEIGHTS.map((weight) => (
+                <div
                   key={weight.id}
-                  initial={{ opacity: 0, x: -20 }}
-                  animate={{ opacity: 1, x: 0 }}
-                  transition={{ delay: 0.1 + index * 0.05 }}
+                  className={`flex items-center space-x-3 p-4 rounded-xl border-2 transition-all cursor-pointer ${
+                    data.decision_weight === weight.id
+                      ? "border-primary bg-primary/5"
+                      : "border-border hover:border-muted-foreground/30"
+                  }`}
+                  onClick={() => setData((prev) => ({ ...prev, decision_weight: weight.id }))}
                 >
-                  <div
-                    className={`flex items-center space-x-3 p-4 rounded-xl border-2 transition-all cursor-pointer hover:shadow-md ${
-                      data.decision_weight === weight.id
-                        ? "border-primary bg-primary/5 shadow-md"
-                        : "border-border hover:border-muted-foreground/30"
-                    }`}
-                    onClick={() => setData((prev) => ({ ...prev, decision_weight: weight.id }))}
-                  >
-                    <RadioGroupItem value={weight.id} id={weight.id} className="hidden" />
-                    <Label htmlFor={weight.id} className="flex-1 cursor-pointer">
-                      <span className="font-medium">{weight.label}</span>
-                      <span className="text-muted-foreground text-sm block">{weight.description}</span>
-                    </Label>
-                    {data.decision_weight === weight.id && (
-                      <motion.div
-                        initial={{ scale: 0 }}
-                        animate={{ scale: 1 }}
-                        className="w-6 h-6 bg-primary rounded-full flex items-center justify-center"
-                      >
-                        <Check className="w-3 h-3 text-primary-foreground" />
-                      </motion.div>
-                    )}
-                  </div>
-                </motion.div>
+                  <RadioGroupItem value={weight.id} id={weight.id} />
+                  <Label htmlFor={weight.id} className="flex-1 cursor-pointer">
+                    <span className="font-medium">{weight.label}</span>
+                    <span className="text-muted-foreground"> — {weight.description}</span>
+                  </Label>
+                </div>
               ))}
             </RadioGroup>
 
@@ -908,7 +673,7 @@ const OnboardingFlow = ({ onComplete }: OnboardingFlowProps) => {
                 <Textarea
                   value={data.stakes_text}
                   onChange={(e) => setData((prev) => ({ ...prev, stakes_text: e.target.value }))}
-                  placeholder="What's at stake if this goes sideways? (optional but helpful)"
+                  placeholder="What's at stake if this goes wrong? (optional)"
                   className="min-h-[80px] text-sm rounded-xl border-2 resize-none"
                 />
               </motion.div>
@@ -917,10 +682,10 @@ const OnboardingFlow = ({ onComplete }: OnboardingFlowProps) => {
             <Button
               onClick={handleNext}
               disabled={!canProceed()}
-              className="w-full h-12 font-semibold rounded-xl group"
+              className="w-full h-12 font-semibold rounded-xl"
             >
               Continue
-              <ArrowRight className="w-4 h-4 ml-2 group-hover:translate-x-1 transition-transform" />
+              <ArrowRight className="w-4 h-4 ml-2" />
             </Button>
           </motion.div>
         )}
@@ -934,40 +699,37 @@ const OnboardingFlow = ({ onComplete }: OnboardingFlowProps) => {
             exit={{ opacity: 0, y: -20 }}
             className="max-w-md w-full space-y-6"
           >
-            <div className="space-y-3 text-center">
-              <h2 className="text-2xl font-semibold">
-                Any constraints shaping your thinking?
+            <div className="space-y-3">
+              <h2 className="text-xl font-semibold">
+                What constraints might distort advice right now?
               </h2>
-              <p className="text-muted-foreground">
-                Select any that apply — or skip if none feel relevant.
-              </p>
             </div>
 
-            <div className="flex flex-wrap gap-2 justify-center">
-              {CONTEXT_CONSTRAINTS.map((constraint, index) => (
-                <motion.button
+            <div className="flex flex-wrap gap-2">
+              {CONTEXT_CONSTRAINTS.map((constraint) => (
+                <button
                   key={constraint.id}
-                  initial={{ opacity: 0, scale: 0.9 }}
-                  animate={{ opacity: 1, scale: 1 }}
-                  transition={{ delay: 0.1 + index * 0.03 }}
                   onClick={() => toggleArrayItem("context_chips", constraint.id)}
                   className={`px-4 py-3 rounded-xl text-sm font-medium transition-all ${
                     data.context_chips.includes(constraint.id)
-                      ? "bg-primary text-primary-foreground shadow-md"
+                      ? "bg-primary text-primary-foreground"
                       : "bg-muted hover:bg-muted/80"
                   }`}
                 >
+                  {data.context_chips.includes(constraint.id) && (
+                    <Check className="w-3 h-3 inline mr-1" />
+                  )}
                   {constraint.label}
-                </motion.button>
+                </button>
               ))}
             </div>
 
             <Button
               onClick={handleNext}
-              className="w-full h-12 font-semibold rounded-xl group"
+              className="w-full h-12 font-semibold rounded-xl"
             >
-              {data.context_chips.length === 0 ? "Skip for now" : "Continue"}
-              <ArrowRight className="w-4 h-4 ml-2 group-hover:translate-x-1 transition-transform" />
+              Continue
+              <ArrowRight className="w-4 h-4 ml-2" />
             </Button>
           </motion.div>
         )}
@@ -979,43 +741,30 @@ const OnboardingFlow = ({ onComplete }: OnboardingFlowProps) => {
             initial={{ opacity: 0, y: 20 }}
             animate={{ opacity: 1, y: 0 }}
             exit={{ opacity: 0, y: -20 }}
-            className="max-w-md w-full text-center space-y-6"
+            className="max-w-md w-full text-center space-y-8"
           >
-            <motion.h2
-              initial={{ opacity: 0, y: 10 }}
-              animate={{ opacity: 1, y: 0 }}
-              transition={{ delay: 0.2 }}
-              className="text-2xl font-semibold"
-            >
-              You're all set!
-            </motion.h2>
+            <div className="space-y-6">
+              <h2 className="text-2xl font-semibold">
+                Thanks for checking in.
+              </h2>
+              <div className="space-y-4 text-muted-foreground">
+                <p>We don't match on titles.</p>
+                <p>We match on forks already crossed.</p>
+              </div>
+              <div className="pt-4 space-y-2 text-sm text-muted-foreground/80">
+                <p>Some conversations are fast.</p>
+                <p>Some change how you think.</p>
+                <p className="pt-2 font-medium text-foreground">We'll respect both.</p>
+              </div>
+            </div>
 
-            {/* Recap Card */}
-            <RecapCard data={data} />
-
-            <motion.div
-              initial={{ opacity: 0 }}
-              animate={{ opacity: 1 }}
-              transition={{ delay: 0.5 }}
-              className="space-y-2 text-sm text-muted-foreground"
+            <Button
+              onClick={handleNext}
+              className="w-full h-14 text-lg font-semibold rounded-xl"
             >
-              <p>We don't match on titles or resumes.</p>
-              <p className="font-medium text-foreground">We match on forks already crossed.</p>
-            </motion.div>
-
-            <motion.div
-              initial={{ opacity: 0, y: 20 }}
-              animate={{ opacity: 1, y: 0 }}
-              transition={{ delay: 0.6 }}
-            >
-              <Button
-                onClick={handleNext}
-                className="w-full h-14 text-lg font-semibold rounded-xl group"
-              >
-                Enter ChekInn
-                <Sparkles className="w-5 h-5 ml-2 group-hover:rotate-12 transition-transform" />
-              </Button>
-            </motion.div>
+              Enter ChekInn
+              <ArrowRight className="w-5 h-5 ml-2" />
+            </Button>
           </motion.div>
         )}
       </AnimatePresence>

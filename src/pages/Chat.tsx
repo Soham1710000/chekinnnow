@@ -3,7 +3,7 @@ import { useAuth } from "@/hooks/useAuth";
 import { supabase } from "@/integrations/supabase/client";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
-import { Send, ArrowLeft, MessageCircle, Users, Clock, Sparkles, Mic, Keyboard, Shield, Target } from "lucide-react";
+import { Send, ArrowLeft, MessageCircle, Users, Clock, Sparkles, Mic, Keyboard, Target } from "lucide-react";
 import { motion, AnimatePresence } from "framer-motion";
 import { useNavigate } from "react-router-dom";
 import { useToast } from "@/hooks/use-toast";
@@ -998,34 +998,7 @@ const Chat = () => {
             <ArrowLeft className="w-5 h-5" />
           </button>
           <h1 className="font-semibold text-lg">ChekInn</h1>
-          {user ? (
-            <motion.button
-              onClick={() => navigate("/reputation")}
-              className="relative text-primary/80 hover:text-primary transition-colors"
-              title="Reputation & Access"
-              whileHover={{ scale: 1.1 }}
-              whileTap={{ scale: 0.95 }}
-            >
-              {/* Shimmer ring */}
-              <motion.div
-                className="absolute inset-0 rounded-full bg-primary/20"
-                animate={{
-                  scale: [1, 1.5, 1],
-                  opacity: [0.5, 0, 0.5],
-                }}
-                transition={{
-                  duration: 2,
-                  repeat: Infinity,
-                  ease: "easeInOut",
-                }}
-              />
-              {/* Glow effect */}
-              <div className="absolute inset-0 rounded-full bg-primary/10 blur-sm" />
-              <Shield className="w-5 h-5 relative z-10" />
-            </motion.button>
-          ) : (
-            <div className="w-5" />
-          )}
+          <div className="w-5" />
         </div>
         
         {/* Tabs - only show for authenticated users */}

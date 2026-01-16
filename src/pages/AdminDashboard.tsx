@@ -241,6 +241,9 @@ const AdminDashboard = () => {
     results: any[];
   } | null>(null);
 
+  // Profile summary generation
+  const [generatingSummary, setGeneratingSummary] = useState(false);
+
   const handlePasswordSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
     setPasswordError(false);
@@ -536,6 +539,48 @@ const AdminDashboard = () => {
       });
     } finally {
       setBackfillRunning(false);
+    }
+  };
+
+  const handleGenerateSummary = async (userId: string) => {
+    setGeneratingSummary(true);
+    try {
+      const { data, error } = await supabase.functions.invoke("summarize-profile", {
+        body: { userId, password: adminPassword },
+      });
+
+      if (error) throw error;
+      if (data?.error) throw new Error(data.error);
+
+      toast({
+        title: "Summary generated!",
+        description: `Profile summary created successfully${data.linkedInData ? ' with LinkedIn data' : ''}.`,
+      });
+
+      // Update the viewUser with new ai_insights
+      if (viewUser && viewUser.id === userId) {
+        setViewUser({
+          ...viewUser,
+          ai_insights: {
+            ...viewUser.ai_insights,
+            profileSummary: data.summary,
+            linkedInData: data.linkedInData,
+            generatedAt: new Date().toISOString(),
+          },
+        });
+      }
+
+      // Refresh data to get updated profiles
+      loadData();
+    } catch (error: any) {
+      console.error("Summary generation error:", error);
+      toast({
+        title: "Failed to generate summary",
+        description: error.message || "Unknown error",
+        variant: "destructive",
+      });
+    } finally {
+      setGeneratingSummary(false);
     }
   };
 
@@ -2177,32 +2222,138 @@ const AdminDashboard = () => {
                 </div>
               )}
 
-              {/* AI Insights */}
-              {viewUser.ai_insights && (
-                <div className="bg-primary/5 border border-primary/20 rounded-lg p-4">
-                  <h4 className="font-semibold text-primary mb-3">✨ AI Insights</h4>
-                  <div className="space-y-2 text-sm">
-                    {viewUser.ai_insights.summary && (
+              {/* AI Profile Summary - Generated from LinkedIn + Onboarding */}
+              <div className="bg-primary/5 border border-primary/20 rounded-lg p-4">
+                <div className="flex items-center justify-between mb-3">
+                  <h4 className="font-semibold text-primary flex items-center gap-2">
+                    <Sparkles className="w-4 h-4" />
+                    AI Profile Summary
+                  </h4>
+                  <Button
+                    variant="outline"
+                    size="sm"
+                    onClick={() => handleGenerateSummary(viewUser.id)}
+                    disabled={generatingSummary}
+                  >
+                    {generatingSummary ? (
+                      <Loader2 className="w-4 h-4 animate-spin mr-2" />
+                    ) : (
+                      <RefreshCw className="w-4 h-4 mr-2" />
+                    )}
+                    {generatingSummary ? "Generating..." : viewUser.ai_insights?.profileSummary ? "Regenerate" : "Generate Summary"}
+                  </Button>
+                </div>
+                
+                {viewUser.ai_insights?.profileSummary ? (
+                  <div className="space-y-3 text-sm">
+                    {viewUser.ai_insights.profileSummary.headline && (
                       <div>
-                        <p className="text-xs font-medium text-muted-foreground">Summary</p>
-                        <p>{viewUser.ai_insights.summary}</p>
+                        <p className="font-semibold text-foreground">{viewUser.ai_insights.profileSummary.headline}</p>
                       </div>
                     )}
-                    {viewUser.onboarding_context?.contrarianBelief && (
+                    {viewUser.ai_insights.profileSummary.narrative && (
                       <div>
-                        <p className="text-xs font-medium text-muted-foreground">Contrarian Belief</p>
-                        <p>{viewUser.onboarding_context.contrarianBelief}</p>
+                        <p className="text-xs font-medium text-muted-foreground">Narrative</p>
+                        <p>{viewUser.ai_insights.profileSummary.narrative}</p>
                       </div>
                     )}
-                    {viewUser.onboarding_context?.careerInflection && (
+                    {viewUser.ai_insights.profileSummary.decisionContext && (
                       <div>
-                        <p className="text-xs font-medium text-muted-foreground">Career Inflection</p>
-                        <p>{viewUser.onboarding_context.careerInflection}</p>
+                        <p className="text-xs font-medium text-muted-foreground">Current Decision</p>
+                        <p className="italic">"{viewUser.ai_insights.profileSummary.decisionContext}"</p>
+                      </div>
+                    )}
+                    <div className="grid grid-cols-2 gap-3">
+                      {viewUser.ai_insights.profileSummary.seeking && (
+                        <div>
+                          <p className="text-xs font-medium text-muted-foreground">Seeking</p>
+                          <p>{viewUser.ai_insights.profileSummary.seeking}</p>
+                        </div>
+                      )}
+                      {viewUser.ai_insights.profileSummary.offering && (
+                        <div>
+                          <p className="text-xs font-medium text-muted-foreground">Offering</p>
+                          <p>{viewUser.ai_insights.profileSummary.offering}</p>
+                        </div>
+                      )}
+                    </div>
+                    {viewUser.ai_insights.profileSummary.matchKeywords?.length > 0 && (
+                      <div>
+                        <p className="text-xs font-medium text-muted-foreground mb-1">Match Keywords</p>
+                        <div className="flex flex-wrap gap-1">
+                          {viewUser.ai_insights.profileSummary.matchKeywords.map((keyword: string) => (
+                            <span key={keyword} className="px-2 py-0.5 bg-primary/10 text-primary text-xs rounded-full">
+                              {keyword}
+                            </span>
+                          ))}
+                        </div>
+                      </div>
+                    )}
+                    {viewUser.ai_insights.profileSummary.matchTypes?.length > 0 && (
+                      <div>
+                        <p className="text-xs font-medium text-muted-foreground mb-1">Best Matches</p>
+                        <div className="flex flex-wrap gap-1">
+                          {viewUser.ai_insights.profileSummary.matchTypes.map((type: string) => (
+                            <span key={type} className="px-2 py-0.5 bg-blue-500/10 text-blue-500 text-xs rounded-full">
+                              {type}
+                            </span>
+                          ))}
+                        </div>
+                      </div>
+                    )}
+                    {viewUser.ai_insights.profileSummary.urgency && (
+                      <div className="flex items-center gap-2">
+                        <span className={`px-2 py-0.5 text-xs rounded-full ${
+                          viewUser.ai_insights.profileSummary.urgency === 'high' 
+                            ? 'bg-red-500/10 text-red-500' 
+                            : viewUser.ai_insights.profileSummary.urgency === 'medium' 
+                            ? 'bg-amber-500/10 text-amber-500'
+                            : 'bg-green-500/10 text-green-500'
+                        }`}>
+                          {viewUser.ai_insights.profileSummary.urgency} urgency
+                        </span>
+                        {viewUser.ai_insights.generatedAt && (
+                          <span className="text-xs text-muted-foreground">
+                            Generated {new Date(viewUser.ai_insights.generatedAt).toLocaleDateString()}
+                          </span>
+                        )}
+                      </div>
+                    )}
+                    {viewUser.ai_insights.linkedInData && (
+                      <div className="pt-2 border-t border-border">
+                        <p className="text-xs text-muted-foreground">
+                          📊 LinkedIn: {viewUser.ai_insights.linkedInData.name} - {viewUser.ai_insights.linkedInData.headline}
+                        </p>
                       </div>
                     )}
                   </div>
-                </div>
-              )}
+                ) : (
+                  <p className="text-sm text-muted-foreground">
+                    Click "Generate Summary" to create an AI-powered profile summary using LinkedIn data and onboarding context.
+                  </p>
+                )}
+
+                {/* Legacy AI insights */}
+                {viewUser.ai_insights?.summary && !viewUser.ai_insights?.profileSummary && (
+                  <div className="mt-3 pt-3 border-t border-border">
+                    <p className="text-xs font-medium text-muted-foreground">Legacy Summary</p>
+                    <p className="text-sm">{viewUser.ai_insights.summary}</p>
+                  </div>
+                )}
+                
+                {viewUser.onboarding_context?.contrarianBelief && (
+                  <div className="mt-3">
+                    <p className="text-xs font-medium text-muted-foreground">Contrarian Belief</p>
+                    <p className="text-sm">{viewUser.onboarding_context.contrarianBelief}</p>
+                  </div>
+                )}
+                {viewUser.onboarding_context?.careerInflection && (
+                  <div className="mt-2">
+                    <p className="text-xs font-medium text-muted-foreground">Career Inflection</p>
+                    <p className="text-sm">{viewUser.onboarding_context.careerInflection}</p>
+                  </div>
+                )}
+              </div>
 
               <div className="grid grid-cols-2 gap-4 text-sm">
                 <div>

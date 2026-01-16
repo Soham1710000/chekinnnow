@@ -1083,12 +1083,8 @@ const Chat = () => {
         </Suspense>
       ) : view === "chekinn" || !user ? (
         <>
-          {/* Learning Progress or Profile Card */}
-          {learningComplete && userProfile ? (
-            <Suspense fallback={<div className="h-20" />}>
-              <UserProfileCard profile={userProfile} />
-            </Suspense>
-          ) : (
+          {/* Learning Progress - only show when not complete */}
+          {!learningComplete && (
             <LearningProgress 
               messageCount={activeMessages.filter(m => m.role === "user").length}
               learningComplete={learningComplete}
@@ -1132,12 +1128,11 @@ const Chat = () => {
                     </motion.div>
                   )}
                   
-                  {/* Template buttons after first AI message */}
-                  {index === 0 && msg.role === "assistant" && activeMessages.length === 1 && (
+                  {/* Template buttons only for UPSC/CAT sources */}
+                  {index === 0 && msg.role === "assistant" && activeMessages.length === 1 && (isUPSC || isCAT) && (
                     <div className="mt-3 animate-fade-in">
-                      {/* Template buttons - different for UPSC/CAT */}
                       <div className="flex flex-wrap gap-1.5 max-w-[300px]">
-                        {(isUPSC ? UPSC_TEMPLATES : isCAT ? CAT_TEMPLATES : GENERAL_TEMPLATES).map((template) => (
+                        {(isUPSC ? UPSC_TEMPLATES : CAT_TEMPLATES).map((template) => (
                           <button
                             key={template}
                             onClick={() => handleSend(template)}

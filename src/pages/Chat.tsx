@@ -1157,10 +1157,6 @@ const Chat = () => {
                         userName={userProfile?.full_name}
                         onboardingContext={userProfile?.onboarding_context}
                         aiInsights={userProfile?.ai_insights}
-                        onViewMatches={() => {
-                          hasShownExternalNudge.current = true;
-                          setView("match");
-                        }}
                       />
                     </motion.div>
                   )}

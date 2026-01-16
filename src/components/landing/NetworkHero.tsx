@@ -391,15 +391,14 @@ export const NetworkHero = () => {
         <span className="text-sm font-medium" style={{ color: '#34A853' }}>l</span>
         <span className="text-sm font-medium" style={{ color: '#EA4335' }}>e</span>
       </div>
-      <span className="text-sm font-bold text-[#E50914] tracking-tight">NETFLIX</span>
       <span className="text-sm font-bold text-gray-800 tracking-tight">BCG</span>
       <span className="text-sm font-bold text-[#8C1515] tracking-tight">Stanford</span>
       <span className="text-sm font-bold text-[#00A1E0] tracking-tight">Salesforce</span>
       <span className="text-xs font-semibold text-gray-700 tracking-tight">Tier 1 VCs</span>
       <span className="text-sm font-black text-gray-800 tracking-tight">CRED</span>
-      <span className="text-sm font-bold text-[#A31F34] tracking-tight">MIT</span>
+      <span className="text-sm font-bold text-[#FF6B00] tracking-tight">MPL</span>
       <span className="text-sm font-bold text-gray-800 italic">flipkart</span>
-      <span className="text-sm font-bold text-[#00356B] tracking-tight">Yale</span>
+      <span className="text-sm font-bold text-[#F5C518] tracking-tight">Rapido</span>
       <span className="text-sm font-bold text-gray-800 tracking-tight">McKinsey</span>
       <span className="text-xs font-bold text-gray-800 tracking-tight">IIT Delhi</span>
       <span className="text-sm font-bold text-[#0077B5] tracking-tight">LinkedIn</span>

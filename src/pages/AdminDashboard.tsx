@@ -37,6 +37,18 @@ import {
 } from "@/components/ui/dialog";
 
 interface OnboardingContext {
+  // New flow fields
+  decision_posture?: string;
+  ask_type?: string;
+  lived_context?: string[];
+  followup_context?: string[];
+  micro_reason?: string;
+  decision_weight?: string;
+  stakes_text?: string;
+  context_chips?: string[];
+  open_help_text?: string;
+  help_style?: string;
+  // Legacy fields (for backwards compatibility)
   lookingFor?: string;
   whyOpportunity?: string;
   constraint?: string;
@@ -1730,19 +1742,34 @@ const AdminDashboard = () => {
                     </div>
 
                     {/* Onboarding Context - most important for matching */}
-                    {profile.onboarding_context?.lookingFor && (
+                    {(profile.onboarding_context?.ask_type || profile.onboarding_context?.lookingFor) && (
                       <div className="bg-emerald-500/10 border border-emerald-500/30 rounded-lg p-3 mb-3">
-                        <p className="text-xs font-medium text-emerald-600 mb-1">🎯 Looking For</p>
-                        <p className="text-sm font-medium">{profile.onboarding_context.lookingFor}</p>
-                        {profile.onboarding_context.whyOpportunity && (
+                        <p className="text-xs font-medium text-emerald-600 mb-1">🎯 Check-in Intent</p>
+                        {/* New flow display */}
+                        {profile.onboarding_context.ask_type && (
+                          <p className="text-sm font-medium capitalize">{profile.onboarding_context.ask_type.replace(/_/g, ' ')}</p>
+                        )}
+                        {profile.onboarding_context.lived_context && profile.onboarding_context.lived_context.length > 0 && (
                           <p className="text-xs text-muted-foreground mt-1">
-                            <span className="font-medium">Why:</span> {profile.onboarding_context.whyOpportunity}
+                            <span className="font-medium">Lived:</span> {profile.onboarding_context.lived_context.slice(0, 2).map(c => c.replace(/_/g, ' ')).join(', ')}
+                            {profile.onboarding_context.lived_context.length > 2 && ` +${profile.onboarding_context.lived_context.length - 2} more`}
                           </p>
                         )}
-                        {profile.onboarding_context.constraint && (
+                        {profile.onboarding_context.decision_weight && (
                           <p className="text-xs text-muted-foreground mt-1">
-                            <span className="font-medium">Constraints:</span> {profile.onboarding_context.constraint}
+                            <span className="font-medium">Stakes:</span> {profile.onboarding_context.decision_weight.replace(/_/g, ' ')}
                           </p>
+                        )}
+                        {/* Legacy flow fallback */}
+                        {!profile.onboarding_context.ask_type && profile.onboarding_context.lookingFor && (
+                          <>
+                            <p className="text-sm font-medium">{profile.onboarding_context.lookingFor}</p>
+                            {profile.onboarding_context.constraint && (
+                              <p className="text-xs text-muted-foreground mt-1">
+                                <span className="font-medium">Constraints:</span> {profile.onboarding_context.constraint}
+                              </p>
+                            )}
+                          </>
                         )}
                       </div>
                     )}
@@ -2036,31 +2063,115 @@ const AdminDashboard = () => {
           {viewUser && (
             <div className="space-y-4">
               {/* Onboarding Context - Primary matching info */}
-              {viewUser.onboarding_context?.lookingFor && (
+              {(viewUser.onboarding_context?.ask_type || viewUser.onboarding_context?.lookingFor) && (
                 <div className="bg-emerald-500/10 border border-emerald-500/30 rounded-lg p-4">
                   <h4 className="font-semibold text-emerald-700 mb-3">🎯 Match Context</h4>
                   <div className="space-y-3">
-                    <div>
-                      <p className="text-xs font-medium text-muted-foreground">Looking For</p>
-                      <p className="font-medium">{viewUser.onboarding_context.lookingFor}</p>
-                    </div>
-                    {viewUser.onboarding_context.whyOpportunity && (
+                    {/* New flow fields */}
+                    {viewUser.onboarding_context.ask_type && (
                       <div>
-                        <p className="text-xs font-medium text-muted-foreground">Why This Opportunity</p>
-                        <p>{viewUser.onboarding_context.whyOpportunity}</p>
+                        <p className="text-xs font-medium text-muted-foreground">Check-in Intent</p>
+                        <p className="font-medium capitalize">{viewUser.onboarding_context.ask_type.replace(/_/g, ' ')}</p>
                       </div>
                     )}
-                    {viewUser.onboarding_context.constraint && (
+                    {viewUser.onboarding_context.decision_posture && (
                       <div>
-                        <p className="text-xs font-medium text-muted-foreground">Constraints</p>
-                        <p>{viewUser.onboarding_context.constraint}</p>
+                        <p className="text-xs font-medium text-muted-foreground">Decision Style</p>
+                        <p className="capitalize">{viewUser.onboarding_context.decision_posture.replace(/_/g, ' ')}</p>
                       </div>
                     )}
-                    {viewUser.onboarding_context.motivation && (
+                    {viewUser.onboarding_context.lived_context && viewUser.onboarding_context.lived_context.length > 0 && (
                       <div>
-                        <p className="text-xs font-medium text-muted-foreground">Motivation</p>
-                        <p>{viewUser.onboarding_context.motivation}</p>
+                        <p className="text-xs font-medium text-muted-foreground">Lived Experience</p>
+                        <div className="flex flex-wrap gap-1 mt-1">
+                          {viewUser.onboarding_context.lived_context.map((ctx) => (
+                            <span key={ctx} className="px-2 py-0.5 bg-emerald-100 text-emerald-700 text-xs rounded-full capitalize">
+                              {ctx.replace(/_/g, ' ')}
+                            </span>
+                          ))}
+                        </div>
                       </div>
+                    )}
+                    {viewUser.onboarding_context.followup_context && viewUser.onboarding_context.followup_context.length > 0 && (
+                      <div>
+                        <p className="text-xs font-medium text-muted-foreground">Relevant Forks</p>
+                        <div className="flex flex-wrap gap-1 mt-1">
+                          {viewUser.onboarding_context.followup_context.map((ctx) => (
+                            <span key={ctx} className="px-2 py-0.5 bg-blue-100 text-blue-700 text-xs rounded-full capitalize">
+                              {ctx.replace(/_/g, ' ')}
+                            </span>
+                          ))}
+                        </div>
+                      </div>
+                    )}
+                    {viewUser.onboarding_context.decision_weight && (
+                      <div>
+                        <p className="text-xs font-medium text-muted-foreground">Decision Weight</p>
+                        <p className="capitalize">{viewUser.onboarding_context.decision_weight.replace(/_/g, ' ')}</p>
+                      </div>
+                    )}
+                    {viewUser.onboarding_context.stakes_text && (
+                      <div>
+                        <p className="text-xs font-medium text-muted-foreground">What's at Stake</p>
+                        <p className="text-sm italic">"{viewUser.onboarding_context.stakes_text}"</p>
+                      </div>
+                    )}
+                    {viewUser.onboarding_context.context_chips && viewUser.onboarding_context.context_chips.length > 0 && (
+                      <div>
+                        <p className="text-xs font-medium text-muted-foreground">Current Constraints</p>
+                        <div className="flex flex-wrap gap-1 mt-1">
+                          {viewUser.onboarding_context.context_chips.map((chip) => (
+                            <span key={chip} className="px-2 py-0.5 bg-amber-100 text-amber-700 text-xs rounded-full capitalize">
+                              {chip.replace(/_/g, ' ')}
+                            </span>
+                          ))}
+                        </div>
+                      </div>
+                    )}
+                    {viewUser.onboarding_context.micro_reason && (
+                      <div>
+                        <p className="text-xs font-medium text-muted-foreground">Additional Context</p>
+                        <p className="text-sm italic">"{viewUser.onboarding_context.micro_reason}"</p>
+                      </div>
+                    )}
+                    {viewUser.onboarding_context.open_help_text && (
+                      <div>
+                        <p className="text-xs font-medium text-muted-foreground">Can Help With</p>
+                        <p className="text-sm italic">"{viewUser.onboarding_context.open_help_text}"</p>
+                      </div>
+                    )}
+                    {viewUser.onboarding_context.help_style && (
+                      <div>
+                        <p className="text-xs font-medium text-muted-foreground">Help Style</p>
+                        <p className="capitalize">{viewUser.onboarding_context.help_style.replace(/_/g, ' ')}</p>
+                      </div>
+                    )}
+                    {/* Legacy fields for backwards compatibility */}
+                    {!viewUser.onboarding_context.ask_type && viewUser.onboarding_context.lookingFor && (
+                      <>
+                        <div>
+                          <p className="text-xs font-medium text-muted-foreground">Looking For</p>
+                          <p className="font-medium">{viewUser.onboarding_context.lookingFor}</p>
+                        </div>
+                        {viewUser.onboarding_context.whyOpportunity && (
+                          <div>
+                            <p className="text-xs font-medium text-muted-foreground">Why This Opportunity</p>
+                            <p>{viewUser.onboarding_context.whyOpportunity}</p>
+                          </div>
+                        )}
+                        {viewUser.onboarding_context.constraint && (
+                          <div>
+                            <p className="text-xs font-medium text-muted-foreground">Constraints</p>
+                            <p>{viewUser.onboarding_context.constraint}</p>
+                          </div>
+                        )}
+                        {viewUser.onboarding_context.motivation && (
+                          <div>
+                            <p className="text-xs font-medium text-muted-foreground">Motivation</p>
+                            <p>{viewUser.onboarding_context.motivation}</p>
+                          </div>
+                        )}
+                      </>
                     )}
                   </div>
                 </div>

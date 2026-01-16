@@ -11,9 +11,7 @@ import { z } from "zod";
 import { useFunnelTracking } from "@/hooks/useFunnelTracking";
 
 // Lazy load onboarding components
-const ContextEarningFlow = lazy(() => import("@/components/onboarding/ContextEarningFlow"));
-const IntentDeclaration = lazy(() => import("@/components/onboarding/IntentDeclaration"));
-const OnboardingComplete = lazy(() => import("@/components/onboarding/OnboardingComplete"));
+const OnboardingFlow = lazy(() => import("@/components/onboarding/OnboardingFlow"));
 
 const emailSchema = z.string().email("Please enter a valid email");
 const passwordSchema = z.string().min(6, "Password must be at least 6 characters");
@@ -22,7 +20,7 @@ const linkedinUrlSchema = z.string()
     message: "Please enter a valid LinkedIn profile URL"
   });
 
-type AuthStep = "credentials" | "context" | "intent" | "complete";
+type AuthStep = "credentials" | "onboarding";
 
 const Auth = () => {
   const { user, loading: authLoading } = useAuth();
@@ -79,7 +77,7 @@ const Auth = () => {
     } else if (data && !data.learning_complete) {
       // User exists but hasn't completed onboarding
       setNewUserId(user.id);
-      setStep("context");
+      setStep("onboarding");
     } else {
       navigate("/chat");
     }
@@ -257,7 +255,7 @@ const Auth = () => {
         }).eq("id", authData.user.id);
 
         setNewUserId(authData.user.id);
-        setStep("context");
+        setStep("onboarding");
       }
     } else {
       const { error } = await supabase.auth.signInWithPassword({
@@ -281,50 +279,37 @@ const Auth = () => {
     setLoading(false);
   };
 
-  const handleContextComplete = async (context: any) => {
+  const handleOnboardingComplete = async (data: any) => {
     if (newUserId) {
-      // Save full context for admin matching + AI matching
+      // Save full onboarding context
       await supabase.from("profiles").update({
-        looking_for: context.lookingFor || null, // Main field for matching
+        looking_for: data.ask_type || null,
+        connection_intent: data.ask_type,
+        learning_complete: true,
         onboarding_context: {
-          lookingFor: context.lookingFor,
-          whyOpportunity: context.whyOpportunity,
-          constraint: context.constraint,
-          motivation: context.motivation,
-          motivationExplanation: context.motivationExplanation,
-          contrarianBelief: context.contrarianBelief,
-          careerInflection: context.careerInflection,
+          decision_posture: data.decision_posture,
+          ask_type: data.ask_type,
+          lived_context: data.lived_context,
+          followup_context: data.followup_context,
+          micro_reason: data.micro_reason,
+          decision_weight: data.decision_weight,
+          stakes_text: data.stakes_text,
+          context_chips: data.context_chips,
+          open_help_text: data.open_help_text,
+          help_style: data.help_style,
           completedAt: new Date().toISOString(),
         },
         ai_insights: {
-          contrarian_belief: context.contrarianBelief,
-          career_inflection: context.careerInflection,
-          motivation: context.motivation,
-          motivation_explanation: context.motivationExplanation,
-          constraint: context.constraint,
+          decision_posture: data.decision_posture,
+          lived_context: data.lived_context,
+          decision_weight: data.decision_weight,
+          context_constraints: data.context_chips,
+          help_style: data.help_style,
         },
       }).eq("id", newUserId);
       
-      trackEvent("context_earning_complete", { userId: newUserId });
+      trackEvent("onboarding_complete", { userId: newUserId, ask_type: data.ask_type });
     }
-    setStep("intent");
-  };
-
-  const handleIntentComplete = async (intent: string) => {
-    if (newUserId) {
-      // Save intent to profile
-      await supabase.from("profiles").update({
-        connection_intent: intent,
-        learning_complete: true,
-      }).eq("id", newUserId);
-      
-      trackEvent("intent_declaration_complete", { userId: newUserId, intent });
-    }
-    setStep("complete");
-  };
-
-  const handleOnboardingComplete = () => {
-    trackEvent("onboarding_complete", { userId: newUserId });
     navigate("/chat");
   };
 
@@ -336,27 +321,11 @@ const Auth = () => {
     );
   }
 
-  // Render onboarding steps
-  if (step === "context" && newUserId) {
+  // Render onboarding flow
+  if (step === "onboarding" && newUserId) {
     return (
       <Suspense fallback={<div className="min-h-screen bg-background flex items-center justify-center"><Loader2 className="w-6 h-6 animate-spin text-muted-foreground" /></div>}>
-        <ContextEarningFlow onComplete={handleContextComplete} />
-      </Suspense>
-    );
-  }
-
-  if (step === "intent" && newUserId) {
-    return (
-      <Suspense fallback={<div className="min-h-screen bg-background flex items-center justify-center"><Loader2 className="w-6 h-6 animate-spin text-muted-foreground" /></div>}>
-        <IntentDeclaration onComplete={handleIntentComplete} />
-      </Suspense>
-    );
-  }
-
-  if (step === "complete") {
-    return (
-      <Suspense fallback={<div className="min-h-screen bg-background flex items-center justify-center"><Loader2 className="w-6 h-6 animate-spin text-muted-foreground" /></div>}>
-        <OnboardingComplete onStart={handleOnboardingComplete} />
+        <OnboardingFlow onComplete={handleOnboardingComplete} />
       </Suspense>
     );
   }

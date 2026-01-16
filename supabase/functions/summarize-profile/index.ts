@@ -6,6 +6,7 @@ const corsHeaders = {
   'Access-Control-Allow-Headers': 'authorization, x-client-info, apikey, content-type',
 };
 
+// Basic LinkedIn lookup (fast, for initial data)
 async function fetchLinkedInProfile(linkedinUrl: string, cladoApiKey: string) {
   if (!linkedinUrl) return null;
 
@@ -33,13 +34,95 @@ async function fetchLinkedInProfile(linkedinUrl: string, cladoApiKey: string) {
   }
 }
 
+// Deep research on a person (comprehensive, takes longer)
+async function initiateDeepResearch(linkedinUrl: string, personName: string, cladoApiKey: string) {
+  try {
+    // Extract LinkedIn username for better search
+    const linkedinMatch = linkedinUrl.match(/linkedin\.com\/in\/([^\/\?]+)/);
+    const linkedinUsername = linkedinMatch ? linkedinMatch[1] : '';
+    
+    // Build a focused search query
+    const searchQuery = personName 
+      ? `${personName} ${linkedinUsername} professional background career experience`
+      : `${linkedinUrl} professional background career experience`;
+    
+    console.log('Initiating deep research for:', searchQuery);
+    
+    const response = await fetch('https://search.clado.ai/api/search/deep_research', {
+      method: 'POST',
+      headers: {
+        'Authorization': `Bearer ${cladoApiKey}`,
+        'Content-Type': 'application/json',
+      },
+      body: JSON.stringify({ 
+        query: searchQuery,
+        limit: 20,
+      }),
+    });
+
+    if (!response.ok) {
+      const errorText = await response.text();
+      console.error('Clado deep research initiation error:', response.status, errorText);
+      return null;
+    }
+    
+    const data = await response.json();
+    console.log('Deep research initiated, job ID:', data.job_id);
+    return data.job_id;
+  } catch (error) {
+    console.error('Error initiating deep research:', error);
+    return null;
+  }
+}
+
+// Poll for deep research results
+async function pollDeepResearchResults(jobId: string, cladoApiKey: string, maxAttempts = 30) {
+  for (let attempt = 0; attempt < maxAttempts; attempt++) {
+    try {
+      console.log(`Polling deep research results, attempt ${attempt + 1}/${maxAttempts}`);
+      
+      const response = await fetch(`https://search.clado.ai/api/search/deep_research/${jobId}`, {
+        method: 'GET',
+        headers: {
+          'Authorization': `Bearer ${cladoApiKey}`,
+          'Content-Type': 'application/json',
+        },
+      });
+
+      if (!response.ok) {
+        console.error('Clado status error:', response.status);
+        return null;
+      }
+      
+      const data = await response.json();
+      
+      if (data.status === 'completed') {
+        console.log('Deep research completed successfully');
+        return data;
+      } else if (data.status === 'failed') {
+        console.error('Deep research failed:', data.error);
+        return null;
+      }
+      
+      // Wait 2 seconds before next poll
+      await new Promise(resolve => setTimeout(resolve, 2000));
+    } catch (error) {
+      console.error('Error polling deep research:', error);
+      return null;
+    }
+  }
+  
+  console.log('Deep research timed out after max attempts');
+  return null;
+}
+
 serve(async (req) => {
   if (req.method === 'OPTIONS') {
     return new Response(null, { headers: corsHeaders });
   }
 
   try {
-    const { userId, password } = await req.json();
+    const { userId, password, useDeepResearch = true } = await req.json();
 
     // Verify admin password
     const expectedPassword = Deno.env.get('ADMIN_PASSWORD');
@@ -75,11 +158,25 @@ serve(async (req) => {
       );
     }
 
-    // Fetch LinkedIn data if URL available
-    let linkedInData = null;
     const cladoApiKey = Deno.env.get('CLADO_API_KEY');
+    
+    // Fetch LinkedIn data
+    let linkedInData = null;
+    let deepResearchData = null;
+    
     if (profile.linkedin_url && cladoApiKey) {
+      // First get basic LinkedIn data (fast)
       linkedInData = await fetchLinkedInProfile(profile.linkedin_url, cladoApiKey);
+      
+      // Then initiate deep research if enabled
+      if (useDeepResearch) {
+        const personName = linkedInData?.name || profile.full_name;
+        const jobId = await initiateDeepResearch(profile.linkedin_url, personName, cladoApiKey);
+        
+        if (jobId) {
+          deepResearchData = await pollDeepResearchResults(jobId, cladoApiKey);
+        }
+      }
     }
 
     // Parse onboarding context
@@ -123,6 +220,15 @@ serve(async (req) => {
     // Build the prompt
     let contextParts: string[] = [];
 
+    // Deep research data (most comprehensive)
+    if (deepResearchData?.results || deepResearchData?.summary) {
+      contextParts.push(`DEEP RESEARCH FINDINGS:
+${deepResearchData.summary || ''}
+
+Key Insights:
+${JSON.stringify(deepResearchData.results?.slice(0, 10) || [], null, 2)}`);
+    }
+
     // LinkedIn data
     if (linkedInData) {
       contextParts.push(`LINKEDIN PROFILE DATA:
@@ -139,6 +245,21 @@ ${JSON.stringify(linkedInData, null, 2)}`);
 - Skills: ${profile.skills?.join(', ') || 'Not provided'}
 - Interests: ${profile.interests?.join(', ') || 'Not provided'}
 - Looking For: ${profile.looking_for || 'Not provided'}`);
+
+    // Onboarding context - depth inputs (new)
+    if (onboardingContext.depth_input_1 || onboardingContext.depth_input_2 || onboardingContext.depth_input_3) {
+      let depthSection = `USER'S OWN WORDS (from onboarding):`;
+      if (onboardingContext.depth_input_1) {
+        depthSection += `\n- What they're working through: "${onboardingContext.depth_input_1}"`;
+      }
+      if (onboardingContext.depth_input_2) {
+        depthSection += `\n- Non-negotiable/Key constraint: "${onboardingContext.depth_input_2}"`;
+      }
+      if (onboardingContext.depth_input_3) {
+        depthSection += `\n- Dream outcome: "${onboardingContext.depth_input_3}"`;
+      }
+      contextParts.push(depthSection);
+    }
 
     // Onboarding context (new flow)
     if (onboardingContext.ask_type || onboardingContext.decision_posture) {
@@ -188,7 +309,7 @@ ${JSON.stringify(linkedInData, null, 2)}`);
 
     const fullContext = contextParts.join('\n\n');
 
-    console.log('Generating profile summary for user:', userId);
+    console.log('Generating profile summary for user:', userId, 'with deep research:', !!deepResearchData);
 
     // Call AI to generate summary
     const aiResponse = await fetch('https://ai.gateway.lovable.dev/v1/chat/completions', {
@@ -204,27 +325,33 @@ ${JSON.stringify(linkedInData, null, 2)}`);
             role: 'system',
             content: `You are a professional profile summarizer for ChekInn, a platform that matches professionals based on their decision-making context and lived experience.
 
+You have access to DEEP RESEARCH data about this person from the web, combined with their own self-reported context from onboarding. Use both to create the most insightful profile possible.
+
 Generate a comprehensive but concise profile summary that would help an admin understand:
-1. Who this person is professionally
+1. Who this person is professionally (background, career trajectory, notable achievements)
 2. What decision/fork they're currently navigating
 3. What kind of connections would be most valuable for them
 4. What unique perspective or experience they can offer to others
+5. Any interesting insights from the deep research (articles, mentions, projects)
 
 Output valid JSON only with this structure:
 {
   "headline": "One-line professional identity (max 100 chars)",
-  "narrative": "2-3 sentence story of who they are and what they're navigating",
+  "narrative": "3-4 sentence story of who they are, their journey, and what they're navigating. Include insights from deep research.",
+  "background": "Key professional background points from deep research",
   "seeking": "What they're looking for in connections (1-2 sentences)",
   "offering": "What unique value they can provide to others (1-2 sentences)",
-  "matchKeywords": ["array", "of", "5-8", "keywords", "for", "matching"],
-  "decisionContext": "Brief summary of their current decision/fork (1 sentence)",
+  "matchKeywords": ["array", "of", "8-12", "keywords", "for", "matching"],
+  "decisionContext": "Brief summary of their current decision/fork (1-2 sentences)",
   "urgency": "low | medium | high",
-  "matchTypes": ["types of people who would be good matches"]
+  "matchTypes": ["specific types of people who would be ideal matches"],
+  "webPresence": "Summary of their online presence/mentions if found",
+  "notableInsights": ["any", "interesting", "findings", "from", "deep", "research"]
 }`
           },
           {
             role: 'user',
-            content: `Generate a profile summary from this data:\n\n${fullContext}`
+            content: `Generate a comprehensive profile summary from this data:\n\n${fullContext}`
           }
         ],
         response_format: { type: 'json_object' },
@@ -275,6 +402,7 @@ Output valid JSON only with this structure:
             location: linkedInData.location,
             fetchedAt: new Date().toISOString(),
           } : null,
+          deepResearchUsed: !!deepResearchData,
           generatedAt: new Date().toISOString(),
         },
         updated_at: new Date().toISOString(),
@@ -289,7 +417,7 @@ Output valid JSON only with this structure:
       );
     }
 
-    console.log('Successfully generated and saved profile summary for:', userId);
+    console.log('Successfully generated and saved profile summary for:', userId, 'deep research:', !!deepResearchData);
 
     return new Response(
       JSON.stringify({
@@ -300,6 +428,7 @@ Output valid JSON only with this structure:
           headline: linkedInData.headline,
           company: linkedInData.current_company || linkedInData.company,
         } : null,
+        deepResearchUsed: !!deepResearchData,
       }),
       { headers: { ...corsHeaders, 'Content-Type': 'application/json' } }
     );

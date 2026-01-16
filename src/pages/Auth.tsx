@@ -515,16 +515,23 @@ const Auth = () => {
                   className="h-12 text-base rounded-xl border-2 border-muted focus:border-primary transition-colors"
                 />
 
-                <Input
-                  id="password"
-                  type="password"
-                  value={password}
-                  onChange={(e) => setPassword(e.target.value)}
-                  placeholder={isSignUp ? "Create a password" : "Your password"}
-                  required
-                  minLength={6}
-                  className="h-12 text-base rounded-xl border-2 border-muted focus:border-primary transition-colors"
-                />
+                <div>
+                  <Input
+                    id="password"
+                    type="password"
+                    value={password}
+                    onChange={(e) => setPassword(e.target.value)}
+                    placeholder={isSignUp ? "Create a password" : "Your password"}
+                    required
+                    minLength={6}
+                    className="h-12 text-base rounded-xl border-2 border-muted focus:border-primary transition-colors"
+                  />
+                  {isSignUp && (
+                    <p className={`text-xs mt-1.5 ml-1 ${password.length >= 6 ? 'text-green-600' : 'text-muted-foreground'}`}>
+                      {password.length >= 6 ? '✓' : '•'} At least 6 characters
+                    </p>
+                  )}
+                </div>
 
                 {isSignUp && (
                   <div className="relative">

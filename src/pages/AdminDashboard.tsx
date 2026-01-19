@@ -997,7 +997,7 @@ const AdminDashboard = () => {
                 )}
               </TabsTrigger>
               <TabsTrigger value="leads">
-                Leads
+                Chats
                 {leads.filter(l => !l.converted_at).length > 0 && (
                   <span className="ml-1.5 bg-orange-500 text-white text-xs px-1.5 py-0.5 rounded-full">
                     {leads.filter(l => !l.converted_at).length}
@@ -1651,12 +1651,12 @@ const AdminDashboard = () => {
             </div>
           </TabsContent>
 
-          {/* Leads Tab */}
+          {/* Chats Tab */}
           <TabsContent value="leads" className="space-y-4">
             <div className="grid grid-cols-2 md:grid-cols-4 gap-4">
               <div className="bg-card border border-border rounded-xl p-4">
                 <p className="text-2xl font-bold">{leads.length}</p>
-                <p className="text-sm text-muted-foreground">Total Leads</p>
+                <p className="text-sm text-muted-foreground">Total Chats</p>
               </div>
               <div className="bg-card border border-border rounded-xl p-4">
                 <p className="text-2xl font-bold text-orange-500">{leads.filter(l => !l.converted_at).length}</p>
@@ -1676,7 +1676,7 @@ const AdminDashboard = () => {
 
             {leads.length === 0 ? (
               <div className="text-center py-12 text-muted-foreground">
-                No leads yet. Anonymous chat sessions will appear here.
+                No chats yet. Anonymous chat sessions will appear here.
               </div>
             ) : (
               <div className="space-y-4">

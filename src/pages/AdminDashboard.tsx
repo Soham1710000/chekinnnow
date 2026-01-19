@@ -1746,10 +1746,12 @@ const AdminDashboard = () => {
                           {profile.full_name?.charAt(0) || "?"}
                         </div>
                         <div>
-                          <h3 className="font-medium">
-                            {profile.full_name || "No name"}
-                          </h3>
-                          <p className="text-sm text-muted-foreground">
+                          {profile.full_name && (
+                            <h3 className="font-medium">
+                              {profile.full_name}
+                            </h3>
+                          )}
+                          <p className={`text-sm ${profile.full_name ? 'text-muted-foreground' : 'font-medium'}`}>
                             {profile.email}
                           </p>
                         </div>

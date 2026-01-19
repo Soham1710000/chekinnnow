@@ -12,6 +12,11 @@ import { useFunnelTracking } from "@/hooks/useFunnelTracking";
 
 // Lazy load onboarding components
 const OnboardingFlow = lazy(() => import("@/components/onboarding/OnboardingFlow"));
+const UPSCOnboardingFlow = lazy(() => import("@/components/onboarding/UPSCOnboardingFlow"));
+
+// Get source for cohort-specific experience
+const getSource = () => sessionStorage.getItem("chekinn_source") || "";
+const isUPSCSource = () => getSource() === "upsc";
 
 const nameSchema = z.string().min(2, "Name must be at least 2 characters").max(100, "Name must be less than 100 characters");
 const emailSchema = z.string().email("Please enter a valid email");
@@ -288,42 +293,78 @@ const Auth = () => {
 
   const handleOnboardingComplete = async (data: any) => {
     if (newUserId) {
-      // Save full onboarding context with depth inputs
-      await supabase.from("profiles").update({
-        looking_for: data.ask_type || null,
-        connection_intent: data.ask_type,
-        learning_complete: true,
-        onboarding_context: {
-          decision_posture: data.decision_posture,
-          ask_type: data.ask_type,
-          lived_context: data.lived_context,
-          followup_context: data.followup_context,
-          micro_reason: data.micro_reason,
-          decision_weight: data.decision_weight,
-          stakes_text: data.stakes_text,
-          context_chips: data.context_chips,
-          open_help_text: data.open_help_text,
-          help_style: data.help_style,
-          // Depth inputs
-          depth_input_1: data.depth_input_1,
-          depth_input_2: data.depth_input_2,
-          depth_input_3: data.depth_input_3,
-          completedAt: new Date().toISOString(),
-        },
-        ai_insights: {
-          decision_posture: data.decision_posture,
-          lived_context: data.lived_context,
-          decision_weight: data.decision_weight,
-          context_constraints: data.context_chips,
-          help_style: data.help_style,
-          // Depth insights for matching
-          depth_input_1: data.depth_input_1,
-          depth_input_2: data.depth_input_2,
-          depth_input_3: data.depth_input_3,
-        },
-      }).eq("id", newUserId);
-      
-      trackEvent("onboarding_complete", { userId: newUserId, ask_type: data.ask_type });
+      // Check if this is UPSC onboarding
+      if (isUPSCSource() && data.current_stage) {
+        // UPSC-specific onboarding data
+        await supabase.from("profiles").update({
+          looking_for: data.current_struggle || null,
+          connection_intent: "upsc_guidance",
+          learning_complete: true,
+          onboarding_context: {
+            source: "upsc",
+            current_stage: data.current_stage,
+            current_struggle: data.current_struggle,
+            tried_before: data.tried_before,
+            tried_details: data.tried_details,
+            specific_challenge: data.specific_challenge,
+            help_style: data.help_style,
+            help_details: data.help_details,
+            constraints: data.constraints,
+            // Store specific challenge as depth input for AI summary display
+            depth_input_1: data.specific_challenge,
+            depth_input_2: data.help_details || `Looking for ${data.help_style?.replace(/_/g, ' ')}`,
+            completedAt: new Date().toISOString(),
+          },
+          ai_insights: {
+            source: "upsc",
+            current_stage: data.current_stage,
+            current_struggle: data.current_struggle,
+            tried_before: data.tried_before,
+            help_style: data.help_style,
+            constraints: data.constraints,
+            specific_challenge: data.specific_challenge,
+          },
+        }).eq("id", newUserId);
+        
+        trackEvent("onboarding_complete", { userId: newUserId, source: "upsc", current_struggle: data.current_struggle });
+      } else {
+        // Regular onboarding flow - save full onboarding context with depth inputs
+        await supabase.from("profiles").update({
+          looking_for: data.ask_type || null,
+          connection_intent: data.ask_type,
+          learning_complete: true,
+          onboarding_context: {
+            decision_posture: data.decision_posture,
+            ask_type: data.ask_type,
+            lived_context: data.lived_context,
+            followup_context: data.followup_context,
+            micro_reason: data.micro_reason,
+            decision_weight: data.decision_weight,
+            stakes_text: data.stakes_text,
+            context_chips: data.context_chips,
+            open_help_text: data.open_help_text,
+            help_style: data.help_style,
+            // Depth inputs
+            depth_input_1: data.depth_input_1,
+            depth_input_2: data.depth_input_2,
+            depth_input_3: data.depth_input_3,
+            completedAt: new Date().toISOString(),
+          },
+          ai_insights: {
+            decision_posture: data.decision_posture,
+            lived_context: data.lived_context,
+            decision_weight: data.decision_weight,
+            context_constraints: data.context_chips,
+            help_style: data.help_style,
+            // Depth insights for matching
+            depth_input_1: data.depth_input_1,
+            depth_input_2: data.depth_input_2,
+            depth_input_3: data.depth_input_3,
+          },
+        }).eq("id", newUserId);
+        
+        trackEvent("onboarding_complete", { userId: newUserId, ask_type: data.ask_type });
+      }
     }
     navigate("/chat");
   };
@@ -336,11 +377,15 @@ const Auth = () => {
     );
   }
 
-  // Render onboarding flow
+  // Render onboarding flow - use UPSC flow for UPSC source
   if (step === "onboarding" && newUserId) {
     return (
       <Suspense fallback={<div className="min-h-screen bg-background flex items-center justify-center"><Loader2 className="w-6 h-6 animate-spin text-muted-foreground" /></div>}>
-        <OnboardingFlow onComplete={handleOnboardingComplete} />
+        {isUPSCSource() ? (
+          <UPSCOnboardingFlow onComplete={handleOnboardingComplete} />
+        ) : (
+          <OnboardingFlow onComplete={handleOnboardingComplete} />
+        )}
       </Suspense>
     );
   }

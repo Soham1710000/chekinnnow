@@ -1,37 +1,24 @@
-import { useState, useEffect, useRef, lazy, Suspense, memo, useCallback } from "react";
+import { useState, useEffect, useRef } from "react";
 import { useAuth } from "@/hooks/useAuth";
 import { supabase } from "@/integrations/supabase/client";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
-import { Send, ArrowLeft, MessageCircle, Users, Clock, Sparkles, Mic, Keyboard, Target } from "lucide-react";
+import { Send, ArrowLeft, MessageCircle, Users, Clock, Sparkles, Mic, Keyboard } from "lucide-react";
 import { motion, AnimatePresence } from "framer-motion";
 import { useNavigate } from "react-router-dom";
 import { useToast } from "@/hooks/use-toast";
-
-// Core components loaded eagerly for initial render
 import IntroCard from "@/components/chat/IntroCard";
+import UserChatView from "@/components/chat/UserChatView";
 import LearningProgress from "@/components/chat/LearningProgress";
-import WelcomeGreeting from "@/components/chat/WelcomeGreeting";
-
-// Lazy load heavy components that aren't needed immediately
-const UserChatView = lazy(() => import("@/components/chat/UserChatView"));
-const UserProfileCard = lazy(() => import("@/components/chat/UserProfileCard"));
-const SaveProgressNudge = lazy(() => import("@/components/chat/SaveProgressNudge"));
-const WhatsAppCommunityNudge = lazy(() => import("@/components/chat/WhatsAppCommunityNudge"));
-const VoiceInput = lazy(() => import("@/components/chat/VoiceInput"));
-const FindingMatchCard = lazy(() => import("@/components/chat/FindingMatchCard"));
-const ExternalMatchNudge = lazy(() => import("@/components/chat/ExternalMatchNudge"));
-const MatchView = lazy(() => import("@/components/match/MatchView"));
-
-// Lazy load undercurrents - only needed for authenticated users with access
-const UndercurrentCard = lazy(() => import("@/components/undercurrents/UndercurrentCard").then(m => ({ default: m.UndercurrentCard })));
-const UndercurrentsFirstAccess = lazy(() => import("@/components/undercurrents/UndercurrentCard").then(m => ({ default: m.UndercurrentsFirstAccess })));
-const UndercurrentsIndicator = lazy(() => import("@/components/undercurrents/UndercurrentCard").then(m => ({ default: m.UndercurrentsIndicator })));
+import OnboardingOverlay from "@/components/chat/OnboardingOverlay";
+import UserProfileCard from "@/components/chat/UserProfileCard";
+import ChatDebriefModal from "@/components/chat/ChatDebriefModal";
+import LearningSummaryNudge from "@/components/chat/LearningSummaryNudge";
+import SaveProgressNudge from "@/components/chat/SaveProgressNudge";
+import VoiceInput from "@/components/chat/VoiceInput";
 
 import { useFunnelTracking } from "@/hooks/useFunnelTracking";
 import { useVoiceInput, InputMode } from "@/hooks/useVoiceExperiment";
-import { useUndercurrents } from "@/hooks/useUndercurrents";
-import { trackReputationAction, evaluateP2PChat } from "@/lib/undercurrents";
 
 interface Message {
   id: string;
@@ -60,10 +47,8 @@ interface Introduction {
 }
 
 const CHAT_URL = `${import.meta.env.VITE_SUPABASE_URL}/functions/v1/chat-ai`;
-
-// Nudge thresholds - adjusted for exam prep users who have faster AI transitions
-const getLoginNudgeThreshold = () => isUPSCSource() || isCATSource() ? 3 : 5;
-const getSaveProgressThreshold = () => isUPSCSource() || isCATSource() ? 2 : 3;
+const LOGIN_NUDGE_THRESHOLD = 5;
+const SAVE_PROGRESS_THRESHOLD = 3; // Show save progress nudge after 3 messages
 
 // Generate or get session ID for anonymous users
 const getSessionId = () => {
@@ -116,60 +101,53 @@ const Chat = () => {
   const { toast } = useToast();
   const { trackEvent } = useFunnelTracking();
   
-  // Voice input
+  // Voice experiment
   const voiceExperiment = useVoiceInput();
-  
-  // Undercurrents (reputation-gated feature)
-  const undercurrents = useUndercurrents();
-  const [showUndercurrent, setShowUndercurrent] = useState(false);
-  
   const [messages, setMessages] = useState<Message[]>([]);
   const [source] = useState(() => getSource());
   const isUPSC = source === "upsc";
   const isCAT = source === "cat";
   
-  const [localMessages, setLocalMessages] = useState<Message[]>([]); // Start empty, greeting handled by WelcomeGreeting component
+  const [localMessages, setLocalMessages] = useState<Message[]>(() => [{
+    id: `local-${Date.now()}`,
+    role: "assistant" as const,
+    content: isUPSCSource() 
+      ? "Hey! I know the UPSC journey can feel overwhelming. Tell me what you're struggling with — I'll connect you with someone who's been through it."
+      : isCATSource()
+      ? "Hey! CAT prep can be intense. Tell me what's on your mind — I'll connect you with someone who's been through it."
+      : "Hey! A few quick questions and I'll find you the right person. What brings you here?",
+    message_type: "text",
+    metadata: {},
+    created_at: new Date().toISOString(),
+  }]); // Pre-populate for instant load
   const [introductions, setIntroductions] = useState<Introduction[]>([]);
   const [unreadCounts, setUnreadCounts] = useState<Record<string, number>>({});
   const [input, setInput] = useState("");
   const [loading, setLoading] = useState(false); // Start false for instant render
   const [sending, setSending] = useState(false);
   const [activeChat, setActiveChat] = useState<Introduction | null>(null);
-  const [view, setView] = useState<"chekinn" | "connections" | "match">("chekinn");
+  const [view, setView] = useState<"chekinn" | "connections">("chekinn");
   const [learningComplete, setLearningComplete] = useState(false);
   const [userProfile, setUserProfile] = useState<any>(null);
   const [showLoginNudge, setShowLoginNudge] = useState(false);
   const [showSaveProgress, setShowSaveProgress] = useState(false);
   const [sessionId] = useState(() => getSessionId());
-  const [showWACommunity, setShowWACommunity] = useState(false);
-  const [showFindingMatch, setShowFindingMatch] = useState(false);
-  const [showExternalMatchNudge, setShowExternalMatchNudge] = useState(false);
-  const evaluatedIntros = useRef<Set<string>>(new Set());
-  const hasShownExternalNudge = useRef(false);
-  
+  const [showOnboarding, setShowOnboarding] = useState(false);
+  const [showDebriefModal, setShowDebriefModal] = useState(false);
+  const [debriefIntro, setDebriefIntro] = useState<Introduction | null>(null);
+  const [hasDebriefs, setHasDebriefs] = useState(false);
+  const [showLearningSummary, setShowLearningSummary] = useState(true);
   const messagesEndRef = useRef<HTMLDivElement>(null);
   const hasTrackedPageLoad = useRef(false);
   const hasSentInitialMessage = useRef(false);
   const hasShownSaveProgress = useRef(false);
-  const hasShownLoginNudge = useRef(false);
+  const debriefedIntros = useRef<Set<string>>(new Set()); // Track intros we've already debriefed
   const chatMessageCounts = useRef<Record<string, number>>({}); // Track message counts per intro
 
-  // Memoized handlers to prevent re-renders
-  const handleSaveProgressDismiss = useCallback(() => {
-    setShowSaveProgress(false);
-    // Show WA community nudge after dismissing save progress (for UPSC/CAT users)
-    if (isUPSC || isCAT) {
-      setTimeout(() => setShowWACommunity(true), 500);
-    }
-  }, [isUPSC, isCAT]);
-
-  const handleWACommunityDismiss = useCallback(() => {
-    setShowWACommunity(false);
-  }, []);
-
-  // Stable no-op handler for compact WA nudge that can't be dismissed
-  const noopHandler = useCallback(() => {}, []);
-
+  const handleOnboardingComplete = () => {
+    sessionStorage.setItem("chekinn_onboarding_seen", "true");
+    setShowOnboarding(false);
+  };
 
   // Track chat page loaded
   useEffect(() => {
@@ -209,22 +187,23 @@ const Chat = () => {
       checkLearningStatus();
       loadUnreadCounts();
       subscribeToUserChats();
-      loadEvaluatedStatus();
+      loadDebriefStatus();
     }
   }, [user]);
 
-  // Load evaluated intro status for returning users
-  const loadEvaluatedStatus = async () => {
+  // Load debrief status for returning users
+  const loadDebriefStatus = async () => {
     if (!user) return;
     
-    // Mark already-evaluated intros so we don't evaluate again
     const { data, error } = await supabase
       .from("chat_debriefs")
       .select("id, introduction_id")
       .eq("user_id", user.id);
     
     if (!error && data && data.length > 0) {
-      data.forEach((d) => evaluatedIntros.current.add(d.introduction_id));
+      setHasDebriefs(true);
+      // Mark debriefed intros so we don't ask again
+      data.forEach((d) => debriefedIntros.current.add(d.introduction_id));
     }
   };
 
@@ -310,63 +289,73 @@ const Chat = () => {
     }
   };
 
-  // Trigger P2P evaluation silently when closing a chat (no user feedback)
+  // Check in on active intros when user comes back from a user-to-user chat
   const prevActiveChat = useRef<Introduction | null>(null);
   useEffect(() => {
     // If user just closed a user-to-user chat (activeChat went from something to null)
     if (prevActiveChat.current && !activeChat && user && introductions.length > 0) {
       const closedIntro = prevActiveChat.current;
       
-      // Silently evaluate P2P chat for reputation (no user feedback needed)
-      const triggerEvaluation = async () => {
+      // Check if this is the first time returning from this chat with messages
+      // and we haven't debriefed yet
+      const shouldDebrief = async () => {
         // Check current message count
-        const { count: msgCount } = await supabase
+        const { count: newCount } = await supabase
           .from("user_chats")
           .select("id", { count: "exact", head: true })
           .eq("introduction_id", closedIntro.id);
         
-        const hasEnoughMessages = (msgCount || 0) >= 5; // At least 5 messages for meaningful evaluation
+        const previousCount = chatMessageCounts.current[closedIntro.id] || 0;
+        const hasNewMessages = (newCount || 0) > previousCount;
+        const hasEnoughMessages = (newCount || 0) >= 3; // At least 3 messages exchanged
         
-        // Only evaluate if: has enough messages and hasn't been evaluated yet
-        if (hasEnoughMessages && !evaluatedIntros.current.has(closedIntro.id)) {
-          evaluatedIntros.current.add(closedIntro.id);
-          // Trigger P2P reputation evaluation silently in background
-          evaluateP2PChat(closedIntro.id, 'chat_end');
+        // Show debrief if: has enough messages, hasn't been debriefed, and user participated
+        if (hasEnoughMessages && !debriefedIntros.current.has(closedIntro.id)) {
+          // Check if user actually sent messages in this chat
+          const { count: userMsgCount } = await supabase
+            .from("user_chats")
+            .select("id", { count: "exact", head: true })
+            .eq("introduction_id", closedIntro.id)
+            .eq("sender_id", user.id);
+          
+          if ((userMsgCount || 0) >= 1) {
+            // Show debrief modal
+            setDebriefIntro(closedIntro);
+            setShowDebriefModal(true);
+            return;
+          }
         }
         
-        // Do the regular check-in
+        // Otherwise, do the regular check-in
         setTimeout(() => {
           checkInOnActiveIntros();
         }, 500);
       };
       
-      triggerEvaluation();
+      shouldDebrief();
     }
     prevActiveChat.current = activeChat;
   }, [activeChat, user, introductions]);
 
-  // Check if we should show save progress nudge or login nudge (thresholds adjust for UPSC/CAT)
+  // Check if we should show save progress nudge (after 3 messages) or login nudge (after 5)
   const variant = sessionStorage.getItem("ab_variant");
   useEffect(() => {
     if (!user && variant !== "C") {
       const userMsgCount = localMessages.filter(m => m.role === "user").length;
-      const saveThreshold = getSaveProgressThreshold();
-      const loginThreshold = getLoginNudgeThreshold();
       
-      // Show save progress nudge (mid-conversation) - only once
-      if (userMsgCount >= saveThreshold && !hasShownSaveProgress.current && !showSaveProgress) {
+      // Show save progress nudge at 3 messages (mid-conversation)
+      if (userMsgCount >= SAVE_PROGRESS_THRESHOLD && !hasShownSaveProgress.current) {
         hasShownSaveProgress.current = true;
         setShowSaveProgress(true);
         trackEvent("save_progress_shown" as any);
       }
       
-      // Show login nudge (blocks further input) - only once
-      if (userMsgCount >= loginThreshold && !hasShownLoginNudge.current && !showLoginNudge) {
-        hasShownLoginNudge.current = true;
+      // Show login nudge at 5 messages (blocks further input)
+      if (userMsgCount >= LOGIN_NUDGE_THRESHOLD) {
         setShowLoginNudge(true);
       }
     }
-  }, [localMessages.length, user, variant]); // Only depend on message length, not full array
+  }, [localMessages, user, variant, trackEvent]);
 
   // Save anonymous chat to leads table
   const saveLeadToDb = async (msgs: Message[]) => {
@@ -409,7 +398,7 @@ const Chat = () => {
     if (!user) return;
     const { data } = await supabase
       .from("profiles")
-      .select("learning_complete, full_name, role, industry, looking_for, skills, interests, ai_insights, onboarding_context")
+      .select("learning_complete, full_name, role, industry, looking_for, skills, interests, ai_insights")
       .eq("id", user.id)
       .maybeSingle();
     
@@ -442,23 +431,8 @@ const Chat = () => {
       if (localMessages.length > 0) {
         await migrateLocalMessages();
       } else {
-        // Create initial greeting for authenticated users so WelcomeGreeting can display
-        const greetingMessage: Message = {
-          id: `greeting-${Date.now()}`,
-          role: "assistant",
-          content: "Welcome back! I've captured your context from onboarding.",
-          created_at: new Date().toISOString(),
-          message_type: "greeting",
-          metadata: null,
-        };
-        // Save to DB so it persists
-        await supabase.from("chat_messages").insert({
-          user_id: user.id,
-          role: greetingMessage.role,
-          content: greetingMessage.content,
-          message_type: greetingMessage.message_type,
-        });
-        setMessages([greetingMessage]);
+        // Send welcome message for new authenticated users
+        await sendBotMessage("Hey! A few quick questions and I'll find you the right person. What brings you here?");
       }
     } else {
       setMessages(data as Message[]);
@@ -540,12 +514,12 @@ const Chat = () => {
     
     // Find active intros we haven't checked in on
     const activeIntrosToCheckIn = introductions.filter(
-      intro => intro.status === "active" && !evaluatedIntros.current.has(intro.id)
+      intro => intro.status === "active" && !debriefedIntros.current.has(intro.id)
     );
     
     if (activeIntrosToCheckIn.length > 0) {
       const intro = activeIntrosToCheckIn[0];
-      evaluatedIntros.current.add(intro.id);
+      debriefedIntros.current.add(intro.id);
       const otherName = intro.other_user?.full_name || "them";
       
       const checkInMessages = [
@@ -796,9 +770,6 @@ const Chat = () => {
         // Save final message to DB (replace streaming placeholder)
         setMessages((prev) => prev.filter(m => m.id !== streamingMsgId));
         await sendBotMessage(aiResponse);
-        
-        // Track reputation silently
-        trackReputationAction('message_sent');
       }
     } else {
       // Anonymous: store locally
@@ -925,49 +896,46 @@ const Chat = () => {
 
   if (activeChat) {
     return (
-      <Suspense fallback={<div className="min-h-screen bg-background" />}>
-        <UserChatView 
-          introduction={activeChat} 
-          onBack={() => setActiveChat(null)} 
-        />
-      </Suspense>
+      <UserChatView 
+        introduction={activeChat} 
+        onBack={() => setActiveChat(null)} 
+      />
     );
   }
 
+  // Handle debrief completion
+  const handleDebriefComplete = () => {
+    if (debriefIntro) {
+      debriefedIntros.current.add(debriefIntro.id);
+      setHasDebriefs(true);
+    }
+    setShowDebriefModal(false);
+    setDebriefIntro(null);
+  };
 
   return (
     <div className="min-h-screen bg-background flex flex-col relative">
-      {/* Undercurrents - Reputation-gated feature (lazy loaded) */}
-      <Suspense fallback={null}>
-        <AnimatePresence>
-          {undercurrents.isFirstAccess && (
-            <UndercurrentsFirstAccess onDismiss={undercurrents.dismissFirstAccess} />
-          )}
-        </AnimatePresence>
-        
-        <AnimatePresence>
-          {showUndercurrent && undercurrents.currentUndercurrent && (
-            <UndercurrentCard
-              undercurrent={undercurrents.currentUndercurrent}
-              prompt={undercurrents.currentPrompt}
-              onSubmitResponse={undercurrents.submitResponse}
-              onDismiss={() => setShowUndercurrent(false)}
-            />
-          )}
-        </AnimatePresence>
-        
-        {undercurrents.hasAccess && undercurrents.canReceiveNew && !showUndercurrent && (
-          <UndercurrentsIndicator
-            canReceiveNew={undercurrents.canReceiveNew}
-            onClick={() => {
-              undercurrents.fetchNewUndercurrent();
-              setShowUndercurrent(true);
-            }}
-          />
+      {/* Debrief Modal */}
+      {showDebriefModal && debriefIntro && user && (
+        <ChatDebriefModal
+          isOpen={showDebriefModal}
+          onClose={() => {
+            setShowDebriefModal(false);
+            setDebriefIntro(null);
+          }}
+          introductionId={debriefIntro.id}
+          otherUserName={debriefIntro.other_user?.full_name || "your connection"}
+          userId={user.id}
+          onComplete={handleDebriefComplete}
+        />
+      )}
+
+      {/* Onboarding overlay for new users */}
+      <AnimatePresence>
+        {showOnboarding && (
+          <OnboardingOverlay onStart={handleOnboardingComplete} />
         )}
-      </Suspense>
-
-
+      </AnimatePresence>
 
       {/* Login nudge banner for non-authenticated users */}
       {!user && (
@@ -1013,7 +981,7 @@ const Chat = () => {
               }`}
             >
               <MessageCircle className="w-4 h-4" />
-              Chat
+              Chat with ChekInn
             </button>
             <button
               onClick={() => setView("connections")}
@@ -1031,33 +999,16 @@ const Chat = () => {
                 </span>
               )}
             </button>
-            <button
-              onClick={() => setView("match")}
-              className={`flex-1 py-3 text-sm font-medium transition-colors flex items-center justify-center gap-2 ${
-                view === "match" 
-                  ? "text-primary border-b-2 border-primary" 
-                  : "text-muted-foreground hover:text-foreground"
-              }`}
-            >
-              <Target className="w-4 h-4" />
-              Match
-            </button>
           </div>
         )}
       </header>
 
-      {view === "match" && user ? (
-        <Suspense fallback={<div className="flex-1 flex items-center justify-center"><div className="animate-spin w-8 h-8 border-2 border-primary border-t-transparent rounded-full" /></div>}>
-          <MatchView 
-            userProfile={userProfile} 
-            onboardingContext={userProfile?.onboarding_context as any}
-            autoSearch={learningComplete && !!userProfile}
-          />
-        </Suspense>
-      ) : view === "chekinn" || !user ? (
+      {view === "chekinn" || !user ? (
         <>
-          {/* Learning Progress - only show when not complete */}
-          {!learningComplete && (
+          {/* Learning Progress or Profile Card */}
+          {learningComplete && userProfile ? (
+            <UserProfileCard profile={userProfile} />
+          ) : (
             <LearningProgress 
               messageCount={activeMessages.filter(m => m.role === "user").length}
               learningComplete={learningComplete}
@@ -1066,6 +1017,14 @@ const Chat = () => {
           
           {/* Messages */}
           <div className="flex-1 overflow-y-auto p-4 space-y-4">
+            {/* Learning Summary Nudge for returning users with debriefs */}
+            {user && hasDebriefs && showLearningSummary && activeIntros.length > 0 && (
+              <LearningSummaryNudge
+                userId={user.id}
+                hasDebriefs={hasDebriefs}
+                onDismiss={() => setShowLearningSummary(false)}
+              />
+            )}
 
             <AnimatePresence mode="popLayout">
               {activeMessages.map((msg, index) => (
@@ -1101,11 +1060,12 @@ const Chat = () => {
                     </motion.div>
                   )}
                   
-                  {/* Template buttons only for UPSC/CAT sources */}
-                  {index === 0 && msg.role === "assistant" && activeMessages.length === 1 && (isUPSC || isCAT) && (
+                  {/* Template buttons after first AI message */}
+                  {index === 0 && msg.role === "assistant" && activeMessages.length === 1 && (
                     <div className="mt-3 animate-fade-in">
+                      {/* Template buttons - different for UPSC/CAT */}
                       <div className="flex flex-wrap gap-1.5 max-w-[300px]">
-                        {(isUPSC ? UPSC_TEMPLATES : CAT_TEMPLATES).map((template) => (
+                        {(isUPSC ? UPSC_TEMPLATES : isCAT ? CAT_TEMPLATES : GENERAL_TEMPLATES).map((template) => (
                           <button
                             key={template}
                             onClick={() => handleSend(template)}
@@ -1118,80 +1078,21 @@ const Chat = () => {
                       </div>
                     </div>
                   )}
-                  {/* Welcome Greeting with profile summary - shown for users who completed onboarding */}
-                  {index === 0 && msg.role === "assistant" && user && learningComplete && userProfile?.onboarding_context && !hasShownExternalNudge.current && (
-                    <motion.div
-                      initial={{ opacity: 0, y: 10 }}
-                      animate={{ opacity: 1, y: 0 }}
-                      transition={{ delay: 0.3 }}
-                      className="mt-4"
-                    >
-                      <WelcomeGreeting
-                        userName={userProfile?.full_name}
-                        onboardingContext={userProfile?.onboarding_context}
-                        aiInsights={userProfile?.ai_insights}
-                      />
-                    </motion.div>
-                  )}
-                  {/* Fallback External Match Nudge - for users without onboarding context */}
-                  {index === 0 && msg.role === "assistant" && user && learningComplete && !userProfile?.onboarding_context && !hasShownExternalNudge.current && (
-                    <Suspense fallback={null}>
-                      <ExternalMatchNudge
-                        onViewMatches={() => {
-                          hasShownExternalNudge.current = true;
-                          setView("match");
-                        }}
-                      />
-                    </Suspense>
-                  )}
                 </motion.div>
               ))}
 
               {/* Progress Indicator - DISABLED for now */}
-            </AnimatePresence>
 
-            {/* Finding Match Card - shown for authenticated users after personalized greeting */}
-            <AnimatePresence>
-              {showFindingMatch && user && learningComplete && (
-                <motion.div key="finding-match" layout={false}>
-                  <Suspense fallback={null}>
-                    <FindingMatchCard 
-                      userName={userProfile?.full_name?.split(' ')[0]}
-                      onComplete={() => {
-                        // Card animation completed
-                        console.log("Match finding animation complete");
-                      }}
-                    />
-                  </Suspense>
-                </motion.div>
-              )}
-            </AnimatePresence>
-
-            {/* Nudges OUTSIDE of AnimatePresence to prevent layout/refresh issues */}
-            <AnimatePresence mode="wait">
               {/* Save Progress Nudge - shown after 3 messages (mid-conversation) */}
               {showSaveProgress && !user && !showLoginNudge && (
-                <motion.div key="save-progress-nudge" layout={false}>
-                  <Suspense fallback={null}>
-                    <SaveProgressNudge onDismiss={handleSaveProgressDismiss} />
-                  </Suspense>
-                </motion.div>
-              )}
-
-              {/* WhatsApp Community Nudge - shown after save progress is dismissed */}
-              {showWACommunity && !user && !showLoginNudge && (isUPSC || isCAT) && (
-                <motion.div key="wa-community-nudge" layout={false}>
-                  <Suspense fallback={null}>
-                    <WhatsAppCommunityNudge onDismiss={handleWACommunityDismiss} />
-                  </Suspense>
-                </motion.div>
+                <SaveProgressNudge
+                  onDismiss={() => setShowSaveProgress(false)}
+                />
               )}
 
               {/* Login Nudge for Anonymous Users - shown after 5 messages */}
               {showLoginNudge && !user && (
                 <motion.div
-                  key="login-nudge"
-                  layout={false}
                   initial={{ opacity: 0, scale: 0.95, y: 20 }}
                   animate={{ opacity: 1, scale: 1, y: 0 }}
                   className="bg-gradient-to-br from-primary/10 to-primary/20 border border-primary/30 rounded-2xl p-5"
@@ -1218,46 +1119,36 @@ const Chat = () => {
                   </p>
                 </motion.div>
               )}
-            </AnimatePresence>
 
-            {/* Pending Intro Cards - only for authenticated users */}
-            {user && pendingIntros.map((intro) => (
-              <IntroCard
-                key={intro.id}
-                introduction={intro}
-                onAccept={() => handleAcceptIntro(intro)}
-                onDecline={() => handleDeclineIntro(intro)}
-              />
-            ))}
+              {/* Pending Intro Cards - only for authenticated users */}
+              {user && pendingIntros.map((intro) => (
+                <IntroCard
+                  key={intro.id}
+                  introduction={intro}
+                  onAccept={() => handleAcceptIntro(intro)}
+                  onDecline={() => handleDeclineIntro(intro)}
+                />
+              ))}
 
-            {/* Nudge when learning is complete but no intros yet */}
-            {user && learningComplete && pendingIntros.length === 0 && activeIntros.length === 0 && (
-              <motion.div
-                initial={{ opacity: 0, y: 10 }}
-                animate={{ opacity: 1, y: 0 }}
-                className="bg-primary/10 border border-primary/20 rounded-xl p-4"
-              >
-                <div className="flex items-center gap-2 mb-2">
-                  <Clock className="w-4 h-4 text-primary" />
-                  <p className="text-sm text-foreground font-medium">
-                    Finding your match...
+              {/* Nudge when learning is complete but no intros yet */}
+              {user && learningComplete && pendingIntros.length === 0 && activeIntros.length === 0 && (
+                <motion.div
+                  initial={{ opacity: 0, y: 10 }}
+                  animate={{ opacity: 1, y: 0 }}
+                  className="bg-primary/10 border border-primary/20 rounded-xl p-4"
+                >
+                  <div className="flex items-center gap-2 mb-2">
+                    <Clock className="w-4 h-4 text-primary" />
+                    <p className="text-sm text-foreground font-medium">
+                      Finding your match...
+                    </p>
+                  </div>
+                  <p className="text-xs text-muted-foreground">
+                    We're working on finding the right person for you. You'll get an email + it'll show up right here — usually within 12 hours!
                   </p>
-                </div>
-                <p className="text-xs text-muted-foreground">
-                  We're working on finding the right person for you. You'll get an email + it'll show up right here — usually within 12 hours!
-                </p>
-                
-                {/* WA Community nudge for UPSC/CAT users waiting for match */}
-                {(isUPSC || isCAT) && (
-                  <Suspense fallback={null}>
-                    <WhatsAppCommunityNudge
-                      variant="compact"
-                      onDismiss={noopHandler}
-                    />
-                  </Suspense>
-                )}
-              </motion.div>
-            )}
+                </motion.div>
+              )}
+            </AnimatePresence>
             
             {sending && (
               <motion.div
@@ -1284,26 +1175,25 @@ const Chat = () => {
                 </div>
               </motion.div>
             )}
+            <div ref={messagesEndRef} />
           </div>
 
           {/* Input - Voice or Text based on experiment variant */}
           {voiceExperiment.currentInputMode === "voice" || voiceExperiment.isRecording ? (
-            <Suspense fallback={<div className="border-t border-border p-4 h-20" />}>
-              <VoiceInput
-                isRecording={voiceExperiment.isRecording}
-                recordingDuration={voiceExperiment.recordingDuration}
-                audioLevel={voiceExperiment.audioLevel}
-                onStartRecording={voiceExperiment.startRecording}
-                onStopRecording={voiceExperiment.stopRecording}
-                onCancelRecording={voiceExperiment.cancelRecording}
-                onSwitchToText={() => voiceExperiment.switchInputMode("text")}
-                onTranscriptReady={(text) => {
-                  voiceExperiment.trackMessageSent("voice", voiceExperiment.recordingDuration);
-                  handleSend(text);
-                }}
-                disabled={sending || (showLoginNudge && !user)}
-              />
-            </Suspense>
+            <VoiceInput
+              isRecording={voiceExperiment.isRecording}
+              recordingDuration={voiceExperiment.recordingDuration}
+              audioLevel={voiceExperiment.audioLevel}
+              onStartRecording={voiceExperiment.startRecording}
+              onStopRecording={voiceExperiment.stopRecording}
+              onCancelRecording={voiceExperiment.cancelRecording}
+              onSwitchToText={() => voiceExperiment.switchInputMode("text")}
+              onTranscriptReady={(text) => {
+                voiceExperiment.trackMessageSent("voice", voiceExperiment.recordingDuration);
+                handleSend(text);
+              }}
+              disabled={sending || (showLoginNudge && !user)}
+            />
           ) : (
             <div className="border-t border-border p-4 bg-background">
               <div className="flex gap-2">

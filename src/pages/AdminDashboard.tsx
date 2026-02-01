@@ -36,33 +36,6 @@ import {
   DialogDescription,
 } from "@/components/ui/dialog";
 
-interface OnboardingContext {
-  // New flow fields
-  decision_posture?: string;
-  ask_type?: string;
-  lived_context?: string[];
-  followup_context?: string[];
-  micro_reason?: string;
-  decision_weight?: string;
-  stakes_text?: string;
-  context_chips?: string[];
-  open_help_text?: string;
-  help_style?: string;
-  // Depth inputs (from onboarding questions)
-  depth_input_1?: string;
-  depth_input_2?: string;
-  depth_input_3?: string;
-  // Legacy fields (for backwards compatibility)
-  lookingFor?: string;
-  whyOpportunity?: string;
-  constraint?: string;
-  motivation?: string;
-  motivationExplanation?: string;
-  contrarianBelief?: string;
-  careerInflection?: string;
-  completedAt?: string;
-}
-
 interface Profile {
   id: string;
   email: string;
@@ -78,8 +51,6 @@ interface Profile {
   learning_complete: boolean;
   learning_messages_count: number;
   ai_insights: any;
-  onboarding_context?: OnboardingContext;
-  linkedin_url?: string;
   created_at: string;
   chat_messages?: any[];
   message_count?: number;
@@ -96,8 +67,6 @@ interface Introduction {
   intro_message: string;
   status: string;
   created_at: string;
-  user_a_accepted: boolean | null;
-  user_b_accepted: boolean | null;
   user_a?: Profile;
   user_b?: Profile;
   chats?: ChatMessage[];
@@ -213,7 +182,7 @@ const AdminDashboard = () => {
   // Password gate
   const [passwordEntered, setPasswordEntered] = useState(false);
   const [passwordInput, setPasswordInput] = useState("");
-  const [adminPassword, setAdminPassword] = useState("");
+  const [adminPassword, setAdminPassword] = useState(""); // Store verified password for API calls
   const [passwordError, setPasswordError] = useState(false);
 
   // Create intro modal
@@ -245,13 +214,11 @@ const AdminDashboard = () => {
     results: any[];
   } | null>(null);
 
-  // Profile summary generation
-  const [generatingSummary, setGeneratingSummary] = useState(false);
-
   const handlePasswordSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
     setPasswordError(false);
     
+    // Verify password server-side
     try {
       const { data, error } = await supabase.functions.invoke("admin-data", {
         body: { password: passwordInput, timeRange: funnelTimeRange },
@@ -262,6 +229,7 @@ const AdminDashboard = () => {
         return;
       }
       
+      // Password verified - store it and load data
       setAdminPassword(passwordInput);
       setPasswordEntered(true);
       setProfiles(data.profiles || []);
@@ -276,6 +244,28 @@ const AdminDashboard = () => {
       setLoading(false);
     } catch {
       setPasswordError(true);
+    }
+  };
+
+  const checkAdminStatus = async () => {
+    if (!user) return;
+
+    const { data, error } = await supabase.rpc("has_role", {
+      _user_id: user.id,
+      _role: "admin",
+    });
+
+    if (error) {
+      console.error("Error checking admin status:", error);
+      setCheckingAdmin(false);
+      return;
+    }
+
+    setIsAdmin(data);
+    setCheckingAdmin(false);
+
+    if (data) {
+      loadData();
     }
   };
 
@@ -519,48 +509,6 @@ const AdminDashboard = () => {
       });
     } finally {
       setBackfillRunning(false);
-    }
-  };
-
-  const handleGenerateSummary = async (userId: string) => {
-    setGeneratingSummary(true);
-    try {
-      const { data, error } = await supabase.functions.invoke("summarize-profile", {
-        body: { userId, password: adminPassword },
-      });
-
-      if (error) throw error;
-      if (data?.error) throw new Error(data.error);
-
-      toast({
-        title: "Summary generated!",
-        description: `Profile summary created successfully${data.linkedInData ? ' with LinkedIn data' : ''}.`,
-      });
-
-      // Update the viewUser with new ai_insights
-      if (viewUser && viewUser.id === userId) {
-        setViewUser({
-          ...viewUser,
-          ai_insights: {
-            ...viewUser.ai_insights,
-            profileSummary: data.summary,
-            linkedInData: data.linkedInData,
-            generatedAt: new Date().toISOString(),
-          },
-        });
-      }
-
-      // Refresh data to get updated profiles
-      loadData();
-    } catch (error: any) {
-      console.error("Summary generation error:", error);
-      toast({
-        title: "Failed to generate summary",
-        description: error.message || "Unknown error",
-        variant: "destructive",
-      });
-    } finally {
-      setGeneratingSummary(false);
     }
   };
 
@@ -997,7 +945,7 @@ const AdminDashboard = () => {
                 )}
               </TabsTrigger>
               <TabsTrigger value="leads">
-                Chats
+                Leads
                 {leads.filter(l => !l.converted_at).length > 0 && (
                   <span className="ml-1.5 bg-orange-500 text-white text-xs px-1.5 py-0.5 rounded-full">
                     {leads.filter(l => !l.converted_at).length}
@@ -1651,12 +1599,12 @@ const AdminDashboard = () => {
             </div>
           </TabsContent>
 
-          {/* Chats Tab */}
+          {/* Leads Tab */}
           <TabsContent value="leads" className="space-y-4">
             <div className="grid grid-cols-2 md:grid-cols-4 gap-4">
               <div className="bg-card border border-border rounded-xl p-4">
                 <p className="text-2xl font-bold">{leads.length}</p>
-                <p className="text-sm text-muted-foreground">Total Chats</p>
+                <p className="text-sm text-muted-foreground">Total Leads</p>
               </div>
               <div className="bg-card border border-border rounded-xl p-4">
                 <p className="text-2xl font-bold text-orange-500">{leads.filter(l => !l.converted_at).length}</p>
@@ -1676,7 +1624,7 @@ const AdminDashboard = () => {
 
             {leads.length === 0 ? (
               <div className="text-center py-12 text-muted-foreground">
-                No chats yet. Anonymous chat sessions will appear here.
+                No leads yet. Anonymous chat sessions will appear here.
               </div>
             ) : (
               <div className="space-y-4">
@@ -1746,12 +1694,10 @@ const AdminDashboard = () => {
                           {profile.full_name?.charAt(0) || "?"}
                         </div>
                         <div>
-                          {profile.full_name && (
-                            <h3 className="font-medium">
-                              {profile.full_name}
-                            </h3>
-                          )}
-                          <p className={`text-sm ${profile.full_name ? 'text-muted-foreground' : 'font-medium'}`}>
+                          <h3 className="font-medium">
+                            {profile.full_name || "No name"}
+                          </h3>
+                          <p className="text-sm text-muted-foreground">
                             {profile.email}
                           </p>
                         </div>
@@ -1768,40 +1714,7 @@ const AdminDashboard = () => {
                       </Button>
                     </div>
 
-                    {/* Onboarding Context - most important for matching */}
-                    {(profile.onboarding_context?.ask_type || profile.onboarding_context?.lookingFor) && (
-                      <div className="bg-emerald-500/10 border border-emerald-500/30 rounded-lg p-3 mb-3">
-                        <p className="text-xs font-medium text-emerald-600 mb-1">🎯 Check-in Intent</p>
-                        {/* New flow display */}
-                        {profile.onboarding_context.ask_type && (
-                          <p className="text-sm font-medium capitalize">{profile.onboarding_context.ask_type.replace(/_/g, ' ')}</p>
-                        )}
-                        {profile.onboarding_context.lived_context && profile.onboarding_context.lived_context.length > 0 && (
-                          <p className="text-xs text-muted-foreground mt-1">
-                            <span className="font-medium">Lived:</span> {profile.onboarding_context.lived_context.slice(0, 2).map(c => c.replace(/_/g, ' ')).join(', ')}
-                            {profile.onboarding_context.lived_context.length > 2 && ` +${profile.onboarding_context.lived_context.length - 2} more`}
-                          </p>
-                        )}
-                        {profile.onboarding_context.decision_weight && (
-                          <p className="text-xs text-muted-foreground mt-1">
-                            <span className="font-medium">Stakes:</span> {profile.onboarding_context.decision_weight.replace(/_/g, ' ')}
-                          </p>
-                        )}
-                        {/* Legacy flow fallback */}
-                        {!profile.onboarding_context.ask_type && profile.onboarding_context.lookingFor && (
-                          <>
-                            <p className="text-sm font-medium">{profile.onboarding_context.lookingFor}</p>
-                            {profile.onboarding_context.constraint && (
-                              <p className="text-xs text-muted-foreground mt-1">
-                                <span className="font-medium">Constraints:</span> {profile.onboarding_context.constraint}
-                              </p>
-                            )}
-                          </>
-                        )}
-                      </div>
-                    )}
-
-                    {/* AI Summary */}
+                    {/* AI Summary - highlighted */}
                     {profile.ai_insights?.summary && (
                       <div className="bg-primary/5 border border-primary/20 rounded-lg p-3 mb-3">
                         <p className="text-xs font-medium text-primary mb-1">AI Summary</p>
@@ -1822,8 +1735,7 @@ const AdminDashboard = () => {
                           {profile.industry}
                         </p>
                       )}
-                      {/* Fallback to looking_for if no onboarding context */}
-                      {!profile.onboarding_context?.lookingFor && profile.looking_for && (
+                      {profile.looking_for && (
                         <p>
                           <span className="text-muted-foreground">Looking for:</span>{" "}
                           {profile.looking_for}
@@ -1899,38 +1811,17 @@ const AdminDashboard = () => {
                     <div className="flex items-start justify-between">
                       <div className="flex items-center gap-4">
                         <div className="flex -space-x-2">
-                          <div className="relative">
-                            <div className="w-10 h-10 rounded-full bg-primary/10 flex items-center justify-center text-primary font-semibold border-2 border-background">
-                              {intro.user_a?.full_name?.charAt(0) || "?"}
-                            </div>
-                            {intro.user_a_accepted && (
-                              <div className="absolute -bottom-1 -right-1 w-4 h-4 bg-green-500 rounded-full flex items-center justify-center">
-                                <CheckCircle className="w-3 h-3 text-white" />
-                              </div>
-                            )}
+                          <div className="w-10 h-10 rounded-full bg-primary/10 flex items-center justify-center text-primary font-semibold border-2 border-background">
+                            {intro.user_a?.full_name?.charAt(0) || "?"}
                           </div>
-                          <div className="relative">
-                            <div className="w-10 h-10 rounded-full bg-blue-500/10 flex items-center justify-center text-blue-500 font-semibold border-2 border-background">
-                              {intro.user_b?.full_name?.charAt(0) || "?"}
-                            </div>
-                            {intro.user_b_accepted && (
-                              <div className="absolute -bottom-1 -right-1 w-4 h-4 bg-green-500 rounded-full flex items-center justify-center">
-                                <CheckCircle className="w-3 h-3 text-white" />
-                              </div>
-                            )}
+                          <div className="w-10 h-10 rounded-full bg-blue-500/10 flex items-center justify-center text-blue-500 font-semibold border-2 border-background">
+                            {intro.user_b?.full_name?.charAt(0) || "?"}
                           </div>
                         </div>
                         <div>
                           <h3 className="font-medium">
-                            <span className={intro.user_a_accepted ? "text-green-600" : "text-muted-foreground"}>
-                              {intro.user_a?.full_name || "User A"}
-                              {intro.user_a_accepted && " ✓"}
-                            </span>
-                            {" ↔ "}
-                            <span className={intro.user_b_accepted ? "text-green-600" : "text-muted-foreground"}>
-                              {intro.user_b?.full_name || "User B"}
-                              {intro.user_b_accepted && " ✓"}
-                            </span>
+                            {intro.user_a?.full_name || "User A"} ↔{" "}
+                            {intro.user_b?.full_name || "User B"}
                           </h3>
                           <p className="text-sm text-muted-foreground">
                             {intro.intro_message}
@@ -2089,273 +1980,6 @@ const AdminDashboard = () => {
 
           {viewUser && (
             <div className="space-y-4">
-              {/* Onboarding Context - Primary matching info */}
-              {(viewUser.onboarding_context?.ask_type || viewUser.onboarding_context?.lookingFor) && (
-                <div className="bg-emerald-500/10 border border-emerald-500/30 rounded-lg p-4">
-                  <h4 className="font-semibold text-emerald-700 mb-3">🎯 Match Context</h4>
-                  <div className="space-y-3">
-                    {/* New flow fields */}
-                    {viewUser.onboarding_context.ask_type && (
-                      <div>
-                        <p className="text-xs font-medium text-muted-foreground">Check-in Intent</p>
-                        <p className="font-medium capitalize">{viewUser.onboarding_context.ask_type.replace(/_/g, ' ')}</p>
-                      </div>
-                    )}
-                    {viewUser.onboarding_context.decision_posture && (
-                      <div>
-                        <p className="text-xs font-medium text-muted-foreground">Decision Style</p>
-                        <p className="capitalize">{viewUser.onboarding_context.decision_posture.replace(/_/g, ' ')}</p>
-                      </div>
-                    )}
-                    {viewUser.onboarding_context.lived_context && viewUser.onboarding_context.lived_context.length > 0 && (
-                      <div>
-                        <p className="text-xs font-medium text-muted-foreground">Lived Experience</p>
-                        <div className="flex flex-wrap gap-1 mt-1">
-                          {viewUser.onboarding_context.lived_context.map((ctx) => (
-                            <span key={ctx} className="px-2 py-0.5 bg-emerald-100 text-emerald-700 text-xs rounded-full capitalize">
-                              {ctx.replace(/_/g, ' ')}
-                            </span>
-                          ))}
-                        </div>
-                      </div>
-                    )}
-                    {viewUser.onboarding_context.followup_context && viewUser.onboarding_context.followup_context.length > 0 && (
-                      <div>
-                        <p className="text-xs font-medium text-muted-foreground">Relevant Forks</p>
-                        <div className="flex flex-wrap gap-1 mt-1">
-                          {viewUser.onboarding_context.followup_context.map((ctx) => (
-                            <span key={ctx} className="px-2 py-0.5 bg-blue-100 text-blue-700 text-xs rounded-full capitalize">
-                              {ctx.replace(/_/g, ' ')}
-                            </span>
-                          ))}
-                        </div>
-                      </div>
-                    )}
-                    {viewUser.onboarding_context.decision_weight && (
-                      <div>
-                        <p className="text-xs font-medium text-muted-foreground">Decision Weight</p>
-                        <p className="capitalize">{viewUser.onboarding_context.decision_weight.replace(/_/g, ' ')}</p>
-                      </div>
-                    )}
-                    {viewUser.onboarding_context.stakes_text && (
-                      <div>
-                        <p className="text-xs font-medium text-muted-foreground">What's at Stake</p>
-                        <p className="text-sm italic">"{viewUser.onboarding_context.stakes_text}"</p>
-                      </div>
-                    )}
-                    {viewUser.onboarding_context.context_chips && viewUser.onboarding_context.context_chips.length > 0 && (
-                      <div>
-                        <p className="text-xs font-medium text-muted-foreground">Current Constraints</p>
-                        <div className="flex flex-wrap gap-1 mt-1">
-                          {viewUser.onboarding_context.context_chips.map((chip) => (
-                            <span key={chip} className="px-2 py-0.5 bg-amber-100 text-amber-700 text-xs rounded-full capitalize">
-                              {chip.replace(/_/g, ' ')}
-                            </span>
-                          ))}
-                        </div>
-                      </div>
-                    )}
-                    {viewUser.onboarding_context.micro_reason && (
-                      <div>
-                        <p className="text-xs font-medium text-muted-foreground">Additional Context</p>
-                        <p className="text-sm italic">"{viewUser.onboarding_context.micro_reason}"</p>
-                      </div>
-                    )}
-                    {/* Depth Inputs - Core context from onboarding questions */}
-                    {viewUser.onboarding_context.depth_input_1 && (
-                      <div className="bg-violet-50 border border-violet-200 rounded-lg p-3">
-                        <p className="text-xs font-medium text-violet-700">📝 What they're working through</p>
-                        <p className="text-sm mt-1">"{viewUser.onboarding_context.depth_input_1}"</p>
-                      </div>
-                    )}
-                    {viewUser.onboarding_context.depth_input_2 && (
-                      <div className="bg-violet-50 border border-violet-200 rounded-lg p-3">
-                        <p className="text-xs font-medium text-violet-700">🔒 Non-negotiable / Key constraint</p>
-                        <p className="text-sm mt-1">"{viewUser.onboarding_context.depth_input_2}"</p>
-                      </div>
-                    )}
-                    {viewUser.onboarding_context.depth_input_3 && (
-                      <div className="bg-violet-50 border border-violet-200 rounded-lg p-3">
-                        <p className="text-xs font-medium text-violet-700">🎯 Dream outcome</p>
-                        <p className="text-sm mt-1">"{viewUser.onboarding_context.depth_input_3}"</p>
-                      </div>
-                    )}
-                    {viewUser.onboarding_context.open_help_text && (
-                      <div>
-                        <p className="text-xs font-medium text-muted-foreground">Can Help With</p>
-                        <p className="text-sm italic">"{viewUser.onboarding_context.open_help_text}"</p>
-                      </div>
-                    )}
-                    {viewUser.onboarding_context.help_style && (
-                      <div>
-                        <p className="text-xs font-medium text-muted-foreground">Help Style</p>
-                        <p className="capitalize">{viewUser.onboarding_context.help_style.replace(/_/g, ' ')}</p>
-                      </div>
-                    )}
-                    {/* Legacy fields for backwards compatibility */}
-                    {!viewUser.onboarding_context.ask_type && viewUser.onboarding_context.lookingFor && (
-                      <>
-                        <div>
-                          <p className="text-xs font-medium text-muted-foreground">Looking For</p>
-                          <p className="font-medium">{viewUser.onboarding_context.lookingFor}</p>
-                        </div>
-                        {viewUser.onboarding_context.whyOpportunity && (
-                          <div>
-                            <p className="text-xs font-medium text-muted-foreground">Why This Opportunity</p>
-                            <p>{viewUser.onboarding_context.whyOpportunity}</p>
-                          </div>
-                        )}
-                        {viewUser.onboarding_context.constraint && (
-                          <div>
-                            <p className="text-xs font-medium text-muted-foreground">Constraints</p>
-                            <p>{viewUser.onboarding_context.constraint}</p>
-                          </div>
-                        )}
-                        {viewUser.onboarding_context.motivation && (
-                          <div>
-                            <p className="text-xs font-medium text-muted-foreground">Motivation</p>
-                            <p>{viewUser.onboarding_context.motivation}</p>
-                          </div>
-                        )}
-                      </>
-                    )}
-                  </div>
-                </div>
-              )}
-
-              {/* AI Profile Summary - Generated from LinkedIn + Onboarding */}
-              <div className="bg-primary/5 border border-primary/20 rounded-lg p-4">
-                <div className="flex items-center justify-between mb-3">
-                  <h4 className="font-semibold text-primary flex items-center gap-2">
-                    <Sparkles className="w-4 h-4" />
-                    AI Profile Summary
-                  </h4>
-                  <Button
-                    variant="outline"
-                    size="sm"
-                    onClick={() => handleGenerateSummary(viewUser.id)}
-                    disabled={generatingSummary}
-                  >
-                    {generatingSummary ? (
-                      <Loader2 className="w-4 h-4 animate-spin mr-2" />
-                    ) : (
-                      <RefreshCw className="w-4 h-4 mr-2" />
-                    )}
-                    {generatingSummary ? "Generating..." : viewUser.ai_insights?.profileSummary ? "Regenerate" : "Generate Summary"}
-                  </Button>
-                </div>
-                
-                {viewUser.ai_insights?.profileSummary ? (
-                  <div className="space-y-3 text-sm">
-                    {viewUser.ai_insights.profileSummary.headline && (
-                      <div>
-                        <p className="font-semibold text-foreground">{viewUser.ai_insights.profileSummary.headline}</p>
-                      </div>
-                    )}
-                    {viewUser.ai_insights.profileSummary.narrative && (
-                      <div>
-                        <p className="text-xs font-medium text-muted-foreground">Narrative</p>
-                        <p>{viewUser.ai_insights.profileSummary.narrative}</p>
-                      </div>
-                    )}
-                    {viewUser.ai_insights.profileSummary.decisionContext && (
-                      <div>
-                        <p className="text-xs font-medium text-muted-foreground">Current Decision</p>
-                        <p className="italic">"{viewUser.ai_insights.profileSummary.decisionContext}"</p>
-                      </div>
-                    )}
-                    <div className="grid grid-cols-2 gap-3">
-                      {viewUser.ai_insights.profileSummary.seeking && (
-                        <div>
-                          <p className="text-xs font-medium text-muted-foreground">Seeking</p>
-                          <p>{viewUser.ai_insights.profileSummary.seeking}</p>
-                        </div>
-                      )}
-                      {viewUser.ai_insights.profileSummary.offering && (
-                        <div>
-                          <p className="text-xs font-medium text-muted-foreground">Offering</p>
-                          <p>{viewUser.ai_insights.profileSummary.offering}</p>
-                        </div>
-                      )}
-                    </div>
-                    {viewUser.ai_insights.profileSummary.matchKeywords?.length > 0 && (
-                      <div>
-                        <p className="text-xs font-medium text-muted-foreground mb-1">Match Keywords</p>
-                        <div className="flex flex-wrap gap-1">
-                          {viewUser.ai_insights.profileSummary.matchKeywords.map((keyword: string) => (
-                            <span key={keyword} className="px-2 py-0.5 bg-primary/10 text-primary text-xs rounded-full">
-                              {keyword}
-                            </span>
-                          ))}
-                        </div>
-                      </div>
-                    )}
-                    {viewUser.ai_insights.profileSummary.matchTypes?.length > 0 && (
-                      <div>
-                        <p className="text-xs font-medium text-muted-foreground mb-1">Best Matches</p>
-                        <div className="flex flex-wrap gap-1">
-                          {viewUser.ai_insights.profileSummary.matchTypes.map((type: string) => (
-                            <span key={type} className="px-2 py-0.5 bg-blue-500/10 text-blue-500 text-xs rounded-full">
-                              {type}
-                            </span>
-                          ))}
-                        </div>
-                      </div>
-                    )}
-                    {viewUser.ai_insights.profileSummary.urgency && (
-                      <div className="flex items-center gap-2">
-                        <span className={`px-2 py-0.5 text-xs rounded-full ${
-                          viewUser.ai_insights.profileSummary.urgency === 'high' 
-                            ? 'bg-red-500/10 text-red-500' 
-                            : viewUser.ai_insights.profileSummary.urgency === 'medium' 
-                            ? 'bg-amber-500/10 text-amber-500'
-                            : 'bg-green-500/10 text-green-500'
-                        }`}>
-                          {viewUser.ai_insights.profileSummary.urgency} urgency
-                        </span>
-                        {viewUser.ai_insights.generatedAt && (
-                          <span className="text-xs text-muted-foreground">
-                            Generated {new Date(viewUser.ai_insights.generatedAt).toLocaleDateString()}
-                          </span>
-                        )}
-                      </div>
-                    )}
-                    {viewUser.ai_insights.linkedInData && (
-                      <div className="pt-2 border-t border-border">
-                        <p className="text-xs text-muted-foreground">
-                          📊 LinkedIn: {viewUser.ai_insights.linkedInData.name} - {viewUser.ai_insights.linkedInData.headline}
-                        </p>
-                      </div>
-                    )}
-                  </div>
-                ) : (
-                  <p className="text-sm text-muted-foreground">
-                    Click "Generate Summary" to create an AI-powered profile summary using LinkedIn data and onboarding context.
-                  </p>
-                )}
-
-                {/* Legacy AI insights */}
-                {viewUser.ai_insights?.summary && !viewUser.ai_insights?.profileSummary && (
-                  <div className="mt-3 pt-3 border-t border-border">
-                    <p className="text-xs font-medium text-muted-foreground">Legacy Summary</p>
-                    <p className="text-sm">{viewUser.ai_insights.summary}</p>
-                  </div>
-                )}
-                
-                {viewUser.onboarding_context?.contrarianBelief && (
-                  <div className="mt-3">
-                    <p className="text-xs font-medium text-muted-foreground">Contrarian Belief</p>
-                    <p className="text-sm">{viewUser.onboarding_context.contrarianBelief}</p>
-                  </div>
-                )}
-                {viewUser.onboarding_context?.careerInflection && (
-                  <div className="mt-2">
-                    <p className="text-xs font-medium text-muted-foreground">Career Inflection</p>
-                    <p className="text-sm">{viewUser.onboarding_context.careerInflection}</p>
-                  </div>
-                )}
-              </div>
-
               <div className="grid grid-cols-2 gap-4 text-sm">
                 <div>
                   <p className="text-muted-foreground">Email</p>
@@ -2370,7 +1994,7 @@ const AdminDashboard = () => {
                   <p>{viewUser.industry || "—"}</p>
                 </div>
                 <div>
-                  <p className="text-muted-foreground">Looking For (legacy)</p>
+                  <p className="text-muted-foreground">Looking For</p>
                   <p>{viewUser.looking_for || "—"}</p>
                 </div>
                 <div>

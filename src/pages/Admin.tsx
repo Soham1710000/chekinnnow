@@ -108,8 +108,11 @@ const Admin = () => {
 
   const fetchVoiceStats = async () => {
     try {
+      const adminPassword = prompt("Enter admin password:");
+      if (!adminPassword) return;
+
       const { data, error } = await supabase.functions.invoke("admin-data", {
-        body: { timeRange: 168 } // Last 7 days
+        body: { password: adminPassword, timeRange: 168 } // Last 7 days
       });
 
       if (error) throw error;
@@ -118,7 +121,6 @@ const Admin = () => {
       }
     } catch (error) {
       console.error("Error fetching voice stats:", error);
-      toast.error("Failed to fetch voice stats");
     }
   };
 

@@ -24,7 +24,6 @@ interface UserContext {
   isFirstMessageOfSession?: boolean;
   hasPendingIntros?: boolean;
   userId?: string;
-  experimentVariant?: "direct" | "reflective"; // A/B test variant
 }
 
 interface ProfileContext {
@@ -33,30 +32,6 @@ interface ProfileContext {
   industry?: string;
   goals?: string[];
   interests?: string[];
-  ai_insights?: {
-    contrarian_belief?: string;
-    career_inflection?: string;
-    motivation?: string;
-    motivation_explanation?: string;
-    constraint?: string;
-    // Depth inputs
-    depth_input_1?: string;
-    depth_input_2?: string;
-    depth_input_3?: string;
-    lived_context?: string[];
-    decision_weight?: string;
-  };
-  connection_intent?: string;
-  learning_complete?: boolean;
-  onboarding_context?: {
-    ask_type?: string;
-    lived_context?: string[];
-    depth_input_1?: string;
-    depth_input_2?: string;
-    depth_input_3?: string;
-    decision_weight?: string;
-    context_chips?: string[];
-  };
 }
 
 // =============================================================================
@@ -87,11 +62,9 @@ async function getDecision(
       ? earlierMessages.map((m: any) => `${m.role}: ${m.content.slice(0, 100)}...`).join("\n")
       : "No prior context.";
 
-  // Force transition after message threshold (VERY fast for exam prep users)
-  const userMessageCount = messages.filter((m: any) => m.role === "user").length;
-  const isExamPrepUser = userContext.source === "upsc" || userContext.source === "cat";
-  const transitionThreshold = isExamPrepUser ? 2 : 4; // Much faster - 2 messages max for UPSC/CAT
-  const shouldForceTransition = userMessageCount >= transitionThreshold;
+    // Force transition after message threshold
+    const userMessageCount = messages.filter((m: any) => m.role === "user").length;
+    const shouldForceTransition = userMessageCount >= 6; // After 6 user messages (12 total), force transition
 
     const decisionPrompt = `You are an internal decision engine for ChekInn.
 
@@ -207,7 +180,7 @@ async function assembleContext(
     
     const { data: profile, error } = await supabase
       .from("profiles")
-      .select("full_name, role, industry, goals, interests, ai_insights, connection_intent, learning_complete, onboarding_context")
+      .select("full_name, role, industry, goals, interests")
       .eq("id", userId)
       .single();
 
@@ -221,227 +194,17 @@ async function assembleContext(
 }
 
 // =============================================================================
-// PERSONALIZED GREETING GENERATOR
-// =============================================================================
-
-async function generatePersonalizedGreeting(
-  profileContext: ProfileContext,
-  apiKey: string
-): Promise<string> {
-  const insights = profileContext.ai_insights || {};
-  const onboarding = profileContext.onboarding_context || {};
-  const intent = profileContext.connection_intent;
-  const name = profileContext.full_name;
-  
-  // Build context summary for AI
-  const contextParts: string[] = [];
-  
-  // Depth inputs provide the most specific context
-  if (onboarding.depth_input_1) {
-    contextParts.push(`What they're looking for: "${onboarding.depth_input_1}"`);
-  }
-  
-  if (onboarding.depth_input_2) {
-    contextParts.push(`Their non-negotiable: "${onboarding.depth_input_2}"`);
-  }
-  
-  if (onboarding.depth_input_3) {
-    contextParts.push(`What they want to avoid: "${onboarding.depth_input_3}"`);
-  }
-  
-  // Add lived context for experience-based matching
-  if (onboarding.lived_context?.length) {
-    const livedLabels: Record<string, string> = {
-      hired_mid_senior: "mid-senior job search",
-      raising_capital: "fundraising/pitching investors",
-      job_vs_startup: "choosing between job and startup",
-      career_switch: "career/function switching",
-      building_product: "building a product from scratch",
-      hiring_early: "early team hiring",
-      decision_paralysis: "navigating decision paralysis",
-    };
-    const experiences = onboarding.lived_context
-      .filter((ctx: string) => livedLabels[ctx])
-      .map((ctx: string) => livedLabels[ctx]);
-    if (experiences.length > 0) {
-      contextParts.push(`Has experience with: ${experiences.slice(0, 2).join(", ")}`);
-    }
-  }
-  
-  if (insights.motivation) {
-    const motivationLabels: Record<string, string> = {
-      "building": "building something meaningful",
-      "recognition": "gaining recognition & status",
-      "financial": "achieving financial freedom",
-      "mastery": "mastery & learning",
-      "stability": "finding stability",
-      "impact": "making an impact on others"
-    };
-    contextParts.push(`They're driven by: ${motivationLabels[insights.motivation] || insights.motivation}`);
-  }
-  
-  if (insights.constraint) {
-    contextParts.push(`Their biggest constraint: ${insights.constraint}`);
-  }
-  
-  if (insights.career_inflection) {
-    contextParts.push(`Career inflection point: "${insights.career_inflection.slice(0, 200)}"`);
-  }
-  
-  if (insights.contrarian_belief) {
-    contextParts.push(`Contrarian belief: "${insights.contrarian_belief.slice(0, 200)}"`);
-  }
-  
-  const intentLabels: Record<string, string> = {
-    "clarity": "seeking clarity between multiple options",
-    "direction": "needs to decide what to do next",
-    "opportunity": "exploring what's possible",
-    "pressure_testing": "wants to validate a decision",
-    "pressure-testing": "wants to validate a decision",
-    "help_others": "wants to help others who are earlier in the journey",
-    "help-others": "wants to help others who are earlier in the journey"
-  };
-  
-  const askType = onboarding.ask_type || intent;
-  if (askType) {
-    contextParts.push(`Current intent: ${intentLabels[askType] || askType}`);
-  }
-  
-  if (contextParts.length === 0) {
-    // No onboarding context, return default
-    return "Hey! I'm Chek. We'll soon help you find the right folks. What's on your mind today?";
-  }
-  
-  const systemPrompt = `You are Chek, a friendly AI that helps connect people with others who've been through similar journeys.
-
-Generate a SHORT, warm, personalized greeting (2-3 sentences max) based on what we know about this user.
-
-RULES:
-- Start with "Hey! I'm Chek."
-- Reference their specific situation or what they're working through
-- Be empathetic but NOT cheesy
-- End with a teaser about matching them with the right people
-- Keep it UNDER 40 words total
-- Don't be generic - make it feel like you actually know them
-
-Example format:
-"Hey! I'm Chek. I see you're navigating [specific thing]. We'll soon help you find folks who've been exactly here."`;
-
-  const userPrompt = `User context:
-${name ? `Name: ${name}` : 'No name provided'}
-${contextParts.join('\n')}
-
-Generate a personalized greeting.`;
-
-  try {
-    const response = await fetch("https://ai.gateway.lovable.dev/v1/chat/completions", {
-      method: "POST",
-      headers: {
-        Authorization: `Bearer ${apiKey}`,
-        "Content-Type": "application/json",
-      },
-      body: JSON.stringify({
-        model: "google/gemini-2.5-flash-lite",
-        messages: [
-          { role: "system", content: systemPrompt },
-          { role: "user", content: userPrompt }
-        ],
-      }),
-    });
-
-    if (!response.ok) {
-      console.error("Greeting generation failed:", response.status);
-      return getDefaultGreeting(profileContext);
-    }
-
-    const data = await response.json();
-    const greeting = data.choices?.[0]?.message?.content?.trim();
-    
-    if (!greeting) return getDefaultGreeting(profileContext);
-    
-    // Clean up any quotes the AI might have added
-    return greeting.replace(/^["']|["']$/g, '');
-  } catch (error) {
-    console.error("Error generating greeting:", error);
-    return getDefaultGreeting(profileContext);
-  }
-}
-
-function getDefaultGreeting(profileContext: ProfileContext): string {
-  const insights = profileContext.ai_insights || {};
-  const intent = profileContext.connection_intent;
-  
-  // Build a simpler rule-based greeting as fallback
-  let greeting = "Hey! I'm Chek.";
-  
-  if (insights.constraint) {
-    greeting += ` I know ${insights.constraint.toLowerCase()} feels limiting right now.`;
-  } else if (intent === "clarity") {
-    greeting += ` I see you're weighing multiple paths.`;
-  } else if (intent === "direction") {
-    greeting += ` I see you're figuring out what's next.`;
-  } else if (intent === "opportunity") {
-    greeting += ` I see you're exploring what's possible.`;
-  } else if (intent === "pressure-testing") {
-    greeting += ` I see you want to validate a decision.`;
-  } else if (intent === "help-others") {
-    greeting += ` Great to have someone who's been through it.`;
-  } else {
-    greeting += ` Good to meet you.`;
-  }
-  
-  greeting += " We'll soon help you find the right folks.";
-  
-  return greeting;
-}
-
-// =============================================================================
 // STEP 3: STREAMING SYSTEM PROMPT (Clean & Focused)
 // =============================================================================
-
-// Helper to detect decision signals in conversation
-function detectDecisionSignal(messages: any[]): boolean {
-  const conversationText = messages.map((m: any) => m.content.toLowerCase()).join(" ");
-  
-  const decisionSignals = [
-    // Previous attempts
-    /\b(first|second|third|1st|2nd|3rd|4th|5th|next)\s*(attempt|try)/i,
-    /\battempt(s|ed)?\b/i,
-    /\bfailed\s*(prelims|mains|interview)/i,
-    /\bcleared\s*(prelims|mains)/i,
-    
-    // Career pauses/switches
-    /\b(quit|left|leaving|pause|paused|resigned|switching)\s*(job|work|career)/i,
-    /\b(full\s*time|full-time)\s*(prep|preparation|study)/i,
-    /\btook\s*a\s*break/i,
-    
-    // Strategy changes
-    /\b(switch|change|changing|switched)\s*(optional|strategy|subject)/i,
-    /\b(dropped|taking|chose|choosing)\s*(optional|subject)/i,
-    
-    // Milestone anxiety
-    /\b(scared|nervous|anxious|worried|stressed)\s*(about|for|of)?\s*(prelims|mains|interview)/i,
-    /\bprelims\s*(is|are)?\s*(coming|near|soon|close)/i,
-    /\b(pressure|stress|anxiety)\b/i,
-    
-    // Stuck between choices
-    /\b(confused|stuck)\s*(between|about)/i,
-    /\b(should\s*i|can't\s*decide|not\s*sure)/i,
-    /\b(dilemma|torn\s*between)/i
-  ];
-  
-  return decisionSignals.some(pattern => pattern.test(conversationText));
-}
 
 function buildSystemPrompt(
   decision: DecisionOutput,
   profileContext: ProfileContext | null,
   userContext: UserContext,
-  messageCount: number,
-  hasDecisionSignal: boolean = false
+  messageCount: number
 ): string {
   const { mode, tone, use_experiences, consider_social } = decision;
-  const { source, isAuthenticated, experimentVariant } = userContext;
+  const { source, isAuthenticated } = userContext;
 
   // Build personal context section
   let personalContextSection = "";
@@ -459,18 +222,6 @@ function buildSystemPrompt(
   }
 
   // Source-specific context
-  const isExamPrepUser = source === "upsc" || source === "cat";
-  
-  // ========================================
-  // A/B TEST: REFLECTIVE MODEL FOR UPSC
-  // ========================================
-  if (isExamPrepUser && experimentVariant === "reflective") {
-    return buildReflectivePrompt(profileContext, userContext, messageCount, hasDecisionSignal);
-  }
-  
-  // ========================================
-  // DEFAULT: DIRECT MODEL
-  // ========================================
   let sourceContext = "";
   if (source === "upsc") {
     sourceContext = "\nThis user is a UPSC aspirant. Understand the prep journey, attempts, optionals, and the emotional weight of this path.";
@@ -478,248 +229,86 @@ function buildSystemPrompt(
     sourceContext = "\nThis user is a CAT/MBA aspirant. Understand the prep journey, mock scores, target schools, and career transitions.";
   }
 
-  // Dynamic threshold based on source - much faster for exam users
-  const transitionThreshold = isExamPrepUser ? 2 : 4;
-
   // Connection transition guidance
   const connectionGuidance = isAuthenticated 
-    ? `Say: "Got it — I'll find someone who's been through this. You'll hear from us within 12-24 hours via email."`
-    : `Say: "Got it — just drop your email and we'll connect you with someone who's been through this within 12-24 hours."`;
+    ? `Say: "I have a sense of where you're at. The ChekInn team will look for someone who's been through this and reach out within 12-24 hours via email."`
+    : `Say: "I have a sense of where you're at. The ChekInn team will look for someone who's been through this — just drop your email so they can reach you within 12-24 hours."`;
 
   // Force transition after threshold
-  const shouldTransitionNow = messageCount >= transitionThreshold;
+  const shouldTransitionNow = messageCount >= 6;
   const transitionInstruction = shouldTransitionNow 
-    ? `\n\n⚠️ CRITICAL: STOP. You have enough info (${messageCount} messages). DO NOT ask another question. Transition to connection NOW. ${connectionGuidance}`
+    ? `\n\n⚠️ CRITICAL: You have gathered enough context (${messageCount} messages). In THIS response, you MUST transition to connection. Do NOT ask more questions. ${connectionGuidance}`
     : "";
 
-  // Carrot messaging - earlier and stronger
-  let carrotMessage = "";
-  if (isExamPrepUser) {
-    if (messageCount === 0) {
-      carrotMessage = `\n\n🥕 END WITH: "We already have people who've cracked this — just need a quick detail to match you."`;
-    } else if (messageCount === 1) {
-      carrotMessage = `\n\n🥕 END WITH: "I think I have someone perfect for you."`;
-    }
-  }
+  return `You are ChekInn — a warm, focused companion who gathers context efficiently.
 
-  return `You are ChekInn — you connect people with others who've been through the same journey.
+Your role is to understand the user quickly so you can connect them with the right person.
 
-⚠️ YOUR #1 JOB: Get the user to email signup in 2 messages MAX. Don't interrogate — CONNECT.
-
-WE ALREADY HAVE MATCHES. Your job is just to get ONE detail to pick the right one.
-
-CURRENT STATE:
-- Message count: ${messageCount}
-- Transition at: ${transitionThreshold} messages
-- Source: ${source || "general"}
+CURRENT MODE: ${mode}
+TONE: ${tone}
+MESSAGE COUNT: ${messageCount} user messages so far
 ${sourceContext}
-${personalContextSection}${transitionInstruction}${carrotMessage}
+${personalContextSection}${transitionInstruction}
 
-${messageCount === 0 ? `––––– FIRST MESSAGE –––––
+––––– CORE BEHAVIOR –––––
 
-Ask ONE direct question. No fluff. Get straight to it.
+1. Combine empathy WITH a question in every response (unless transitioning).
+2. Keep responses to 1-2 sentences max.
+3. Ask specific, concrete questions — not open-ended ones.
+4. Move the conversation forward, don't just reflect.
+5. ${shouldTransitionNow ? 'STOP ASKING QUESTIONS. Transition to connection NOW.' : 'After 2-3 key facts, transition to connection.'}
 
-UPSC example:
-"Quick one — Prelims, Mains, or Interview prep?"
+GOOD examples:
+- "That sounds heavy — are you in Prelims prep or Mains right now?"
+- "Makes sense you'd want that clarity. What's your optional?"
+- "I get it. Is this your first attempt or have you given it before?"
 
-CAT example: 
-"What's the blocker — quant, verbal, or overall strategy?"
+BAD examples (avoid these):
+- "I understand. That sounds challenging." (no question)
+- "What resonates most with you?" (too vague)
+- "Is that right?" (doesn't gather new info)
 
-General:
-"What are you trying to figure out?"
+––––– KEY INFO TO GATHER –––––
 
-END WITH the carrot: "We already have people who've cracked this — just need a quick detail to match you."
+For UPSC/exam users, prioritize learning:
+1. Exam stage (Prelims/Mains/Interview prep)
+2. Attempt number
+3. Optional subject (if relevant)
+4. What specific help they need
 
-That's it. Don't ask about background, attempts, or anything else yet.` : messageCount === 1 ? `––––– SECOND MESSAGE — TRANSITION NOW –––––
+For general users:
+1. Current role/situation
+2. What they're trying to figure out
+3. What kind of person would help
 
-You have enough. DO NOT ask another question.
+Once you have 2-3 key facts, you have enough context. ${shouldTransitionNow ? 'You definitely have enough now!' : ''}
 
-1. Acknowledge briefly (5 words max)
-2. Drop the carrot: "I have someone who's been exactly here"
-3. Ask for email: "Just drop your email — we'll connect you within 24 hours"
+––––– CONTEXT USAGE –––––
 
-Example:
-"Got it, Mains prep. I have someone who's been exactly here. Just drop your email — we'll connect you within 24 hours."` : `––––– FORCE TRANSITION –––––
+${use_experiences ? "You may briefly reference others in similar situations to build rapport." : "Do NOT invent examples or reference others."}
 
-STOP ASKING QUESTIONS. Transition NOW.
+––––– TRANSITION TO CONNECTION –––––
 
-1. Brief acknowledgment
-2. "I have the right person for this"
-3. ${connectionGuidance}`}
+${consider_social || shouldTransitionNow ? `${shouldTransitionNow ? 'MANDATORY: Transition NOW. ' : 'When you have enough context: '}
+${connectionGuidance}
 
-––––– HARD RULES –––––
+Do not keep asking questions indefinitely. Move to connection once you understand their situation.` : "Do not mention social connections or introductions in this response."}
 
-1. MAX 2 sentences total
-2. ONE question max (only in message 1)
-3. NEVER ask multiple things ("What stage and which optional?") — pick ONE
-4. NEVER ask preference questions ("online/offline?", "same background?")
-5. ALWAYS mention "we have someone" or "people who've cracked this" — give hope
-6. By message 2, you MUST transition to email ask
-7. ${shouldTransitionNow ? 'STOP ASKING. Get the email NOW.' : 'Keep momentum.'}
+––––– HARD CONSTRAINTS –––––
 
-EXAMPLES OF WHAT NOT TO DO:
-❌ "What stage are you in? And what's your optional? Are you a fresher?"
-❌ "That sounds challenging. Tell me more about your journey..."
-❌ "Would you prefer someone with the same optional or same attempt?"
+- Never give long empathy-only responses.
+- Never ask vague questions like "what resonates?"
+- Never fabricate facts or claim capabilities you don't have.
+- Never claim you've already found someone.
+- Keep it conversational and concise.
+${shouldTransitionNow ? '- DO NOT ASK MORE QUESTIONS. TRANSITION NOW.' : ''}
 
-EXAMPLES OF WHAT TO DO:
-✅ "Prelims, Mains, or Interview?" + carrot
-✅ "Got it. I have someone perfect for this. Drop your email."
-✅ "Mains with Sociology — we have exactly that person. Email?"`;
+––––– RESPONSE FORMAT –––––
+
+${shouldTransitionNow ? '[Brief acknowledgment of what you learned] + [Transition message asking for email or confirming next steps]' : '[Brief empathy/acknowledgment] + [Specific question OR transition to connection]'}
+
+Example: ${shouldTransitionNow ? '"Sounds like you\'re a 2nd attempt candidate focused on Mains with Sociology optional. The ChekInn team will find someone who\'s been through this — just drop your email so they can reach you within 12-24 hours."' : '"That\'s a real grind. Are you doing this alongside work or full-time prep?"'}`;
 }
-
-// =============================================================================
-// REFLECTIVE MODEL (A/B Test Variant for UPSC)
-// =============================================================================
-
-function buildReflectivePrompt(
-  profileContext: ProfileContext | null,
-  userContext: UserContext,
-  messageCount: number,
-  hasDecisionSignal: boolean
-): string {
-  const { isAuthenticated } = userContext;
-  
-  // Build personal context section
-  let personalContextSection = "";
-  if (profileContext) {
-    const parts: string[] = [];
-    if (profileContext.full_name) parts.push(`Name: ${profileContext.full_name}`);
-    if (profileContext.role) parts.push(`Role: ${profileContext.role}`);
-    if (profileContext.goals?.length) parts.push(`Goals: ${profileContext.goals.join(", ")}`);
-    
-    if (parts.length > 0) {
-      personalContextSection = `\n––––– CONTEXT –––––\n${parts.join("\n")}\n`;
-    }
-  }
-
-  const connectionGuidance = isAuthenticated 
-    ? `"If you want, I can connect you with someone who's already crossed this stage. You'll hear from us within 24 hours."`
-    : `"If you want, I can connect you with someone who's already crossed this stage. I'll need your email to do that."`;
-
-  // Determine conversation phase based on signals, not just message count
-  let phaseInstruction = "";
-  
-  if (hasDecisionSignal) {
-    // DECISION-AWARE PHASE: User has revealed a significant decision moment
-    phaseInstruction = `––––– DECISION-AWARE PHASE –––––
-
-A decision signal was detected. The user has shared something significant:
-- A previous attempt
-- A career pause/switch
-- Strategy change
-- Milestone anxiety
-- Being stuck between choices
-
-GOAL: Acknowledge the weight. Make human perspective feel necessary.
-
-Example response:
-"This is one of those phases where thinking alone stops helping, even if you're sincere."
-
-Do NOT ask for email yet. Let them sit with this.
-
-NEXT MESSAGE after this one, you may offer:
-${connectionGuidance}`;
-  } else if (messageCount === 0) {
-    // EARLY PHASE: Create safety, offload mental clutter
-    phaseInstruction = `––––– EARLY PHASE –––––
-
-GOAL: Create safety + help them offload mental clutter.
-
-1. Reflect what they said in simple language
-2. Ask ONE grounding question
-
-Examples:
-"It sounds like your mind is carrying a lot more than just syllabus right now.
-What's the thought that keeps looping today?"
-
-"That uncertainty can get heavy when you're preparing alone.
-What's been hardest this week?"
-
-Do NOT mention connection, email, or "we have someone" yet.`;
-  } else if (messageCount <= 3) {
-    // MIDDLE PHASE: Help patterns surface without advice
-    phaseInstruction = `––––– MIDDLE PHASE –––––
-
-GOAL: Help patterns surface, without giving advice.
-
-1. Mirror emotions or repetition you notice
-2. Gently narrow the fog
-
-Examples:
-"I notice the anxiety shows up whenever revision comes up.
-What do you tell yourself in those moments?"
-
-"It feels less about effort and more about confidence right now.
-Does that sound right?"
-
-Do NOT give study plans, advice, or mention connection yet.`;
-  } else {
-    // EXTENDED PHASE: Still no signal, continue being present
-    phaseInstruction = `––––– EXTENDED PHASE –––––
-
-They've shared a lot but no clear decision signal yet.
-
-Continue being present:
-- Reflect what you're hearing
-- Let them keep talking
-- Look for when a decision moment surfaces
-
-Only transition when they reveal:
-- Attempt history
-- Career pause
-- Strategy switch
-- Strong anxiety about a milestone
-- Feeling stuck between choices`;
-  }
-
-  return `You are ChekInn — a quiet, always-available thinking space for UPSC aspirants.
-
-🎯 CORE PRINCIPLE (NON-NEGOTIABLE)
-- Do NOT solve.
-- Do NOT coach.
-- Do NOT sound like a topper.
-- If the user leaves feeling lighter and clearer, you succeeded.
-- If they leave with a plan, you failed.
-${personalContextSection}
-
-CURRENT STATE:
-- Message count: ${messageCount}
-- Decision signal detected: ${hasDecisionSignal ? "YES" : "NO"}
-
-${phaseInstruction}
-
-––––– HARD RULES –––––
-
-1. MAX 2 short sentences. Prefer 1.
-2. Ask at most ONE question per reply
-3. Questions must help them talk more, not choose categories
-4. NEVER ask multiple-choice or preference questions
-5. NEVER give study plans, book lists, or strategy
-6. Tone: Calm, grounded, non-judgmental
-7. Like someone sitting beside them at night, not across a desk
-
-UNTIL A DECISION SIGNAL APPEARS:
-❌ No email
-❌ No intro promise
-❌ No "we have someone for you"
-
-ATTENTION OWNERSHIP (implicit):
-- Leave a gentle open loop when appropriate
-- "When you're done studying today, come back and tell me what felt unclear."
-- Do NOT set reminders or push streaks
-
-🚫 NEVER DO:
-- Give study plans
-- Give book lists
-- Give strategy breakdowns
-- Talk like an authority
-- Predict outcomes
-- Replace human mentors
-
-You are the space before clarity, not the source of it.`;
-}
-
 
 // =============================================================================
 // STEP 4: PROFILE FACT EXTRACTION (with confidence scores)
@@ -873,7 +462,6 @@ serve(async (req) => {
   }
 
   try {
-    const body = await req.json();
     const { 
       messages, 
       userId, 
@@ -881,57 +469,12 @@ serve(async (req) => {
       source, 
       isReturningUser, 
       isFirstMessageOfSession, 
-      hasPendingIntros,
-      generateGreeting // New flag to request personalized greeting
-    } = body;
+      hasPendingIntros 
+    } = await req.json();
     
     const LOVABLE_API_KEY = Deno.env.get("LOVABLE_API_KEY");
     if (!LOVABLE_API_KEY) {
       throw new Error("LOVABLE_API_KEY is not configured");
-    }
-
-    // ========================================
-    // PERSONALIZED GREETING MODE
-    // ========================================
-    if (generateGreeting && userId) {
-      console.log(`Generating personalized greeting for user: ${userId}`);
-      
-      const profileContext = await assembleContext(userId, LOVABLE_API_KEY);
-      
-      if (profileContext?.learning_complete) {
-        const greeting = await generatePersonalizedGreeting(profileContext, LOVABLE_API_KEY);
-        console.log(`Generated greeting: ${greeting}`);
-        
-        return new Response(
-          JSON.stringify({ greeting }),
-          { status: 200, headers: { ...corsHeaders, "Content-Type": "application/json" } }
-        );
-      } else {
-        // User hasn't completed onboarding, return default greeting
-        return new Response(
-          JSON.stringify({ greeting: "Hey! A few quick questions and I'll find you the right person. What brings you here?" }),
-          { status: 200, headers: { ...corsHeaders, "Content-Type": "application/json" } }
-        );
-      }
-    }
-
-    // ========================================
-    // A/B TEST: 50/50 split for UPSC users
-    // ========================================
-    const isExamPrepUser = source === "upsc" || source === "cat";
-    let experimentVariant: "direct" | "reflective" = "direct";
-    
-    if (source === "upsc") {
-      // Use userId or session to create consistent bucketing
-      // Hash the userId to get a deterministic 50/50 split
-      const hashInput = userId || messages[0]?.content || Date.now().toString();
-      let hash = 0;
-      for (let i = 0; i < hashInput.length; i++) {
-        const char = hashInput.charCodeAt(i);
-        hash = ((hash << 5) - hash) + char;
-        hash = hash & hash; // Convert to 32-bit integer
-      }
-      experimentVariant = Math.abs(hash) % 2 === 0 ? "direct" : "reflective";
     }
 
     const userContext: UserContext = {
@@ -940,28 +483,22 @@ serve(async (req) => {
       isReturningUser,
       isFirstMessageOfSession,
       hasPendingIntros,
-      userId,
-      experimentVariant
+      userId
     };
 
     const userMessages = messages.filter((m: any) => m.role === "user");
     const userMessageCount = userMessages.length;
-    const transitionThreshold = isExamPrepUser ? 3 : 5;
-    
-    // Detect decision signals for reflective model
-    const hasDecisionSignal = experimentVariant === "reflective" ? detectDecisionSignal(messages) : false;
-    
-    console.log(`Chat: user=${userId}, source=${source}, variant=${experimentVariant}, msgCount=${userMessageCount}, decisionSignal=${hasDecisionSignal}`);
+    console.log(`Chat: user=${userId}, source=${source}, msgCount=${userMessageCount}, returning=${isReturningUser}, firstMsg=${isFirstMessageOfSession}`);
 
     // STEP 1: Get decision (fast, non-streaming)
     const decision = await getDecision(messages, userContext, LOVABLE_API_KEY);
-    console.log(`Decision: mode=${decision.mode}, tone=${decision.tone}, social=${decision.consider_social}, forceTransition=${userMessageCount >= transitionThreshold}`);
+    console.log(`Decision: mode=${decision.mode}, tone=${decision.tone}, social=${decision.consider_social}, forceTransition=${userMessageCount >= 6}`);
 
     // STEP 2: Assemble context (profile data)
     const profileContext = await assembleContext(userId, LOVABLE_API_KEY);
 
-    // STEP 3: Build clean system prompt with message count and decision signal
-    const systemPrompt = buildSystemPrompt(decision, profileContext, userContext, userMessageCount, hasDecisionSignal);
+    // STEP 3: Build clean system prompt with message count
+    const systemPrompt = buildSystemPrompt(decision, profileContext, userContext, userMessageCount);
 
     // Only send recent messages (last 8 turns = 16 messages max)
     const recentMessages = messages.slice(-16);
@@ -1003,10 +540,9 @@ serve(async (req) => {
       throw new Error(`AI gateway error: ${response.status}`);
     }
 
-    // STEP 5: Async profile extraction (earlier for UPSC/CAT users)
-    const extractionThreshold = isExamPrepUser ? 3 : 5;
-    if (userMessages.length >= extractionThreshold && userId) {
-      console.log(`Triggering profile extraction for user ${userId} (threshold: ${extractionThreshold})`);
+    // STEP 5: Async profile extraction (5+ user messages)
+    if (userMessages.length >= 5 && userId) {
+      console.log(`Triggering profile extraction for user ${userId}`);
       extractProfileFacts(messages, userId).catch(err => 
         console.error("Extraction error:", err)
       );

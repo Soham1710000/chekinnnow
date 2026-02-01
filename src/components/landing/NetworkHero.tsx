@@ -1,26 +1,13 @@
 import { motion, AnimatePresence } from "framer-motion";
-import { useState, useEffect, lazy, Suspense, memo, useCallback, startTransition } from "react";
+import { useState, useEffect, lazy, Suspense, memo, useCallback } from "react";
 import { useSearchParams, useNavigate } from "react-router-dom";
 import { Button } from "@/components/ui/button";
 import { ChevronDown, Users } from "lucide-react";
 import { supabase } from "@/integrations/supabase/client";
 import { useFunnelTracking } from "@/hooks/useFunnelTracking";
 
-// Prefetch critical routes on idle
-const prefetchRoutes = () => {
-  if ('requestIdleCallback' in window) {
-    (window as any).requestIdleCallback(() => {
-      import("@/pages/Auth");
-      import("@/pages/Chat");
-    });
-  } else {
-    setTimeout(() => {
-      import("@/pages/Auth");
-      import("@/pages/Chat");
-    }, 3000);
-  }
-};
-
+// Lazy load overlays - only needed on click
+const OnboardingOverlay = lazy(() => import("@/components/chat/OnboardingOverlay"));
 
 // Lazy load the modal - only needed on click
 const WaitlistModal = lazy(() => import("@/components/waitlist/WaitlistModal").then(m => ({ default: m.WaitlistModal })));
@@ -76,68 +63,68 @@ const profiles = [
   {
     id: 1,
     name: "Rhea",
-    title: "SDE at Microsoft",
-    bio: "Got an offer from a **Series A startup** vs staying at Microsoft — how do people really judge this later?",
+    title: "Engineer",
+    bio: "Anyone interviewing for **Amazon SDE II**?",
     image: rheaImg,
-    replyName: "chek",
-    replyTitle: "",
-    replyImage: null,
-    reply: "That's a real fork. I know someone who made this exact call."
+    replyName: "Dev",
+    replyTitle: "Engineer",
+    replyImage: devImg,
+    reply: "Yes I just interviewed last week"
   },
   {
     id: 2,
     name: "Kushal",
-    title: "Hiring Manager",
-    bio: "This candidate feels **impressive**, but I've been burned before.",
+    title: "UPSC Aspirant",
+    bio: "Anyone who **cleared mains**?",
     image: kushalImg,
-    replyName: "chek",
-    replyTitle: "",
-    replyImage: null,
-    reply: "I hear you. I know someone who's great at reading signals."
+    replyName: "Rajat",
+    replyTitle: "Cleared Mains Twice",
+    replyImage: rajatImg,
+    reply: "Yes happy to chat"
   },
   {
     id: 3,
     name: "Arnav",
-    title: "Founder",
-    bio: "We're **post-revenue but small** — do I raise or keep bootstrapping?",
+    title: "Robotics Student",
+    bio: "Working on a **robotics project** and exploring **US research paths**.",
     image: arnavImg,
-    replyName: "chek",
-    replyTitle: "",
-    replyImage: null,
-    reply: "Tough call. I know someone who's been on both sides."
+    replyName: "Dr. Meera Iyer",
+    replyTitle: "Research Faculty",
+    replyImage: meeraImg,
+    reply: "Sounds interesting. Happy to talk."
   },
   {
     id: 4,
     name: "Siddharth",
-    title: "Ops at Reliance",
-    bio: "I'm 30 and in ops at Reliance — is switching to **product** unrealistic?",
+    title: "College Student",
+    bio: "Built **side projects**, trying to break into **gaming** as an SDE.",
     image: siddharthImg,
-    replyName: "chek",
-    replyTitle: "",
-    replyImage: null,
-    reply: "Not at all. I know someone who made this switch."
+    replyName: "Ananya",
+    replyTitle: "Talent Lead, Gaming Startup",
+    replyImage: ananyaImg,
+    reply: "That's understandable. Happy to chat."
   },
   {
     id: 5,
     name: "Ishaan",
-    title: "Engineer at Google",
-    bio: "I'm at Google and doing fine, but I feel **weirdly replaceable**.",
+    title: "Growth Marketer",
+    bio: "Curious how **brand marketing** works at different stages.",
     image: ishaanImg,
-    replyName: "chek",
-    replyTitle: "",
-    replyImage: null,
-    reply: "That's real. I know someone who felt the same."
+    replyName: "Pallavi",
+    replyTitle: "Brand Marketer",
+    replyImage: pallaviImg,
+    reply: "Happy to share notes."
   },
   {
     id: 6,
     name: "Aarav",
-    title: "Considering Meesho",
-    bio: "Does this role at **Meesho** actually compound?",
+    title: "Early Career",
+    bio: "I've been trying to meet people who enjoy **long runs**.",
     image: aaravImg,
-    replyName: "chek",
-    replyTitle: "",
-    replyImage: null,
-    reply: "Good question. I know someone inside who can share."
+    replyName: "Nisha",
+    replyTitle: "Working Professional",
+    replyImage: nishaImg,
+    reply: "That sounds like my kind of thing. When?"
   }
 ];
 
@@ -239,36 +226,16 @@ const IPhoneMockup = memo(({ currentIndex }: { currentIndex: number }) => {
                   <div className="flex items-center gap-1.5 sm:gap-2 mr-0.5 sm:mr-1">
                     <div className="text-right">
                       <p className="text-[10px] sm:text-[11px] md:text-sm text-gray-900 font-semibold">{currentProfile.replyName}</p>
-                      {currentProfile.replyTitle && (
-                        <p className="text-[8px] sm:text-[9px] md:text-xs text-gray-500 font-medium">{currentProfile.replyTitle}</p>
-                      )}
+                      <p className="text-[8px] sm:text-[9px] md:text-xs text-gray-500 font-medium">{currentProfile.replyTitle}</p>
                     </div>
-                    {currentProfile.replyImage ? (
-                      <img 
-                        src={currentProfile.replyImage} 
-                        alt={currentProfile.replyName}
-                        loading="eager"
-                        decoding="async"
-                        fetchPriority="high"
-                        className="w-7 h-7 sm:w-9 sm:h-9 md:w-11 md:h-11 rounded-full object-cover object-top border-2 border-gray-200 shadow-sm"
-                      />
-                    ) : (
-                      <motion.span 
-                        className="text-xl sm:text-2xl md:text-3xl"
-                        initial={{ rotate: 0 }}
-                        animate={{ 
-                          rotate: [0, 14, -8, 14, -4, 10, 0],
-                        }}
-                        transition={{ 
-                          duration: 1.2, 
-                          delay: 0.5,
-                          ease: "easeInOut"
-                        }}
-                        style={{ display: 'inline-block', transformOrigin: '70% 70%' }}
-                      >
-                        👋
-                      </motion.span>
-                    )}
+                    <img 
+                      src={currentProfile.replyImage} 
+                      alt={currentProfile.replyName}
+                      loading="eager"
+                      decoding="async"
+                      fetchPriority="high"
+                      className="w-7 h-7 sm:w-9 sm:h-9 md:w-11 md:h-11 rounded-full object-cover object-top border-2 border-gray-200 shadow-sm"
+                    />
                   </div>
                   {/* Message bubble */}
                   <div className="bg-[#007AFF] text-white rounded-xl sm:rounded-2xl rounded-br-sm sm:rounded-br-md px-3 sm:px-4 md:px-5 py-2 sm:py-2.5">
@@ -310,14 +277,10 @@ export const NetworkHero = () => {
   // Preload all images on mount for instant switching
   usePreloadImages(allImages);
   
-  // Prefetch likely next routes on mount
-  useEffect(() => {
-    prefetchRoutes();
-  }, []);
-  
   const [searchParams] = useSearchParams();
   const navigate = useNavigate();
   const [isModalOpen, setIsModalOpen] = useState(false);
+  const [showExplainer, setShowExplainer] = useState(false);
   const [currentIndex, setCurrentIndex] = useState(0);
   const [waitlistCount, setWaitlistCount] = useState<number>(BASE_WAITLIST_COUNT);
   const referralCode = searchParams.get("ref");
@@ -332,9 +295,14 @@ export const NetworkHero = () => {
       // Already logged in, go straight to chat
       navigate("/chat");
     } else {
-      // Go directly to auth
-      navigate("/auth");
+      // Not logged in, show explainer first
+      setShowExplainer(true);
     }
+  };
+
+  const handleExplainerContinue = () => {
+    setShowExplainer(false);
+    navigate("/auth");
   };
 
   // Fetch waitlist count and subscribe to real-time updates
@@ -391,14 +359,15 @@ export const NetworkHero = () => {
         <span className="text-sm font-medium" style={{ color: '#34A853' }}>l</span>
         <span className="text-sm font-medium" style={{ color: '#EA4335' }}>e</span>
       </div>
+      <span className="text-sm font-bold text-[#E50914] tracking-tight">NETFLIX</span>
       <span className="text-sm font-bold text-gray-800 tracking-tight">BCG</span>
       <span className="text-sm font-bold text-[#8C1515] tracking-tight">Stanford</span>
       <span className="text-sm font-bold text-[#00A1E0] tracking-tight">Salesforce</span>
       <span className="text-xs font-semibold text-gray-700 tracking-tight">Tier 1 VCs</span>
       <span className="text-sm font-black text-gray-800 tracking-tight">CRED</span>
-      <span className="text-sm font-bold text-[#FF6B00] tracking-tight">MPL</span>
+      <span className="text-sm font-bold text-[#A31F34] tracking-tight">MIT</span>
       <span className="text-sm font-bold text-gray-800 italic">flipkart</span>
-      <span className="text-sm font-bold text-[#F5C518] tracking-tight">Rapido</span>
+      <span className="text-sm font-bold text-[#00356B] tracking-tight">Yale</span>
       <span className="text-sm font-bold text-gray-800 tracking-tight">McKinsey</span>
       <span className="text-xs font-bold text-gray-800 tracking-tight">IIT Delhi</span>
       <span className="text-sm font-bold text-[#0077B5] tracking-tight">LinkedIn</span>
@@ -445,11 +414,11 @@ export const NetworkHero = () => {
               initial={{ opacity: 0, y: 20 }}
               animate={{ opacity: 1, y: 0 }}
               transition={{ duration: 0.8, delay: 0.1 }}
-              className="font-medium text-foreground leading-tight mb-6 sm:mb-8 md:mb-10"
+              className="text-xl sm:text-2xl md:text-3xl lg:text-4xl xl:text-5xl font-medium text-foreground leading-tight mb-6 sm:mb-8 md:mb-10"
             >
-              <span className="font-semibold text-xl sm:text-2xl md:text-3xl lg:text-4xl xl:text-5xl">chek knows everyone.</span>
+              <span className="font-normal text-muted-foreground">Don't know who to reach out to?</span>
               <br />
-              <span className="font-normal text-muted-foreground text-base sm:text-lg md:text-2xl lg:text-3xl xl:text-4xl">It talks to millions, so you don't need to.</span>
+              <span className="font-semibold">We make the introduction.</span>
             </motion.h1>
 
             {/* CTA Button */}
@@ -479,6 +448,23 @@ export const NetworkHero = () => {
                   </Button>
                 </motion.div>
                 
+                {/* Waitlist counter with live indicator */}
+                <motion.div
+                  initial={{ opacity: 0 }}
+                  animate={{ opacity: 1 }}
+                  transition={{ delay: 0.5 }}
+                  className="flex items-center justify-center lg:justify-start gap-2 text-gray-500 w-full"
+                >
+                  {/* Pulsing live dot */}
+                  <span className="relative flex h-2 w-2">
+                    <span className="animate-ping absolute inline-flex h-full w-full rounded-full bg-green-400 opacity-75"></span>
+                    <span className="relative inline-flex rounded-full h-2 w-2 bg-green-500"></span>
+                  </span>
+                  <Users className="w-3 h-3 sm:w-3.5 sm:h-3.5" />
+                  <span className="text-[11px] sm:text-xs md:text-sm font-medium">
+                    {waitlistCount.toLocaleString()}+ people in beta
+                  </span>
+                </motion.div>
               </div>
               
             </motion.div>
@@ -508,6 +494,16 @@ export const NetworkHero = () => {
         </Suspense>
       )}
 
+      {/* Explainer Overlay - lazy loaded */}
+      <AnimatePresence>
+        {showExplainer && (
+          <Suspense fallback={<div className="fixed inset-0 z-50 bg-background" />}>
+            <div className="fixed inset-0 z-50 bg-background">
+              <OnboardingOverlay onStart={handleExplainerContinue} />
+            </div>
+          </Suspense>
+        )}
+      </AnimatePresence>
     </section>
   );
 };

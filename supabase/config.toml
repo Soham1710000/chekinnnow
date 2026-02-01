@@ -7,10 +7,10 @@ verify_jwt = false
 verify_jwt = false
 
 [functions.admin-data]
-verify_jwt = true
+verify_jwt = false
 
 [functions.admin-create-intro]
-verify_jwt = true
+verify_jwt = false
 
 [functions.chat-nudge]
 verify_jwt = false
@@ -28,22 +28,4 @@ verify_jwt = false
 verify_jwt = false
 
 [functions.voice-to-text]
-verify_jwt = false
-
-[functions.reputation-engine]
-verify_jwt = false
-
-[functions.undercurrents]
-verify_jwt = false
-
-[functions.evaluate-p2p-chat]
-verify_jwt = false
-
-[functions.initiate-search]
-verify_jwt = false
-
-[functions.get-search-status]
-verify_jwt = false
-
-[functions.generate-match-context]
 verify_jwt = false

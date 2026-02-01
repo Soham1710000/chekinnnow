@@ -13,7 +13,7 @@ Deno.serve(async (req) => {
   try {
     const { password, timeRange, action, user_id, full_name } = await req.json();
 
-    // Verify admin password
+    // Verify admin password from secure secret
     const adminPassword = Deno.env.get("ADMIN_PASSWORD");
     if (!adminPassword || password !== adminPassword) {
       return new Response(
@@ -22,9 +22,7 @@ Deno.serve(async (req) => {
       );
     }
 
-    console.log("Admin password verified");
-
-    // Use service role to bypass RLS for admin operations
+    // Use service role to bypass RLS
     const supabase = createClient(
       Deno.env.get("SUPABASE_URL")!,
       Deno.env.get("SUPABASE_SERVICE_ROLE_KEY")!

@@ -1,32 +1,20 @@
-import { useState, useEffect, useRef, lazy, Suspense } from "react";
+import { useState, useEffect, useRef } from "react";
 import { useNavigate } from "react-router-dom";
 import { useAuth } from "@/hooks/useAuth";
 import { supabase } from "@/integrations/supabase/client";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { useToast } from "@/hooks/use-toast";
-import { motion, AnimatePresence } from "framer-motion";
-import { Loader2, ArrowLeft, Shield, Linkedin } from "lucide-react";
+import { motion } from "framer-motion";
+import { Loader2, ArrowLeft, Sparkles } from "lucide-react";
 import { z } from "zod";
 import { useFunnelTracking } from "@/hooks/useFunnelTracking";
+import { LinkedInStep } from "@/components/auth/LinkedInStep";
 
-// Lazy load onboarding components
-const OnboardingFlow = lazy(() => import("@/components/onboarding/OnboardingFlow"));
-const UPSCOnboardingFlow = lazy(() => import("@/components/onboarding/UPSCOnboardingFlow"));
-
-// Get source for cohort-specific experience
-const getSource = () => sessionStorage.getItem("chekinn_source") || "";
-const isUPSCSource = () => getSource() === "upsc";
-
-const nameSchema = z.string().min(2, "Name must be at least 2 characters").max(100, "Name must be less than 100 characters");
 const emailSchema = z.string().email("Please enter a valid email");
 const passwordSchema = z.string().min(6, "Password must be at least 6 characters");
-const linkedinUrlSchema = z.string()
-  .refine(val => val === '' || val.includes('linkedin.com'), {
-    message: "Please enter a valid LinkedIn profile URL"
-  });
 
-type AuthStep = "credentials" | "onboarding";
+type AuthStep = "credentials" | "linkedin";
 
 const Auth = () => {
   const { user, loading: authLoading } = useAuth();
@@ -42,53 +30,10 @@ const Auth = () => {
   const [forgotStep, setForgotStep] = useState<"request" | "reset">("request");
   const [email, setEmail] = useState("");
   const [password, setPassword] = useState("");
-  const [fullName, setFullName] = useState("");
-  const [linkedinUrl, setLinkedinUrl] = useState("");
   const [tempPassword, setTempPassword] = useState("");
   const [newPassword, setNewPassword] = useState("");
   const [newPasswordConfirm, setNewPasswordConfirm] = useState("");
   const [loading, setLoading] = useState(false);
-
-  // Track page view
-  useEffect(() => {
-    trackPageView();
-  }, [trackPageView]);
-
-  // Track auth_start when user begins typing
-  useEffect(() => {
-    if ((email || password) && !hasTrackedAuthStart.current) {
-      hasTrackedAuthStart.current = true;
-      trackEvent("auth_start", { mode: isSignUp ? "signup" : "signin" });
-    }
-  }, [email, password, isSignUp, trackEvent]);
-
-  // Redirect logged-in users (but not during onboarding steps)
-  useEffect(() => {
-    if (!authLoading && user && step === "credentials" && !newUserId) {
-      // Check if user has completed onboarding
-      checkOnboardingStatus();
-    }
-  }, [user, authLoading, step, newUserId]);
-
-  const checkOnboardingStatus = async () => {
-    if (!user) return;
-    
-    const { data } = await supabase
-      .from("profiles")
-      .select("learning_complete, connection_intent")
-      .eq("id", user.id)
-      .maybeSingle();
-    
-    if (data?.learning_complete && data?.connection_intent) {
-      navigate("/chat");
-    } else if (data && !data.learning_complete) {
-      // User exists but hasn't completed onboarding
-      setNewUserId(user.id);
-      setStep("onboarding");
-    } else {
-      navigate("/chat");
-    }
-  };
 
   const handleForgotPassword = async (e: React.FormEvent) => {
     e.preventDefault();
@@ -188,19 +133,34 @@ const Auth = () => {
     setLoading(false);
   };
 
+
+  // Track page view
+  useEffect(() => {
+    trackPageView();
+  }, [trackPageView]);
+
+  // Track auth_start when user begins typing
+  useEffect(() => {
+    if ((email || password) && !hasTrackedAuthStart.current) {
+      hasTrackedAuthStart.current = true;
+      trackEvent("auth_start", { mode: isSignUp ? "signup" : "signin" });
+    }
+  }, [email, password, isSignUp, trackEvent]);
+
+  // Redirect logged-in users (but not during LinkedIn step)
+  useEffect(() => {
+    if (!authLoading && user && step === "credentials" && !newUserId) {
+      navigate("/chat");
+    }
+  }, [user, authLoading, navigate, step, newUserId]);
+
   const handleAuth = async (e: React.FormEvent) => {
     e.preventDefault();
     setLoading(true);
 
     try {
-      if (isSignUp) {
-        nameSchema.parse(fullName);
-      }
       emailSchema.parse(email);
       passwordSchema.parse(password);
-      if (isSignUp && linkedinUrl) {
-        linkedinUrlSchema.parse(linkedinUrl);
-      }
     } catch (err) {
       if (err instanceof z.ZodError) {
         toast({
@@ -218,11 +178,7 @@ const Auth = () => {
         email,
         password,
         options: {
-          emailRedirectTo: `${window.location.origin}/auth`,
-          data: {
-            full_name: fullName,
-            linkedin_url: linkedinUrl || null,
-          },
+          emailRedirectTo: `${window.location.origin}/chat`,
         },
       });
 
@@ -244,30 +200,18 @@ const Auth = () => {
         setLoading(false);
         return;
       }
-
       trackEvent("auth_complete", { mode: "signup", email });
-
-      // Enrich LinkedIn if provided
-      if (authData.user && linkedinUrl) {
-        try {
-          await supabase.functions.invoke('enrich-linkedin', {
-            body: { linkedinUrl, userId: authData.user.id }
-          });
-          trackEvent("linkedin_enriched", { userId: authData.user.id });
-        } catch (e) {
-          console.error('LinkedIn enrichment error:', e);
-        }
-      }
-
-      // Update profile with name and LinkedIn URL
+      toast({
+        title: "You're in! 🎉",
+        description: "One more quick step to help us know you better.",
+      });
+      
+      // Show LinkedIn step for new signups
       if (authData.user) {
-        await supabase.from("profiles").update({
-          full_name: fullName,
-          linkedin_url: linkedinUrl || null,
-        }).eq("id", authData.user.id);
-
         setNewUserId(authData.user.id);
-        setStep("onboarding");
+        setStep("linkedin");
+      } else {
+        navigate("/chat");
       }
     } else {
       const { error } = await supabase.auth.signInWithPassword({
@@ -285,88 +229,11 @@ const Auth = () => {
         return;
       }
       trackEvent("auth_complete", { mode: "signin", email });
+      // Navigate immediately after successful signin
       navigate("/chat");
     }
 
     setLoading(false);
-  };
-
-  const handleOnboardingComplete = async (data: any) => {
-    if (newUserId) {
-      // Check if this is UPSC onboarding
-      if (isUPSCSource() && data.current_stage) {
-        // UPSC-specific onboarding data
-        await supabase.from("profiles").update({
-          looking_for: data.current_struggle || null,
-          connection_intent: "upsc_guidance",
-          learning_complete: true,
-          onboarding_context: {
-            source: "upsc",
-            current_stage: data.current_stage,
-            current_struggle: data.current_struggle,
-            tried_before: data.tried_before,
-            tried_details: data.tried_details,
-            specific_challenge: data.specific_challenge,
-            help_style: data.help_style,
-            help_details: data.help_details,
-            constraints: data.constraints,
-            // Store specific challenge as depth input for AI summary display
-            depth_input_1: data.specific_challenge,
-            depth_input_2: data.help_details || `Looking for ${data.help_style?.replace(/_/g, ' ')}`,
-            completedAt: new Date().toISOString(),
-          },
-          ai_insights: {
-            source: "upsc",
-            current_stage: data.current_stage,
-            current_struggle: data.current_struggle,
-            tried_before: data.tried_before,
-            help_style: data.help_style,
-            constraints: data.constraints,
-            specific_challenge: data.specific_challenge,
-          },
-        }).eq("id", newUserId);
-        
-        trackEvent("onboarding_complete", { userId: newUserId, source: "upsc", current_struggle: data.current_struggle });
-      } else {
-        // Regular onboarding flow - save full onboarding context with depth inputs
-        await supabase.from("profiles").update({
-          looking_for: data.ask_type || null,
-          connection_intent: data.ask_type,
-          learning_complete: true,
-          onboarding_context: {
-            decision_posture: data.decision_posture,
-            ask_type: data.ask_type,
-            lived_context: data.lived_context,
-            followup_context: data.followup_context,
-            micro_reason: data.micro_reason,
-            decision_weight: data.decision_weight,
-            stakes_text: data.stakes_text,
-            context_chips: data.context_chips,
-            open_help_text: data.open_help_text,
-            help_style: data.help_style,
-            // Depth inputs
-            depth_input_1: data.depth_input_1,
-            depth_input_2: data.depth_input_2,
-            depth_input_3: data.depth_input_3,
-            completedAt: new Date().toISOString(),
-          },
-          ai_insights: {
-            decision_posture: data.decision_posture,
-            lived_context: data.lived_context,
-            decision_weight: data.decision_weight,
-            context_constraints: data.context_chips,
-            help_style: data.help_style,
-            // Depth insights for matching
-            depth_input_1: data.depth_input_1,
-            depth_input_2: data.depth_input_2,
-            depth_input_3: data.depth_input_3,
-          },
-        }).eq("id", newUserId);
-        
-        trackEvent("onboarding_complete", { userId: newUserId, ask_type: data.ask_type });
-      }
-    }
-    navigate("/chat");
   };
 
   if (authLoading) {
@@ -377,24 +244,22 @@ const Auth = () => {
     );
   }
 
-  // Render onboarding flow - use UPSC flow for UPSC source
-  if (step === "onboarding" && newUserId) {
-    return (
-      <Suspense fallback={<div className="min-h-screen bg-background flex items-center justify-center"><Loader2 className="w-6 h-6 animate-spin text-muted-foreground" /></div>}>
-        {isUPSCSource() ? (
-          <UPSCOnboardingFlow onComplete={handleOnboardingComplete} />
-        ) : (
-          <OnboardingFlow onComplete={handleOnboardingComplete} />
-        )}
-      </Suspense>
-    );
-  }
+  // Handle LinkedIn step completion
+  const handleLinkedInComplete = () => {
+    trackEvent("linkedin_enriched", { userId: newUserId });
+    navigate("/chat");
+  };
+
+  const handleLinkedInSkip = () => {
+    trackEvent("linkedin_skipped", { userId: newUserId });
+    navigate("/chat");
+  };
 
   return (
     <div className="min-h-screen bg-background flex flex-col">
       <header className="p-4">
         <button 
-          onClick={() => navigate("/")} 
+          onClick={() => step === "linkedin" ? setStep("credentials") : navigate("/")} 
           className="flex items-center gap-2 text-muted-foreground hover:text-foreground transition-colors"
         >
           <ArrowLeft className="w-5 h-5" />
@@ -403,11 +268,26 @@ const Auth = () => {
       </header>
 
       <div className="flex-1 flex items-center justify-center px-4 py-8">
-        <motion.div
-          initial={{ opacity: 0, y: 20 }}
-          animate={{ opacity: 1, y: 0 }}
-          className="w-full max-w-sm"
-        >
+        {step === "linkedin" && newUserId ? (
+          <LinkedInStep 
+            userId={newUserId} 
+            onComplete={handleLinkedInComplete} 
+            onSkip={handleLinkedInSkip} 
+          />
+        ) : (
+          <motion.div
+            initial={{ opacity: 0, y: 20 }}
+            animate={{ opacity: 1, y: 0 }}
+            className="w-full max-w-sm"
+          >
+          {/* Quick step indicator */}
+          <div className="flex items-center justify-center gap-2 mb-6">
+            <div className="flex items-center gap-1.5 px-3 py-1.5 bg-primary/10 rounded-full">
+              <Sparkles className="w-3.5 h-3.5 text-primary" />
+              <span className="text-xs font-medium text-primary">30 seconds</span>
+            </div>
+          </div>
+
           <div className="text-center mb-8">
             <h1 className="text-2xl font-bold mb-3">
               {isForgotPassword
@@ -415,7 +295,7 @@ const Auth = () => {
                   ? "Get a temporary password"
                   : "Set a new password"
                 : isSignUp
-                  ? "Enter ChekInn"
+                  ? "Quick step to get intros"
                   : "Welcome back"}
             </h1>
             <p className="text-muted-foreground text-sm leading-relaxed">
@@ -424,8 +304,8 @@ const Auth = () => {
                   ? "Enter your email — we'll send you a temporary password."
                   : "Enter the temporary password from your email, then set a new one."
                 : isSignUp
-                  ? "A private space for thinking with people who've been here before."
-                  : "Sign in to continue your check-ins"}
+                  ? "Just an email so we can nudge you when we find someone great for you to meet"
+                  : "Sign in to see your intros"}
             </p>
           </div>
 
@@ -538,18 +418,6 @@ const Auth = () => {
           ) : (
             <>
               <form onSubmit={handleAuth} className="space-y-3">
-                {isSignUp && (
-                  <Input
-                    id="fullName"
-                    type="text"
-                    value={fullName}
-                    onChange={(e) => setFullName(e.target.value)}
-                    placeholder="Your name"
-                    required
-                    className="h-12 text-base rounded-xl border-2 border-muted focus:border-primary transition-colors"
-                  />
-                )}
-
                 <Input
                   id="email"
                   type="email"
@@ -560,37 +428,17 @@ const Auth = () => {
                   className="h-12 text-base rounded-xl border-2 border-muted focus:border-primary transition-colors"
                 />
 
-                <div>
-                  <Input
-                    id="password"
-                    type="password"
-                    value={password}
-                    onChange={(e) => setPassword(e.target.value)}
-                    placeholder={isSignUp ? "Create a password" : "Your password"}
-                    required
-                    minLength={6}
-                    className="h-12 text-base rounded-xl border-2 border-muted focus:border-primary transition-colors"
-                  />
-                  {isSignUp && (
-                    <p className={`text-xs mt-1.5 ml-1 ${password.length >= 6 ? 'text-green-600' : 'text-muted-foreground'}`}>
-                      {password.length >= 6 ? '✓' : '•'} At least 6 characters
-                    </p>
-                  )}
-                </div>
-
-                {isSignUp && (
-                  <div className="relative">
-                    <Linkedin className="absolute left-3 top-1/2 -translate-y-1/2 w-5 h-5 text-muted-foreground" />
-                    <Input
-                      id="linkedin"
-                      type="url"
-                      value={linkedinUrl}
-                      onChange={(e) => setLinkedinUrl(e.target.value)}
-                      placeholder="linkedin.com/in/yourprofile"
-                      className="h-12 text-base rounded-xl border-2 border-muted focus:border-primary transition-colors pl-11"
-                    />
-                  </div>
-                )}
+                <Input
+                  id="password"
+                  type="password"
+                  value={password}
+                  onChange={(e) => setPassword(e.target.value)}
+                  placeholder="Create a password"
+                  required
+                  minLength={6}
+                  className="h-12 text-base rounded-xl border-2 border-muted focus:border-primary transition-colors"
+                />
+                <p className="text-xs text-muted-foreground text-center">Min 6 characters — we keep it simple</p>
 
                 <Button 
                   type="submit" 
@@ -600,7 +448,7 @@ const Auth = () => {
                   {loading ? (
                     <Loader2 className="w-4 h-4 animate-spin" />
                   ) : isSignUp ? (
-                    "Enter ChekInn →"
+                    "Get Started →"
                   ) : (
                     "Sign In"
                   )}
@@ -634,17 +482,14 @@ const Auth = () => {
 
               {/* Trust indicator */}
               {isSignUp && (
-                <div className="mt-8 flex items-start gap-3 p-4 bg-muted/50 rounded-xl">
-                  <Shield className="w-5 h-5 text-muted-foreground flex-shrink-0 mt-0.5" />
-                  <div className="text-xs text-muted-foreground leading-relaxed">
-                    <p className="font-medium text-foreground/80 mb-1">We use identity to protect context.</p>
-                    <p>No feeds. No broadcasting.</p>
-                  </div>
-                </div>
+                <p className="mt-8 text-xs text-center text-muted-foreground/70">
+                  No spam. We only reach out when we find a match.
+                </p>
               )}
             </>
           )}
         </motion.div>
+        )}
       </div>
     </div>
   );
